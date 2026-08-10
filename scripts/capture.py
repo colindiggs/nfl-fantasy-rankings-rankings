@@ -11,9 +11,37 @@ from datetime import datetime, timezone
 
 from common import DATA, FORMATS, get_logger, session, write_json
 import sleeper
-from sources import cbs, espn, fantasypros
+from sources import (cbs, draftsharks, espn, fantasypros, ffcalc, fftoday, mfl,
+                     nfl_com, pff, ringer, rotoballer, sharks, underdog, walter, yahoo)
 
 log = get_logger("capture")
+
+# source -> (formats, fetch(fmt, season, sess))
+DRAFT_SOURCES = {
+    "fantasypros": (FORMATS, lambda f, y, s: fantasypros.fetch_draft(f, s)),
+    "espn": (["standard", "ppr"], lambda f, y, s: espn.fetch_draft(f, y, s)),
+    "cbs": (["standard", "ppr"], lambda f, y, s: cbs.fetch_draft(f, s)),
+    "nfl": (["standard"], lambda f, y, s: nfl_com.fetch_draft(f, s)),
+    "yahoo": (["half_ppr"], lambda f, y, s: yahoo.fetch_draft(f, s)),
+    "ringer": (["half_ppr"], lambda f, y, s: ringer.fetch_draft(f, s)),
+    "pff": (["ppr"], lambda f, y, s: pff.fetch_draft(f, s)),
+    "ffcalc": (FORMATS, lambda f, y, s: ffcalc.fetch_draft(f, y, s)),
+    "mfl": (["standard", "ppr"], lambda f, y, s: mfl.fetch_draft(f, y, s)),
+    "sharks": (FORMATS, lambda f, y, s: sharks.fetch_draft(f, s)),
+    "fftoday": (FORMATS, lambda f, y, s: fftoday.fetch_draft(f, s)),
+    "walter": (["standard"], lambda f, y, s: walter.fetch_draft(f, y, s)),
+    "rotoballer": (FORMATS, lambda f, y, s: rotoballer.fetch_draft(f, s)),
+    "draftsharks": (FORMATS, lambda f, y, s: draftsharks.fetch_draft(f, s)),
+    "underdog": (["half_ppr"], lambda f, y, s: underdog.fetch_draft(f, s)),
+}
+
+# source -> (formats, fetch(fmt, season, week, sess))
+WEEKLY_SOURCES = {
+    "fantasypros": (FORMATS, lambda f, y, w, s: fantasypros.fetch_weekly(f, s)),
+    "cbs": (["standard", "ppr"], lambda f, y, w, s: cbs.fetch_weekly(f, s)),
+    "nfl": (["standard"], lambda f, y, w, s: nfl_com.fetch_weekly(f, w, s)),
+    "fftoday": (FORMATS, lambda f, y, w, s: fftoday.fetch_weekly(f, y, w, s)),
+}
 
 
 def _now():
@@ -38,14 +66,10 @@ def _save(season, scope, source, fmt, result):
 def capture_predraft(season):
     sess = session()
     ok, failed = [], []
-    for fmt in FORMATS:
-        for source, fn in [
-            ("fantasypros", lambda f=fmt: fantasypros.fetch_draft(f, sess)),
-            ("espn", lambda f=fmt: espn.fetch_draft(f, season, sess)),
-            ("cbs", lambda f=fmt: cbs.fetch_draft(f, sess)),
-        ]:
+    for source, (formats, fn) in DRAFT_SOURCES.items():
+        for fmt in formats:
             try:
-                _save(season, "predraft", source, fmt, fn())
+                _save(season, "predraft", source, fmt, fn(fmt, season, sess))
                 ok.append(f"{source}/{fmt}")
             except Exception as e:
                 failed.append(f"{source}/{fmt}: {e}")
@@ -57,13 +81,10 @@ def capture_weekly(season, week):
     sess = session()
     scope = f"week{week:02d}"
     ok, failed = [], []
-    for fmt in FORMATS:
-        for source, fn in [
-            ("fantasypros", lambda f=fmt: fantasypros.fetch_weekly(f, sess)),
-            ("cbs", lambda f=fmt: cbs.fetch_weekly(f, sess)),
-        ]:
+    for source, (formats, fn) in WEEKLY_SOURCES.items():
+        for fmt in formats:
             try:
-                _save(season, scope, source, fmt, fn())
+                _save(season, scope, source, fmt, fn(fmt, season, week, sess))
                 ok.append(f"{source}/{fmt}")
             except Exception as e:
                 failed.append(f"{source}/{fmt}: {e}")

@@ -44,25 +44,44 @@ def load_players():
 
 
 def build_matchers(players):
-    """Return (by_espn, by_namepos) lookup dicts -> sleeper_id."""
+    """Return matcher dict: espn_id, (name,pos), and unambiguous name-only lookups."""
     by_espn = {}
     by_namepos = {}
+    by_name = {}
+    ambiguous = set()
     for pid, p in players.items():
         if p.get("espn_id"):
             by_espn[str(p["espn_id"])] = pid
-        key = (norm_name(p["name"]), p["pos"])
+        n = apply_alias(norm_name(p["name"]))
+        key = (n, p["pos"])
         # prefer active players on name collisions
         if key not in by_namepos or p.get("active"):
             by_namepos[key] = pid
-    return by_espn, by_namepos
+        if n in by_name and by_name[n] != pid:
+            prev = players[by_name[n]]
+            if p.get("active") and not prev.get("active"):
+                by_name[n] = pid
+            elif prev.get("active") and not p.get("active"):
+                pass
+            else:
+                ambiguous.add(n)
+        else:
+            by_name[n] = pid
+    for n in ambiguous:
+        by_name.pop(n, None)
+    return {"espn": by_espn, "namepos": by_namepos, "name": by_name, "db": players}
 
 
-def match_player(by_espn, by_namepos, name=None, pos=None, espn_id=None):
-    if espn_id and str(espn_id) in by_espn:
-        return by_espn[str(espn_id)]
-    if name and pos:
+def match_player(matchers, name=None, pos=None, espn_id=None):
+    if espn_id and str(espn_id) in matchers["espn"]:
+        return matchers["espn"][str(espn_id)]
+    if name:
         n = apply_alias(norm_name(name))
-        return by_namepos.get((n, pos))
+        if pos:
+            pid = matchers["namepos"].get((n, pos))
+            if pid:
+                return pid
+        return matchers["name"].get(n)
     return None
 
 

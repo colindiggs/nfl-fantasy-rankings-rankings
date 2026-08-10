@@ -92,16 +92,25 @@ def norm_name(name):
     return " ".join(parts)
 
 
-# Common alias mismatches across sites (normalized form -> sleeper normalized form)
-ALIASES = {
-    "gabriel davis": "gabe davis",
-    "joshua palmer": "josh palmer",
-    "jeffery wilson": "jeff wilson",
-    "cameron ward": "cam ward",
-    "marquise brown": "hollywood brown",
-    "chigoziem okonkwo": "chig okonkwo",
-    "kenneth gainwell": "kenny gainwell",
-}
+# Synonym groups for names sites disagree on. apply_alias canonicalizes to the
+# first entry of each group and is applied to BOTH the scraped name and the
+# Sleeper index, so direction never matters.
+ALIAS_GROUPS = [
+    ["gabe davis", "gabriel davis"],
+    ["josh palmer", "joshua palmer"],
+    ["jeff wilson", "jeffery wilson"],
+    ["cam ward", "cameron ward"],
+    ["hollywood brown", "marquise brown"],
+    ["chig okonkwo", "chigoziem okonkwo"],
+    ["kenny gainwell", "kenneth gainwell"],
+    ["kyle monangai", "kyle monanagi"],
+    ["jonathon brooks", "jonathan brooks"],
+]
+
+ALIASES = {}
+for group in ALIAS_GROUPS:
+    for variant in group[1:]:
+        ALIASES[variant] = group[0]
 
 
 def apply_alias(n):

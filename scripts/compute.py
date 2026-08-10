@@ -74,10 +74,13 @@ def evaluate(players, points_by_pid, top_n, hit_n=HIT_N):
     }
 
 
-def attach_ids(players, by_espn, by_namepos):
+def attach_ids(players, matchers):
     for p in players:
-        p["sleeper_id"] = sleeper.match_player(
-            by_espn, by_namepos, name=p.get("name"), pos=p.get("pos"), espn_id=p.get("espn_id"))
+        pid = sleeper.match_player(
+            matchers, name=p.get("name"), pos=p.get("pos"), espn_id=p.get("espn_id"))
+        p["sleeper_id"] = pid
+        if pid and not p.get("pos"):
+            p["pos"] = matchers["db"][pid]["pos"]
     return players
 
 
@@ -107,7 +110,7 @@ def main():
     state = sleeper.get_state()
     season = int(state["season"])
     players_db = sleeper.load_players()
-    by_espn, by_namepos = sleeper.build_matchers(players_db)
+    matchers = sleeper.build_matchers(players_db)
 
     # ---- actual points per completed week
     actual_weeks = {}
@@ -147,7 +150,7 @@ def main():
             for (source, f2), payload in rankings.items():
                 if f2 != fmt:
                     continue
-                plist = attach_ids(payload["players"], by_espn, by_namepos)
+                plist = attach_ids(payload["players"], matchers)
                 by_pos = pos_lists(plist)
                 pts = pts_for(w, fmt)
                 pos_metrics = {}
@@ -182,24 +185,41 @@ def main():
         for (source, f2), payload in predraft.items():
             if f2 != fmt:
                 continue
-            plist = attach_ids(payload["players"], by_espn, by_namepos)
-            src_entry = {"captured_at": payload.get("captured_at"), "series": {}}
+            plist = attach_ids(payload["players"], matchers)
+            # positional-only boards (e.g. per-position lists) repeat rank 1
+            positional_only = sum(1 for p in plist if p["rank"] == 1) > 1
+            src_entry = {"captured_at": payload.get("captured_at"), "series": {},
+                         "positional_only": positional_only}
             if latest:
                 by_pos = pos_lists(plist)
+                ordered = None if positional_only else sorted(
+                    (p for p in plist if p.get("pos") in POSITIONS), key=lambda x: x["rank"])
                 for w in weeks:
                     cpts = cum_pts(w, fmt)
-                    overall = evaluate(sorted(plist, key=lambda x: x["rank"]), cpts, PREDRAFT_TOP_OVERALL)
-                    src_entry["series"][str(w)] = overall["spearman"] if overall else None
+                    pos_rhos = []
+                    for pos in POSITIONS:
+                        m = evaluate(by_pos[pos], cpts, TOP_N[pos])
+                        if m and m["spearman"] is not None:
+                            pos_rhos.append(m["spearman"])
+                    src_entry["series"][str(w)] = (
+                        round(sum(pos_rhos) / len(pos_rhos), 4) if pos_rhos else None)
                 cpts = cum_pts(latest, fmt)
                 pos_metrics = {}
                 for pos in POSITIONS:
                     m = evaluate(by_pos[pos], cpts, TOP_N[pos])
                     if m:
                         pos_metrics[pos] = m
-                overall = evaluate(sorted(plist, key=lambda x: x["rank"]), cpts, PREDRAFT_TOP_OVERALL)
+                overall = evaluate(ordered, cpts, PREDRAFT_TOP_OVERALL) if ordered else None
                 src_entry["latest"] = {"through_week": latest, "overall": overall, "positions": pos_metrics}
-                if overall and overall["spearman"] is not None:
-                    board.append({"source": source, "score": overall["spearman"], "through_week": latest})
+                rhos = [m["spearman"] for m in pos_metrics.values() if m["spearman"] is not None]
+                if rhos:
+                    board.append({
+                        "source": source,
+                        "score": round(sum(rhos) / len(rhos), 4),
+                        "overall": overall["spearman"] if overall else None,
+                        "positions": len(rhos),
+                        "through_week": latest,
+                    })
             summary["predraft"][fmt][source] = src_entry
         board.sort(key=lambda x: -x["score"])
         summary["leaderboard"]["predraft"][fmt] = board
@@ -214,10 +234,13 @@ def main():
         for (source, f2), payload in predraft.items():
             if f2 != fmt:
                 continue
+            if sum(1 for p in payload["players"] if p["rank"] == 1) > 1:
+                continue  # positional-only board — no overall order to show
             cols[source] = [
                 {"rank": p["rank"], "name": p["name"], "pos": p.get("pos"), "team": p.get("team")}
-                for p in sorted(payload["players"], key=lambda x: x["rank"])[:100]
-            ]
+                for p in sorted(payload["players"], key=lambda x: x["rank"])
+                if p.get("pos") in ("QB", "RB", "WR", "TE", "K", "DST")
+            ][:100]
         comparison["formats"][fmt] = cols
     write_json(DOCS / "data" / "predraft.json", comparison)
     log.info("predraft.json written")
