@@ -9,8 +9,29 @@ from pathlib import Path
 
 from common import DATA, DOCS, FORMATS, POSITIONS, get_logger, read_json, write_json
 import sleeper
+import spec_engine
 
 log = get_logger("compute")
+
+# display names for code-adapter sources; spec sources carry their own "label",
+# and anything else (e.g. manual inbox boards) gets its slug prettified
+CODE_LABELS = {
+    "fantasypros": "FantasyPros", "espn": "ESPN", "cbs": "CBS", "nfl": "NFL.com",
+    "yahoo": "Yahoo", "pff": "PFF", "mfl": "MyFantasyLeague (ADP)",
+    "sharks": "FantasySharks", "fftoday": "FFToday", "walter": "WalterFootball",
+    "draftsharks": "Draft Sharks",
+}
+
+
+def source_labels(seen_sources):
+    labels = dict(CODE_LABELS)
+    for name, spec in spec_engine.load_specs().items():
+        if spec.get("label"):
+            labels[name] = spec["label"]
+    for s in seen_sources:
+        if s not in labels:
+            labels[s] = s.replace("-", " ").replace("_", " ").title()
+    return labels
 
 TOP_N = {"QB": 24, "RB": 36, "WR": 48, "TE": 24}
 HIT_N = 12  # top-12 hit rate window
@@ -223,6 +244,12 @@ def main():
             summary["predraft"][fmt][source] = src_entry
         board.sort(key=lambda x: -x["score"])
         summary["leaderboard"]["predraft"][fmt] = board
+
+    seen = set()
+    for fmt in FORMATS:
+        seen.update(summary["weekly"][fmt])
+        seen.update(summary["predraft"][fmt])
+    summary["labels"] = source_labels(seen)
 
     write_json(DOCS / "data" / "summary.json", summary)
     log.info("summary.json written (%d weeks evaluated)", len(weeks))

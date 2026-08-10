@@ -1,0 +1,12 @@
+{
+  "source": "underdog",
+  "label": "Underdog (ADP)",
+  "draft": {
+    "type": "json",
+    "url": "https://fantasy-slice-data.web.app/player_stacker_data.json",
+    "params_by_format": {"half_ppr": {}},
+    "items": "",
+    "fields": {"name": "player", "pos": "position", "team": "team"},
+    "sort_by": "adp"
+  }
+}

@@ -1,0 +1,16 @@
+{
+  "source": "ffcalc",
+  "label": "FF Calculator (ADP)",
+  "draft": {
+    "type": "json",
+    "url": "https://fantasyfootballcalculator.com/api/v1/adp/{slug}?teams=12&year={season}",
+    "params_by_format": {
+      "standard": {"slug": "standard"},
+      "half_ppr": {"slug": "half-ppr"},
+      "ppr": {"slug": "ppr"}
+    },
+    "items": "players",
+    "fields": {"name": "name", "pos": "position", "team": "team"},
+    "sort_by": "adp"
+  }
+}

@@ -137,7 +137,7 @@ function dotStyle(s) { return `style="background:${SRC_COLOR[s] || "var(--muted)
 let SUMMARY = null, PREDRAFT = null, FMT = "ppr";
 
 const $ = s => document.querySelector(s);
-const srcName = s => SRC_LABEL[s] || s;
+const srcName = s => (SUMMARY && SUMMARY.labels && SUMMARY.labels[s]) || SRC_LABEL[s] || s;
 
 function orderSources(list) {
   return [...list].sort((a, b) => {

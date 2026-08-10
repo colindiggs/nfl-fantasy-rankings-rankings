@@ -1,0 +1,15 @@
+{
+  "source": "rotoballer",
+  "label": "RotoBaller",
+  "draft": {
+    "type": "json",
+    "url": "https://www.rotoballer.com/wp-json/rb/v1/rankings?league=Overall&perPage=600&spreadsheet={slug}",
+    "params_by_format": {
+      "standard": {"slug": "standard"},
+      "half_ppr": {"slug": "half-ppr"},
+      "ppr": {"slug": "ppr"}
+    },
+    "items": "data",
+    "fields": {"rank": "rank", "name": "player.name", "pos": "position", "team": "team"}
+  }
+}

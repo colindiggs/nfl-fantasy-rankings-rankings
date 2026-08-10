@@ -45,6 +45,7 @@ def run_tuesday():
     state = sleeper.get_state()
     season = int(state["season"])
     stype = state.get("season_type")
+    capture.import_inbox(season)
     if stype == "pre":
         log.info("preseason: refreshing pre-draft rankings")
         sleeper.refresh_players()
@@ -66,6 +67,7 @@ def run_thursday():
     state = sleeper.get_state()
     season = int(state["season"])
     stype = state.get("season_type")
+    capture.import_inbox(season)
     if stype == "pre":
         log.info("preseason: refreshing pre-draft rankings")
         capture.capture_predraft(season)

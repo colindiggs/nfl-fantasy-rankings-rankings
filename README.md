@@ -75,6 +75,35 @@ python compute.py               # rebuild docs/data/*.json
 python runner.py tuesday        # full scheduled run (capture + compute + push)
 ```
 
+## Adding a ranker (any ranker)
+
+The benchmark is designed so nearly anyone who publishes fantasy rankings can be
+added. Three on-ramps, cheapest first — all are scored identically:
+
+**1. CSV inbox — no code, ~2 minutes.** Drop `{source}_{format}_{scope}.csv`
+into `data/inbox/` with columns `rank,name,pos,team`. Works for podcasts,
+Reddit/X posts, paywalled sites you transcribe, or your own rankings. See
+[data/inbox/README.md](data/inbox/README.md).
+
+**2. JSON spec — no code, ~10 minutes.** If the source has a JSON API, CSV
+export, or regex-parseable HTML, describe it declaratively in
+`scripts/sources/specs/{source}.json` (fetch URL per format, parse recipe,
+field paths). The engine handles fetching, cleaning, position normalization,
+de-duping, and validation. Four of the current sources (RotoBaller, FF
+Calculator, The Ringer, Underdog) run this way — copy one as a template. Schema
+documented in [scripts/spec_engine.py](scripts/spec_engine.py).
+
+**3. Python adapter — for gnarly sites.** Anything needing multi-request joins,
+custom headers, or odd markup gets a module in `scripts/sources/` returning
+`{"players": [{"rank", "name", "team", "pos"}], "meta": {}}`, registered in
+`capture.py`.
+
+Player matching (normalized names + alias table + Sleeper ID database) and
+display labels are automatic for all three paths; unknown positions are
+backfilled from the player database. Sources may cover any subset of scoring
+formats and be draft-only or weekly — the leaderboards only compare each source
+where it competes.
+
 ## Notes / limitations
 
 - Scrapers validate row counts and fail loudly per source/format; one source
