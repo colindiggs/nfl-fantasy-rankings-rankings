@@ -1,0 +1,274 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>NFL Rankings of Rankings</title>
+<style>
+:root {
+  color-scheme: light;
+  --page: #f9f9f7; --surface: #fcfcfb;
+  --ink: #0b0b0b; --ink-2: #52514e; --muted: #898781;
+  --grid: #e1e0d9; --baseline: #c3c2b7; --border: rgba(11,11,11,0.10);
+  --s1: #2a78d6; --s2: #eb6834; --s3: #1baf7a;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --page: #0d0d0d; --surface: #1a1a19;
+    --ink: #ffffff; --ink-2: #c3c2b7; --muted: #898781;
+    --grid: #2c2c2a; --baseline: #383835; --border: rgba(255,255,255,0.10);
+    --s1: #3987e5; --s2: #d95926; --s3: #199e70;
+  }
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --page: #0d0d0d; --surface: #1a1a19;
+  --ink: #ffffff; --ink-2: #c3c2b7; --muted: #898781;
+  --grid: #2c2c2a; --baseline: #383835; --border: rgba(255,255,255,0.10);
+  --s1: #3987e5; --s2: #d95926; --s3: #199e70;
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0; background: var(--page); color: var(--ink);
+  font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+  line-height: 1.5;
+}
+.wrap { max-width: 1080px; margin: 0 auto; padding: 24px 16px 64px; }
+h1 { font-size: 1.6rem; margin: 0 0 4px; }
+.sub { color: var(--ink-2); margin: 0 0 20px; font-size: .95rem; }
+.card {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 10px; padding: 18px; margin-bottom: 20px;
+}
+h2 { font-size: 1.1rem; margin: 0 0 10px; }
+.tabs { display: flex; gap: 6px; margin-bottom: 16px; flex-wrap: wrap; }
+.tabs button {
+  background: var(--surface); color: var(--ink-2); border: 1px solid var(--border);
+  border-radius: 999px; padding: 6px 16px; cursor: pointer; font: inherit; font-size: .9rem;
+}
+.tabs button.active { color: var(--ink); border-color: var(--ink-2); font-weight: 600; }
+table { border-collapse: collapse; width: 100%; font-size: .92rem; }
+th, td { text-align: left; padding: 6px 10px; border-bottom: 1px solid var(--grid); }
+th { color: var(--muted); font-weight: 600; font-size: .8rem; text-transform: uppercase; letter-spacing: .04em; }
+td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
+.dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 7px; vertical-align: baseline; }
+.src-fantasypros { background: var(--s1); } .src-espn { background: var(--s2); } .src-cbs { background: var(--s3); }
+.legend { display: flex; gap: 16px; font-size: .85rem; color: var(--ink-2); margin: 8px 0 0; flex-wrap: wrap; }
+.legend span { display: inline-flex; align-items: center; }
+.empty { color: var(--muted); font-style: italic; padding: 12px 0; }
+.scroll-x { overflow-x: auto; }
+.meta { color: var(--muted); font-size: .8rem; margin-top: 24px; }
+.chartbox { position: relative; }
+#tooltip {
+  position: absolute; pointer-events: none; display: none;
+  background: var(--surface); border: 1px solid var(--border); border-radius: 8px;
+  padding: 8px 10px; font-size: .82rem; box-shadow: 0 2px 10px rgba(0,0,0,.15); z-index: 5;
+  min-width: 130px;
+}
+#tooltip .tt-week { color: var(--muted); margin-bottom: 4px; }
+#tooltip .row { display: flex; justify-content: space-between; gap: 12px; }
+svg text { fill: var(--muted); font-size: 11px; font-family: system-ui, sans-serif; }
+a { color: var(--s1); }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>NFL Rankings of Rankings</h1>
+  <p class="sub">Which site's fantasy football rankings actually predict performance? Expert rankings are
+  snapshotted before games, then scored against real fantasy points every week.</p>
+
+  <div class="tabs" id="fmt-tabs">
+    <button data-fmt="ppr" class="active">PPR</button>
+    <button data-fmt="half_ppr">Half PPR</button>
+    <button data-fmt="standard">Standard</button>
+  </div>
+
+  <div class="card">
+    <h2>In-season leaderboard</h2>
+    <p class="sub" style="margin-bottom:8px">Average Spearman correlation between each source's weekly positional
+    rankings (QB/RB/WR/TE) and that week's actual fantasy points. 1.0 = perfect ordering.</p>
+    <div id="weekly-board"></div>
+  </div>
+
+  <div class="card">
+    <h2>Week-by-week accuracy</h2>
+    <div class="chartbox" id="chartbox">
+      <div id="trend-chart"></div>
+      <div id="tooltip"></div>
+    </div>
+    <div class="legend" id="trend-legend"></div>
+  </div>
+
+  <div class="card">
+    <h2>Pre-draft rankings vs. season results</h2>
+    <p class="sub" style="margin-bottom:8px">Each source's pre-draft board (frozen at kickoff) scored against
+    cumulative fantasy points, top 150 overall.</p>
+    <div id="predraft-board"></div>
+  </div>
+
+  <div class="card">
+    <h2>Pre-draft boards side by side</h2>
+    <div class="scroll-x" id="predraft-compare"></div>
+  </div>
+
+  <p class="meta" id="meta"></p>
+</div>
+
+<script>
+const SRC_LABEL = { fantasypros: "FantasyPros", espn: "ESPN", cbs: "CBS" };
+const SRC_COLOR = { fantasypros: "var(--s1)", espn: "var(--s2)", cbs: "var(--s3)" };
+const SRC_ORDER = ["fantasypros", "espn", "cbs"];
+let SUMMARY = null, PREDRAFT = null, FMT = "ppr";
+
+const $ = s => document.querySelector(s);
+const srcName = s => SRC_LABEL[s] || s;
+
+function orderSources(list) {
+  return [...list].sort((a, b) => {
+    const ia = SRC_ORDER.indexOf(a), ib = SRC_ORDER.indexOf(b);
+    return (ia < 0 ? 99 : ia) - (ib < 0 ? 99 : ib);
+  });
+}
+
+function renderWeeklyBoard() {
+  const board = (SUMMARY.leaderboard.weekly[FMT] || []);
+  if (!board.length) {
+    $("#weekly-board").innerHTML = '<div class="empty">No completed weeks yet — the leaderboard fills in once the season starts.</div>';
+    return;
+  }
+  let html = '<table><thead><tr><th>#</th><th>Source</th><th class="num">Avg Spearman</th><th class="num">Weeks</th></tr></thead><tbody>';
+  board.forEach((r, i) => {
+    html += `<tr><td>${i + 1}</td><td><span class="dot src-${r.source}"></span>${srcName(r.source)}</td>` +
+            `<td class="num">${r.score.toFixed(3)}</td><td class="num">${r.weeks}</td></tr>`;
+  });
+  $("#weekly-board").innerHTML = html + "</tbody></table>";
+}
+
+function renderPredraftBoard() {
+  const board = (SUMMARY.leaderboard.predraft[FMT] || []);
+  if (!board.length) {
+    $("#predraft-board").innerHTML = '<div class="empty">Scored after week 1 is in the books.</div>';
+    return;
+  }
+  let html = '<table><thead><tr><th>#</th><th>Source</th><th class="num">Spearman</th><th class="num">Through week</th></tr></thead><tbody>';
+  board.forEach((r, i) => {
+    html += `<tr><td>${i + 1}</td><td><span class="dot src-${r.source}"></span>${srcName(r.source)}</td>` +
+            `<td class="num">${r.score.toFixed(3)}</td><td class="num">${r.through_week}</td></tr>`;
+  });
+  $("#predraft-board").innerHTML = html + "</tbody></table>";
+}
+
+function renderTrend() {
+  const weekly = SUMMARY.weekly[FMT] || {};
+  const sources = orderSources(Object.keys(weekly).filter(s => Object.keys(weekly[s].weeks || {}).length));
+  const weeks = SUMMARY.weeks_evaluated || [];
+  const legend = $("#trend-legend");
+  legend.innerHTML = sources.map(s =>
+    `<span><span class="dot src-${s}"></span>${srcName(s)}</span>`).join("");
+  if (!sources.length || !weeks.length) {
+    $("#trend-chart").innerHTML = '<div class="empty">Chart appears once weekly scores exist.</div>';
+    return;
+  }
+  const W = 940, H = 300, L = 44, R = 90, T = 14, B = 30;
+  const pw = W - L - R, ph = H - T - B;
+  const vals = [];
+  sources.forEach(s => weeks.forEach(w => {
+    const v = weekly[s].weeks[String(w)]?.avg_spearman;
+    if (v != null) vals.push(v);
+  }));
+  let lo = Math.min(0, ...vals), hi = Math.max(0.8, ...vals);
+  lo = Math.floor(lo * 5) / 5; hi = Math.ceil(hi * 5) / 5;
+  const x = w => weeks.length === 1 ? L + pw / 2 : L + pw * (weeks.indexOf(w) / (weeks.length - 1));
+  const y = v => T + ph * (1 - (v - lo) / (hi - lo));
+  let g = "";
+  for (let v = lo; v <= hi + 1e-9; v += 0.2) {
+    const yy = y(v);
+    g += `<line x1="${L}" y1="${yy}" x2="${W - R}" y2="${yy}" stroke="var(--grid)" stroke-width="1"/>` +
+         `<text x="${L - 8}" y="${yy + 4}" text-anchor="end">${v.toFixed(1)}</text>`;
+  }
+  weeks.forEach(w => {
+    g += `<text x="${x(w)}" y="${H - 8}" text-anchor="middle">W${w}</text>`;
+  });
+  sources.forEach(s => {
+    const pts = weeks.map(w => [w, weekly[s].weeks[String(w)]?.avg_spearman]).filter(p => p[1] != null);
+    if (!pts.length) return;
+    const d = pts.map((p, i) => `${i ? "L" : "M"}${x(p[0]).toFixed(1)},${y(p[1]).toFixed(1)}`).join(" ");
+    g += `<path d="${d}" fill="none" stroke="${SRC_COLOR[s]}" stroke-width="2" stroke-linejoin="round"/>`;
+    pts.forEach(p => {
+      g += `<circle cx="${x(p[0]).toFixed(1)}" cy="${y(p[1]).toFixed(1)}" r="4" fill="${SRC_COLOR[s]}" stroke="var(--surface)" stroke-width="2"/>`;
+    });
+    const last = pts[pts.length - 1];
+    g += `<text x="${W - R + 8}" y="${y(last[1]) + 4}" style="fill:var(--ink-2)">${srcName(s)}</text>`;
+  });
+  $("#trend-chart").innerHTML =
+    `<svg viewBox="0 0 ${W} ${H}" style="width:100%;height:auto;display:block" id="trend-svg">${g}</svg>`;
+  attachHover(weeks, sources, weekly, x, W, H, L, R);
+}
+
+function attachHover(weeks, sources, weekly, x, W, H, L, R) {
+  const svg = $("#trend-svg"), tip = $("#tooltip"), box = $("#chartbox");
+  svg.addEventListener("mousemove", e => {
+    const r = svg.getBoundingClientRect();
+    const mx = (e.clientX - r.left) * (W / r.width);
+    let best = null, bd = 1e9;
+    weeks.forEach(w => { const d = Math.abs(x(w) - mx); if (d < bd) { bd = d; best = w; } });
+    if (best == null) return;
+    let rows = "";
+    orderSources(sources).forEach(s => {
+      const v = weekly[s].weeks[String(best)]?.avg_spearman;
+      if (v != null) rows += `<div class="row"><span><span class="dot src-${s}"></span>${srcName(s)}</span><b>${v.toFixed(3)}</b></div>`;
+    });
+    tip.innerHTML = `<div class="tt-week">Week ${best}</div>${rows}`;
+    tip.style.display = "block";
+    const bx = box.getBoundingClientRect();
+    let px = e.clientX - bx.left + 14;
+    if (px + 160 > bx.width) px -= 180;
+    tip.style.left = px + "px";
+    tip.style.top = (e.clientY - bx.top + 10) + "px";
+  });
+  svg.addEventListener("mouseleave", () => { tip.style.display = "none"; });
+}
+
+function renderCompare() {
+  const cols = (PREDRAFT && PREDRAFT.formats[FMT]) || {};
+  const sources = orderSources(Object.keys(cols));
+  if (!sources.length) {
+    $("#predraft-compare").innerHTML = '<div class="empty">No pre-draft boards captured for this format.</div>';
+    return;
+  }
+  const depth = 50;
+  let html = '<table><thead><tr><th class="num">#</th>' +
+    sources.map(s => `<th><span class="dot src-${s}"></span>${srcName(s)}</th>`).join("") + "</tr></thead><tbody>";
+  for (let i = 0; i < depth; i++) {
+    html += `<tr><td class="num">${i + 1}</td>` + sources.map(s => {
+      const p = cols[s]?.[i];
+      return `<td>${p ? `${p.name} <span style="color:var(--muted)">${p.pos || ""}${p.team ? " · " + p.team : ""}</span>` : ""}</td>`;
+    }).join("") + "</tr>";
+  }
+  $("#predraft-compare").innerHTML = html + "</tbody></table>";
+}
+
+function renderAll() {
+  renderWeeklyBoard(); renderTrend(); renderPredraftBoard(); renderCompare();
+  $("#meta").textContent =
+    `Season ${SUMMARY.season} · ${SUMMARY.weeks_evaluated.length} week(s) evaluated · updated ${SUMMARY.generated_at} UTC · ` +
+    `Sources: FantasyPros expert consensus, ESPN draft ranks, CBS Sports. Actual points from Sleeper. ` +
+    `ESPN and CBS publish standard + PPR only; half-PPR is FantasyPros-only pre-draft.`;
+}
+
+document.getElementById("fmt-tabs").addEventListener("click", e => {
+  const b = e.target.closest("button"); if (!b) return;
+  FMT = b.dataset.fmt;
+  document.querySelectorAll("#fmt-tabs button").forEach(x => x.classList.toggle("active", x === b));
+  renderAll();
+});
+
+Promise.all([
+  fetch("data/summary.json").then(r => r.json()),
+  fetch("data/predraft.json").then(r => r.json()).catch(() => null),
+]).then(([s, p]) => { SUMMARY = s; PREDRAFT = p; renderAll(); })
+ .catch(() => { document.querySelector(".wrap").insertAdjacentHTML("beforeend", '<div class="empty">No data yet — first capture pending.</div>'); });
+</script>
+</body>
+</html>
