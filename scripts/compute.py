@@ -472,9 +472,20 @@ def available_seasons():
 
 def write_index(current):
     seasons = available_seasons()
+    # The current season has no completed weeks until it kicks off, so landing
+    # on it shows empty leaderboards and reads as broken. Point the site at the
+    # newest season that actually has scored weeks instead.
+    scored = []
+    for s in seasons:
+        summary = read_json(DOCS / "data" / str(s) / "summary.json") or {}
+        if summary.get("weeks_evaluated"):
+            scored.append(s)
     write_json(DOCS / "data" / "seasons.json",
-               {"current": current, "seasons": seasons})
-    log.info("seasons.json written: %s (current %s)", seasons, current)
+               {"current": current, "seasons": seasons,
+                "scored": scored,
+                "default": scored[0] if scored else current})
+    log.info("seasons.json: %d seasons, %d scored, default %s",
+             len(seasons), len(scored), scored[0] if scored else current)
 
 
 if __name__ == "__main__":

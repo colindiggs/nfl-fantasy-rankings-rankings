@@ -156,10 +156,47 @@ where it competes.
   normalized name + position (aliases in `scripts/common.py`). Defenses resolve
   by team code instead — `scripts/teams.py` maps every published form
   ("Philadelphia Eagles", "Eagles D/ST", "Eagles", "PHI") onto the team code
-  Sleeper keys defenses by.
-- Sources publish boards in formats they don't always declare. Some are known to
-  diverge from the 1QB / half-PPR / K+DST baseline this benchmark targets:
-  **FantasySharks** orders by raw projected points rather than draft value (so
-  ~25 QBs lead the board), **MyFantasyLeague** ADP pools superflex leagues, and
-  **Draft Sharks** publishes an IDP board. Detection and labelling of this is in
-  progress; until then treat those three with care.
+  Sleeper keys defenses by. The **name** is authoritative for a defense, not the
+  adjacent team column: The Ringer's sheet lists "Seattle Seahawks" against team
+  "PIT", and trusting the column silently scored 12 defenses as the wrong team.
+
+## Source tags
+
+Every captured board is tagged at retrieval with what it actually is, so
+downstream code filters on facts rather than inferring from a URL:
+
+| Tag | Values | Meaning |
+|---|---|---|
+| `qb` | `1qb` / `superflex` | superflex boards never enter a 1QB consensus |
+| `basis` | `expert` / `adp` / `projection` | opinion, market, or raw projections |
+| `roster` | `offense` / `idp` | IDP boards rank LB/DL/DB alongside offense |
+| `scope` | `redraft` / `bestball` | best ball has no waivers, streaming, or K/DST |
+| `order` | `overall` / `positional` | positional boards restart ranks per position |
+
+The **baseline** this benchmark answers for is 1QB, half-PPR, K+DST, single
+RB/WR/TE flex redraft. Boards that don't match are still captured and scored —
+they're just kept out of the default consensus and badged in the UI, which has
+a header-level Team-DST/IDP toggle.
+
+### Audit findings (Aug 2026)
+
+Every source was re-inspected against its live site:
+
+- **The Ringer** — the Google Sheet is their own publication, not a workaround
+  (same title and update date as the web page). One CSV carries **four** boards:
+  half-PPR, zero-PPR, PPR and superflex. We now capture all of them. The
+  superflex board is the same analysts in the same week differing only in format,
+  which makes it a labelled control: QB4 at rank 5 versus 33–43 on their 1QB
+  boards.
+- **FantasySharks** — was pulling `projections.php`, ordered by raw projected
+  points pooled across positions, so ~25 QBs led the board. That's a projections
+  table, not a draft board. Now uses `adp.php` (Gibbs #1, QB4 at 45).
+- **Draft Sharks** — *not* superflex-contaminated; their superflex slugs exist
+  separately and differ clearly. IDP rows were crowding offense down to 83
+  players in the top 250. Captured as two views now.
+- **MyFantasyLeague** — QB-heavier than peers (QB4 at pick 23) but a genuine 1QB
+  board, not superflex.
+- **Underdog** — best-ball ADP: no K or DST at all, and QB4 goes at pick 67
+  against 49 on the redraft consensus. Tagged `bestball` and kept out of the
+  redraft leaderboard, since scoring it against redraft outcomes would penalise
+  it for correctly doing its own job.

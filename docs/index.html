@@ -63,13 +63,24 @@ body {
   border-radius: 999px; padding: 7px 18px; cursor: pointer; font: inherit; font-size: .92rem;
 }
 .tabs button.active { color: #fff; background: var(--accent); border-color: var(--accent); font-weight: 600; }
-.controls { display: flex; gap: 18px; align-items: center; flex-wrap: wrap; }
-.controls .tabs { margin: 18px 0 16px; }
-#scope-tabs button { font-size: .84rem; padding: 6px 14px; }
+.controls {
+  display: flex; gap: 22px; align-items: flex-end; flex-wrap: wrap;
+  margin: 20px 0 10px; padding: 14px 16px;
+  background: var(--surface); border: 1px solid var(--border); border-radius: 12px;
+}
+.ctl { display: flex; flex-direction: column; gap: 6px; }
+.ctl > label {
+  font-size: .68rem; text-transform: uppercase; letter-spacing: .07em;
+  color: var(--muted); font-weight: 600;
+}
+.controls .tabs { margin: 0; }
+.tabs.small button { font-size: .84rem; padding: 6px 13px; }
 #season-select {
-  background: var(--surface); color: var(--ink); border: 1px solid var(--border);
+  background: var(--page); color: var(--ink); border: 1px solid var(--border);
   border-radius: 999px; padding: 7px 14px; font: inherit; font-size: .9rem; cursor: pointer;
 }
+.baseline-note { color: var(--muted); font-size: .8rem; margin: 0 0 18px; }
+.baseline-note b { color: var(--ink-2); font-weight: 600; }
 
 .card {
   background: var(--surface); border: 1px solid var(--border);
@@ -131,6 +142,22 @@ tbody tr:hover td.pcol { background: color-mix(in srgb, var(--surface) 94%, var(
   width: 34px; height: 34px; border-radius: 50%; object-fit: cover; object-position: top;
   background: var(--chip); flex: none; border: 1px solid var(--border);
 }
+/* team logos want padding and no crop, unlike headshots */
+.face.logo { object-fit: contain; object-position: center; padding: 3px; background: var(--chip); }
+.mark {
+  display: inline-flex; align-items: center; justify-content: center;
+  min-width: 26px; height: 18px; padding: 0 5px; margin-right: 7px;
+  border-radius: 4px; color: #fff; font-size: .62rem; font-weight: 700;
+  letter-spacing: .02em; flex: none; line-height: 1;
+}
+th .mark { margin: 0 auto; }
+.spread-cell { display: flex; align-items: center; gap: 8px; }
+.spread-num { color: var(--muted); font-size: .74rem; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.tag-pill {
+  display: inline-block; font-size: .64rem; font-weight: 600; border-radius: 4px;
+  padding: 1px 6px; margin-left: 6px; background: var(--chip); color: var(--muted);
+  border: 1px solid var(--border); text-transform: uppercase; letter-spacing: .04em;
+}
 .face-fallback {
   width: 34px; height: 34px; border-radius: 50%; background: var(--chip); color: var(--ink-2);
   display: inline-flex; align-items: center; justify-content: center; font-size: .72rem;
@@ -145,8 +172,8 @@ tbody tr:hover td.pcol { background: color-mix(in srgb, var(--surface) 94%, var(
 .pos-QB { background: var(--s7); } .pos-RB { background: var(--s3); }
 .pos-WR { background: var(--s1); } .pos-TE { background: var(--s2); }
 .pos-K  { background: var(--s4); } .pos-DST{ background: var(--muted); }
-.range { display: inline-block; width: 90px; height: 6px; background: var(--chip); border-radius: 3px; position: relative; vertical-align: middle; }
-.range i { position: absolute; top: 0; height: 6px; background: var(--accent); opacity: .55; border-radius: 3px; }
+.range { display: inline-block; width: 78px; height: 7px; background: var(--grid); border-radius: 4px; position: relative; vertical-align: middle; flex: none; }
+.range i { position: absolute; top: 0; height: 7px; background: var(--accent); opacity: .9; border-radius: 4px; min-width: 3px; }
 .cov { color: var(--muted); font-size: .78rem; }
 td.best { color: var(--s6); font-weight: 700; }
 td.worst { color: var(--s8); font-weight: 700; }
@@ -165,17 +192,38 @@ td.na { text-align: right; color: var(--grid); }
   </div>
 
   <div class="controls">
-    <div class="tabs" id="fmt-tabs">
-      <button data-fmt="half_ppr" class="active">Half PPR</button>
-      <button data-fmt="ppr">PPR</button>
-      <button data-fmt="standard">Standard</button>
+    <div class="ctl">
+      <label for="fmt-tabs">Scoring</label>
+      <div class="tabs" id="fmt-tabs">
+        <button data-fmt="half_ppr" class="active">Half PPR</button>
+        <button data-fmt="ppr">PPR</button>
+        <button data-fmt="standard">Standard</button>
+      </div>
     </div>
-    <div class="tabs" id="scope-tabs" title="Which positions count toward the leaderboard scores">
-      <button data-scope="skill" class="active">QB/RB/WR/TE</button>
-      <button data-scope="all">+ K &amp; DST</button>
+    <div class="ctl">
+      <label for="scope-tabs">Positions scored</label>
+      <div class="tabs small" id="scope-tabs">
+        <button data-scope="skill" class="active"
+          title="QB, RB, WR and TE only — every source ranks these, so scores stay comparable across the whole field">QB/RB/WR/TE</button>
+        <button data-scope="all"
+          title="Adds kickers and defenses, for the sources that rank them">+ K &amp; DST</button>
+      </div>
     </div>
-    <select id="season-select" aria-label="Season"></select>
+    <div class="ctl">
+      <label for="roster-tabs">Roster</label>
+      <div class="tabs small" id="roster-tabs">
+        <button data-roster="offense" class="active"
+          title="Standard redraft: offense plus a team defense">Team DST</button>
+        <button data-roster="idp"
+          title="Individual defensive players ranked alongside offense">IDP</button>
+      </div>
+    </div>
+    <div class="ctl">
+      <label for="season-select">Season</label>
+      <select id="season-select" aria-label="Season"></select>
+    </div>
   </div>
+  <p class="baseline-note" id="baseline-note"></p>
 
   <div class="card">
     <h2>Consensus draft board</h2>
@@ -239,15 +287,40 @@ const SRC_ORDER = ["fantasypros", "cbs", "nfl", "fftoday", "espn", "yahoo", "pff
 const SRC_COLOR = {};
 SRC_ORDER.forEach((s, i) => { SRC_COLOR[s] = i < 8 ? `var(--s${i + 1})` : "var(--muted)"; });
 function dotStyle(s) { return `style="background:${SRC_COLOR[s] || "var(--muted)"}"`; }
-// Half PPR / 1QB / K+DST is the default league lens for this benchmark.
+// Half PPR / 1QB / K+DST / single flex is the default league lens.
 let SUMMARY = null, PREDRAFT = null, SEASONS = null;
 let FMT = "half_ppr", POS = "ALL", QUERY = "", SCOPE = "skill", SEASON = null;
+let ROSTER = "offense";   // "offense" = team DST (default), "idp" = IDP leagues
+
+const srcTags = s => (SUMMARY && SUMMARY.source_tags && SUMMARY.source_tags[s]) || {};
+
+/* A source belongs in the current view when its roster type matches and it
+   isn't answering a different question (superflex / best ball). */
+function inView(s) {
+  const t = srcTags(s);
+  if ((t.roster || "offense") !== ROSTER) return false;
+  if ((t.qb || "1qb") !== "1qb") return false;
+  if ((t.scope || "redraft") !== "redraft") return false;
+  return true;
+}
+
+/* Short badges explaining why a source is what it is. */
+function tagPills(s) {
+  const t = srcTags(s), out = [];
+  if (t.basis === "adp") out.push(["ADP", "Market average draft position, not an expert opinion"]);
+  if (t.scope === "bestball") out.push(["BEST BALL", "Best-ball ADP — no waivers, streaming or start/sit, and no K/DST"]);
+  if (t.qb === "superflex") out.push(["SUPERFLEX", "Two-QB format — not comparable to a 1QB board"]);
+  if (t.roster === "idp") out.push(["IDP", "Individual defensive players ranked alongside offense"]);
+  if (t.order === "positional") out.push(["BY POSITION", "Ranks restart at 1 per position — no overall board"]);
+  return out.map(([txt, tip]) => `<span class="tag-pill" title="${esc(tip)}">${esc(txt)}</span>`).join("");
+}
 
 // leaderboard.{weekly,predraft}[fmt] is {skill:[...], all:[...]}
 function boardFor(kind) {
   const b = (SUMMARY.leaderboard[kind] || {})[FMT];
   if (!b) return [];
-  return Array.isArray(b) ? b : (b[SCOPE] || []);   // arrays = pre-scope data
+  const rows = Array.isArray(b) ? b : (b[SCOPE] || []);   // arrays = pre-scope data
+  return rows.filter(r => inView(r.source));
 }
 function weekScore(entry, w) {
   const wk = entry.weeks[String(w)];
@@ -273,18 +346,54 @@ function initials(name) {
 }
 
 function faceHtml(p) {
-  if (!p.id || p.pos === "DST") return `<span class="face-fallback">${esc(initials(p.name))}</span>`;
-  return `<img class="face" loading="lazy" src="https://sleepercdn.com/content/nfl/players/thumb/${p.id}.jpg"
-    alt="" onerror="this.outerHTML='<span class=&quot;face-fallback&quot;>${esc(initials(p.name))}</span>'">`;
+  const init = esc(initials(p.name));
+  if (!p.id) return `<span class="face-fallback">${init}</span>`;
+  // defenses are keyed by team code, and Sleeper serves team logos off the
+  // same CDN as player headshots
+  const src = p.pos === "DST"
+    ? `https://sleepercdn.com/images/team_logos/nfl/${String(p.id).toLowerCase()}.png`
+    : `https://sleepercdn.com/content/nfl/players/thumb/${p.id}.jpg`;
+  const cls = p.pos === "DST" ? "face logo" : "face";
+  // the replacement markup lives inside a double-quoted attribute, so its own
+  // quotes have to be entities or they close the attribute early
+  const fb = `<span class=&quot;face-fallback&quot;>${init}</span>`;
+  return `<img class="${cls}" loading="lazy" src="${src}" alt="" ` +
+         `onerror="this.outerHTML='${fb}'">`;
+}
+
+/* Source marks. Favicons proved unreliable at this size (ESPN serves an empty
+   body, CBS a 26px gif), so each source gets a branded monogram chip instead —
+   always renders, no third-party request, readable in both themes. */
+const SRC_MARK = {
+  fantasypros: ["FP", "#0b6ab0"], espn: ["E", "#d50a0a"], cbs: ["CBS", "#0072ce"],
+  nfl: ["NFL", "#013369"], yahoo: ["Y!", "#6001d2"], ringer: ["R", "#e4002b"],
+  "ringer-superflex": ["R+", "#a1002b"], pff: ["PFF", "#f26722"],
+  rotoballer: ["RB", "#1b8a3f"], draftsharks: ["DS", "#0a7ea4"],
+  "draftsharks-idp": ["DS+", "#075f7c"], sharks: ["FS", "#2d6b8f"],
+  fftoday: ["FFT", "#8a6d1f"], walter: ["WF", "#5c5c5c"],
+  ffcalc: ["FFC", "#3b7dd8"], mfl: ["MFL", "#7a3fb0"], underdog: ["UD", "#111827"],
+};
+
+function srcMark(s, withName) {
+  const [txt, color] = SRC_MARK[s] || [(SRC_SHORT[s] || s).slice(0, 2).toUpperCase(), "#6b7280"];
+  const chip = `<span class="mark" style="background:${color}">${esc(txt)}</span>`;
+  return withName ? `<span class="srccell">${chip}${esc(srcName(s))}</span>` : chip;
 }
 
 function renderHero() {
-  const nSrc = SUMMARY.labels ? Object.keys(SUMMARY.labels).length : 0;
+  // count what's actually being shown for this format and view, not every
+  // source label the project has ever seen
+  const inFmt = new Set();
+  Object.keys(SUMMARY.weekly[FMT] || {}).forEach(s => inView(s) && inFmt.add(s));
+  Object.keys(SUMMARY.predraft[FMT] || {}).forEach(s => inView(s) && inFmt.add(s));
   const updated = (SUMMARY.generated_at || "").slice(0, 10);
+  const wks = SUMMARY.weeks_evaluated.length;
+  const nSeasons = (SEASONS && SEASONS.scored || []).length;
   $("#hero-chips").innerHTML =
     `<span class="chip"><b>${SUMMARY.season}</b> season</span>` +
-    `<span class="chip"><b>${nSrc}</b> ranking sources</span>` +
-    `<span class="chip"><b>${SUMMARY.weeks_evaluated.length}</b> weeks scored</span>` +
+    `<span class="chip"><b>${inFmt.size}</b> ${inFmt.size === 1 ? "source" : "sources"} in this view</span>` +
+    `<span class="chip"><b>${wks}</b> ${wks === 1 ? "week" : "weeks"} scored</span>` +
+    (nSeasons > 1 ? `<span class="chip"><b>${nSeasons}</b> seasons of history</span>` : "") +
     `<span class="chip">updated <b>${updated}</b></span>`;
 }
 
@@ -299,18 +408,21 @@ function renderBoard() {
   let rows = data.players;
   if (POS !== "ALL") rows = rows.filter(p => p.pos === POS);
   if (QUERY) rows = rows.filter(p => p.name.toLowerCase().includes(QUERY));
-  const maxRank = 200;
+  // scale to the widest rank actually displayed — against a fixed 200 the
+  // top of the board collapses into an unreadable sliver
+  const maxRank = Math.max(10, ...rows.map(r => r.max));
   let html = '<table><thead><tr><th class="num">#</th><th class="pcol">Player</th>' +
-    '<th class="num">Avg</th><th>Spread</th><th class="num">Cov</th>' +
-    sources.map(s => `<th class="rk" title="${esc(srcName(s))}">${esc(srcShort(s))}</th>`).join("") +
+    '<th class="num" title="Mean rank across the sources that rank him">Avg</th><th title="Best and worst rank any source gave him">Spread</th><th class="num" title="How many sources rank him, out of those with a board this format">Cov</th>' +
+    sources.map(s => `<th class="rk" title="${esc(srcName(s))}">${srcMark(s)}</th>`).join("") +
     "</tr></thead><tbody>";
   rows.forEach((p, i) => {
     const left = (p.min - 1) / maxRank * 100, width = Math.max(2, (p.max - p.min) / maxRank * 100);
+    const spread = `<span class="spread-cell"><span class="range" title="Best rank ${p.min}, worst ${p.max}"><i style="left:${left}%;width:${width}%"></i></span><span class="spread-num">${p.min}–${p.max}</span></span>`;
     html += `<tr><td class="num">${i + 1}</td>` +
       `<td class="pcol"><span class="pcell">${faceHtml(p)}<span><span class="pname">${esc(p.name)}</span><br>` +
       `<span class="pmeta"><span class="posbadge pos-${p.pos}">${p.pos}</span>${esc(p.team || "")}</span></span></span></td>` +
       `<td class="num"><b>${p.avg}</b></td>` +
-      `<td><span class="range" title="best ${p.min} · worst ${p.max}"><i style="left:${left}%;width:${width}%"></i></span></td>` +
+      `<td>${spread}</td>` +
       `<td class="num"><span class="cov">${p.n}/${sources.length}</span></td>`;
     sources.forEach(s => {
       const r = p.ranks[s];
@@ -327,12 +439,13 @@ function renderBoard() {
 function renderWeeklyBoard() {
   const board = boardFor("weekly");
   if (!board.length) {
-    $("#weekly-board").innerHTML = '<div class="empty">No completed weeks yet — the leaderboard fills in once the season starts.</div>';
+    $("#weekly-board").innerHTML = emptyWithHistory(
+      "No games played yet this season.");
     return;
   }
   let html = '<table><thead><tr><th>#</th><th>Source</th><th class="num">Avg Spearman</th><th class="num">Weeks</th></tr></thead><tbody>';
   board.forEach((r, i) => {
-    html += `<tr><td>${i + 1}</td><td><span class="srccell"><span class="dot" ${dotStyle(r.source)}></span>${esc(srcName(r.source))}</span></td>` +
+    html += `<tr><td>${i + 1}</td><td>${srcMark(r.source, true)}${tagPills(r.source)}</td>` +
             `<td class="num">${r.score.toFixed(3)}</td><td class="num">${r.weeks}</td></tr>`;
   });
   $("#weekly-board").innerHTML = html + "</tbody></table>";
@@ -341,12 +454,13 @@ function renderWeeklyBoard() {
 function renderPredraftBoard() {
   const board = boardFor("predraft");
   if (!board.length) {
-    $("#predraft-board").innerHTML = '<div class="empty">Scored after week 1 is in the books.</div>';
+    $("#predraft-board").innerHTML = emptyWithHistory(
+      "Pre-draft boards are scored once week 1 is in the books.");
     return;
   }
   let html = '<table><thead><tr><th>#</th><th>Source</th><th class="num">Avg pos Spearman</th><th class="num">Overall</th><th class="num">Through week</th></tr></thead><tbody>';
   board.forEach((r, i) => {
-    html += `<tr><td>${i + 1}</td><td><span class="srccell"><span class="dot" ${dotStyle(r.source)}></span>${esc(srcName(r.source))}</span></td>` +
+    html += `<tr><td>${i + 1}</td><td>${srcMark(r.source, true)}${tagPills(r.source)}</td>` +
             `<td class="num">${r.score.toFixed(3)}</td>` +
             `<td class="num">${r.overall != null ? r.overall.toFixed(3) : "—"}</td>` +
             `<td class="num">${r.through_week}</td></tr>`;
@@ -357,12 +471,13 @@ function renderPredraftBoard() {
 /* ---------- trend chart ---------- */
 function renderTrend() {
   const weekly = SUMMARY.weekly[FMT] || {};
-  const sources = orderSources(Object.keys(weekly).filter(s => Object.keys(weekly[s].weeks || {}).length));
+  const sources = orderSources(Object.keys(weekly)
+    .filter(s => Object.keys(weekly[s].weeks || {}).length && inView(s)));
   const weeks = SUMMARY.weeks_evaluated || [];
   $("#trend-legend").innerHTML = sources.map(s =>
-    `<span><span class="dot" ${dotStyle(s)}></span>${esc(srcName(s))}</span>`).join("");
+    `<span>${srcMark(s)}${esc(srcName(s))}</span>`).join("");
   if (!sources.length || !weeks.length) {
-    $("#trend-chart").innerHTML = '<div class="empty">Chart appears once weekly scores exist.</div>';
+    $("#trend-chart").innerHTML = emptyWithHistory("No weekly scores for this season yet.");
     return;
   }
   const W = 940, H = 300, L = 44, R = 90, T = 14, B = 30;
@@ -425,8 +540,43 @@ function attachHover(weeks, sources, weekly, x, W) {
   svg.addEventListener("mouseleave", () => { tip.style.display = "none"; });
 }
 
+/* An empty panel during the preseason should route somewhere useful rather
+   than just reporting that it's empty. */
+function emptyWithHistory(msg) {
+  const scored = (SEASONS && SEASONS.scored) || [];
+  const last = scored.filter(y => y !== SEASON)[0];
+  if (!last) return `<div class="empty">${esc(msg)}</div>`;
+  return `<div class="empty">${esc(msg)} ` +
+    `<a href="#" onclick="jumpSeason(${last});return false;">See ${last} results</a>` +
+    ` — ${scored.length} seasons of history available.</div>`;
+}
+
+function jumpSeason(year) {
+  const sel = document.getElementById("season-select");
+  if (sel) sel.value = String(year);
+  loadSeason(year).then(() => { renderSeasonSelect(); renderAll(); });
+}
+
+function renderBaselineNote() {
+  const all = Object.keys(SUMMARY.source_tags || {});
+  const hidden = all.filter(s => !inView(s));
+  const lens = ROSTER === "idp"
+    ? "IDP leagues — individual defensive players ranked alongside offense"
+    : "1QB redraft with a team defense and a single RB/WR/TE flex";
+  let html = `Scoring every board against <b>${esc(lens)}</b>.`;
+  if (hidden.length) {
+    // in IDP mode nearly everything is excluded, so name a few and count the rest
+    const show = hidden.slice(0, 4);
+    let names = show.map(s => `${esc(srcName(s))}${tagPills(s)}`).join(", ");
+    if (hidden.length > show.length) names += `, and ${hidden.length - show.length} more`;
+    html += ` Not in this view: ${names}.`;
+  }
+  $("#baseline-note").innerHTML = html;
+}
+
 function renderAll() {
-  renderHero(); renderBoard(); renderWeeklyBoard(); renderTrend(); renderPredraftBoard();
+  renderHero(); renderBaselineNote(); renderBoard();
+  renderWeeklyBoard(); renderTrend(); renderPredraftBoard();
   $("#meta").innerHTML =
     `Sources: FantasyPros, ESPN, CBS, NFL.com, Yahoo, The Ringer, PFF, RotoBaller, Draft Sharks, FantasySharks, ` +
     `FFToday, WalterFootball, plus market ADP from FF Calculator, MyFantasyLeague, and Underdog. ` +
@@ -457,6 +607,12 @@ document.getElementById("scope-tabs").addEventListener("click", e => {
   document.querySelectorAll("#scope-tabs button").forEach(x => x.classList.toggle("active", x === b));
   renderAll();
 });
+document.getElementById("roster-tabs").addEventListener("click", e => {
+  const b = e.target.closest("button"); if (!b) return;
+  ROSTER = b.dataset.roster;
+  document.querySelectorAll("#roster-tabs button").forEach(x => x.classList.toggle("active", x === b));
+  renderAll();
+});
 document.getElementById("season-select").addEventListener("change", e => {
   loadSeason(Number(e.target.value)).then(renderAll);
 });
@@ -480,9 +636,13 @@ function renderSeasonSelect() {
   const sel = document.getElementById("season-select");
   const list = (SEASONS && SEASONS.seasons) || [];
   if (list.length < 2) { sel.style.display = "none"; return; }
-  sel.innerHTML = list.map(y =>
-    `<option value="${y}"${y === SEASON ? " selected" : ""}>${y}${y === SEASONS.current ? " (current)" : ""}</option>`
-  ).join("");
+  const scored = new Set(SEASONS.scored || list);
+  sel.innerHTML = list.map(y => {
+    let label = String(y);
+    if (y === SEASONS.current) label += scored.has(y) ? " (current)" : " (upcoming)";
+    else if (!scored.has(y)) label += " (no results)";
+    return `<option value="${y}"${y === SEASON ? " selected" : ""}>${label}</option>`;
+  }).join("");
 }
 
 fetch("data/seasons.json").then(r => r.json())
