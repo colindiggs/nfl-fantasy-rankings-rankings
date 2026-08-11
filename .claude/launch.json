@@ -3,8 +3,12 @@
   "configurations": [
     {
       "name": "site",
+      "autoPort": true,
       "runtimeExecutable": "python",
-      "runtimeArgs": ["-m", "http.server", "8742", "--directory", "docs"],
+      "runtimeArgs": [
+        "-c",
+        "import os,functools,http.server;http.server.test(HandlerClass=functools.partial(http.server.SimpleHTTPRequestHandler,directory='docs'),port=int(os.environ.get('PORT','8742')))"
+      ],
       "port": 8742
     }
   ]
