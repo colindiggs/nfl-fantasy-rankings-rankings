@@ -73,14 +73,17 @@ def resolve_dst(name=None, team=None):
     """Resolve a defense row to its Sleeper team code.
 
     Accepts any of: "Philadelphia Eagles", "Eagles D/ST", "Eagles",
-    "Philadelphia", "PHI" — plus an optional team column, which wins when valid.
+    "Philadelphia", "PHI", falling back to the team column only when the name
+    doesn't resolve.
+
+    The name wins deliberately. A defense's name almost always names the team,
+    while the team column next to it is not reliably its own team — The Ringer's
+    published sheet, for one, lists "Seattle Seahawks" against team "PIT". When
+    the two disagree, trusting the column silently assigns the wrong defense.
     """
-    code = normalize_code(team)
-    if code:
-        return code
     n = _norm(name)
     if not n:
-        return None
+        return normalize_code(team)
     code = normalize_code(n.upper())        # name column holding a bare code
     if code:
         return code
@@ -96,4 +99,4 @@ def resolve_dst(name=None, team=None):
         for nick, code in table.items():
             if re.search(rf"\b{re.escape(nick)}\b", n):
                 return code
-    return None
+    return normalize_code(team)
