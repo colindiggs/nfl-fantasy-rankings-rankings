@@ -22,15 +22,15 @@ fantasy points every week, and publishes a running leaderboard for the season.
 | Source | Std | Half | PPR | Weekly | How |
 |---|---|---|---|---|---|
 | FantasyPros | ✓ | ✓ | ✓ | ✓ | embedded ecrData JSON |
-| ESPN | ✓ | | ✓ | | fantasy API (`kona_player_info`) |
+| ESPN | ✓ | | ✓ | | fantasy API (`kona_player_info`), historical to 2023 |
 | CBS Sports | ✓ | | ✓ | ✓ | HTML top-200 / positional pages |
 | NFL.com | ✓ | | | ✓ | server-rendered research pages |
 | Yahoo | | ✓ | | | public `pub-api-ro` JSON (default = half-PPR) |
-| The Ringer | | ✓ | | | published Google Sheet CSV |
+| The Ringer | ✓ | ✓ | ✓ | | published Google Sheet CSV (4 boards incl. a labelled superflex control) |
 | PFF | | | ✓ | | consumer API (public client key — may rotate) |
 | RotoBaller | ✓ | ✓ | ✓ | | WordPress JSON API |
-| Draft Sharks | ✓ | ✓ | ✓ | | htmx table fragment |
-| FantasySharks | ✓ | ✓ | ✓ | | HTML projections table |
+| Draft Sharks (IDP) | ✓ | ✓ | ✓ | | htmx table fragment — **IDP board, excluded from the 1QB consensus** |
+| FantasySharks (ADP) | ✓ | ✓ | ✓ | | `adp.php` draft order (scoring param is ignored) |
 | FFToday | ✓ | ✓ | ✓ | ✓ | HTML top-225 / weekly pages |
 | WalterFootball | ✓ | | | | per-position HTML pages (positional-only) |
 | FF Calculator (ADP) | ✓ | ✓ | ✓ | | free JSON API, real mock-draft ADP |
@@ -54,10 +54,18 @@ Scores are reported under two **scopes**, both computed and stored:
 | `skill` | QB/RB/WR/TE | Every source publishes these, so it's comparable across the whole field and across seasons — the default view |
 | `all` | + K and DST | The full redraft roster, for sources that rank kickers and defenses |
 
-They're kept separate rather than blended because K/DST coverage is patchy and
-both positions are far more luck-driven week to week. FantasyPros' own accuracy
-competitions make the same call — they score K/DST and then leave them out of
-"Overall." The site exposes the choice as a toggle.
+Both are computed and stored. The site scores the full roster the league starts
+(`all`); the per-position detail lives in the "Average error by position" chart,
+where the K/DST effect is legible instead of averaged away.
+
+Alongside Spearman, every board is scored in **points space** using the
+FantasyPros "Accuracy Gap": each predicted rank implies the points that rank slot
+has historically produced (from 13 seasons of our own actuals, see
+`scripts/rankvalue.py`), and the gap is the distance from what the player really
+scored. It weights automatically — a miss at RB2 costs far more than one at RB45.
+The two metrics can disagree, which is usually the interesting case: kickers have
+the *lowest* points-space error of any position despite near-random rank
+correlation, because they all score within a narrow band.
 
 The site also builds a **consensus draft board** (top 200 per format, with player
 headshots): each source's board is re-numbered over matched skill players, and a
@@ -131,11 +139,14 @@ live-captured one:
 | FantasyPros | weekly **and** pre-draft ECR, all positions, all formats | `?week=N&year=YYYY` on the ranking pages |
 | FF Calculator | real mock-draft ADP for that season | `?year=YYYY` |
 | MyFantasyLeague | ADP export | per-season path |
+| ESPN | that season's draft board | season in the API path, **2023+ only** |
 
 Everything captured is real published data — nothing is reconstructed. Verified
 *not* backfillable: FFToday weekly (accepts a `Season` param but returns an empty
-table for past seasons), CBS, NFL.com, ESPN, Yahoo, PFF, RotoBaller, The Ringer,
-Underdog, Draft Sharks, FantasySharks, WalterFootball. For extra historical depth
+table for past seasons), CBS, NFL.com, Yahoo, PFF, RotoBaller, The Ringer,
+Underdog, Draft Sharks, FantasySharks, WalterFootball. RotoBaller accepts a
+`season` param and silently ignores it. The Wayback Machine holds only one
+capture of FFToday's weekly page for all of 2025, with the week params stripped. For extra historical depth
 the CSV inbox is the on-ramp.
 
 ## Adding a ranker (any ranker)
