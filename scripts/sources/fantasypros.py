@@ -50,16 +50,45 @@ def _parse_ecr(html):
 
 
 def _players_from_ecr(data):
-    out = []
+    """Rows -> our shape, skipping malformed entries.
+
+    The archive contains the occasional placeholder row carrying only ids and
+    ranks with no player_name (2023 week 1 WR has one). Dropping the row keeps
+    the rest of the week; raising would cost the whole season's snapshot.
+    """
+    out, skipped = [], 0
     for p in data.get("players", []):
+        name = p.get("player_name")
+        rank = p.get("rank_ecr")
+        if not name or rank is None:
+            skipped += 1
+            continue
         out.append({
-            "rank": p["rank_ecr"],
-            "name": p["player_name"],
+            "rank": rank,
+            "name": name,
             "team": p.get("player_team_id"),
             "pos": (p.get("player_position_id") or "").upper(),
         })
+    if skipped:
+        log.info("skipped %d malformed ECR row(s)", skipped)
     out.sort(key=lambda x: x["rank"])
     return out
+
+
+# QB/K/DST pages are shared across all three formats, so a weekly capture would
+# otherwise fetch each of them three times. Cache per URL for the life of the
+# process — a backfill run re-requests the same page constantly.
+_PAGE_CACHE = {}
+
+
+def _page(url, sess=None):
+    if url not in _PAGE_CACHE:
+        _PAGE_CACHE[url] = fetch(url, sess=sess).text
+    return _PAGE_CACHE[url]
+
+
+def clear_cache():
+    _PAGE_CACHE.clear()
 
 
 def _archived(url, season=None, week=None):
@@ -74,7 +103,7 @@ def _archived(url, season=None, week=None):
 
 def fetch_draft(fmt, sess=None, season=None):
     """Pre-draft board. Passing season pulls that year's frozen preseason ECR."""
-    html = fetch(_archived(DRAFT_URLS[fmt], season=season), sess=sess).text
+    html = _page(_archived(DRAFT_URLS[fmt], season=season), sess=sess)
     data = _parse_ecr(html)
     if season and str(data.get("year")) != str(season):
         raise RuntimeError(
@@ -95,7 +124,7 @@ def fetch_weekly(fmt, sess=None, season=None, week=None):
     players = []
     meta = {}
     for pos, url in WEEKLY_URLS[fmt].items():
-        html = fetch(_archived(url, season=season, week=week), sess=sess).text
+        html = _page(_archived(url, season=season, week=week), sess=sess)
         data = _parse_ecr(html)
         # guard against the site quietly serving the current week instead
         if week is not None and str(data.get("week")) != str(week):

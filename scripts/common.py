@@ -134,6 +134,43 @@ def apply_alias(n):
     return ALIASES.get(n, n)
 
 
+# ---------------------------------------------------------------- source tags
+#
+# Every captured board carries these so downstream code can filter instead of
+# guessing. They describe what the source ACTUALLY published, which is not
+# always what its URL implies.
+#
+#   qb      "1qb" | "superflex"      superflex boards must never enter a 1QB consensus
+#   basis   "expert" | "adp" | "projection"
+#             expert     — a human/consensus draft board
+#             adp        — aggregated real draft picks (the market, not an opinion)
+#             projection — ordered by raw projected points, NOT draft value
+#   roster  "offense" | "idp"        idp boards rank LB/DL/DB alongside offense
+#   scope   "redraft" | "bestball"   best-ball has no waivers/streaming and no K/DST
+#   order   "overall" | "positional" positional boards restart ranks per position
+#
+DEFAULT_TAGS = {"qb": "1qb", "basis": "expert", "roster": "offense",
+                "scope": "redraft", "order": "overall"}
+
+# The league this benchmark is built to answer for.
+BASELINE = {"qb": "1qb", "format": "half_ppr", "roster": "offense",
+            "scope": "redraft"}
+
+
+def tags(**overrides):
+    """Build a source tag dict, defaulting anything not stated."""
+    t = dict(DEFAULT_TAGS)
+    t.update({k: v for k, v in overrides.items() if v is not None})
+    return t
+
+
+def matches_baseline(t):
+    """True when a board can be compared directly against the default league."""
+    t = t or {}
+    return all(t.get(k, DEFAULT_TAGS.get(k)) == v
+               for k, v in BASELINE.items() if k != "format")
+
+
 def normalize_pos(pos):
     """Canonicalize a scraped position label, or None if it isn't one we score.
 

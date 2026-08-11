@@ -23,11 +23,11 @@ import sys
 from datetime import datetime, timezone
 from pathlib import Path
 
-from common import DATA, FORMATS, get_logger, session, write_json
+from common import DATA, FORMATS, get_logger, session, tags, write_json
 import sleeper
 import spec_engine
 from sources import (cbs, draftsharks, espn, fantasypros, fftoday, mfl,
-                     nfl_com, pff, sharks, walter, yahoo)
+                     nfl_com, pff, ringer, sharks, walter, yahoo)
 
 log = get_logger("capture")
 
@@ -46,6 +46,11 @@ DRAFT_SOURCES = {
     "fftoday": (FORMATS, lambda f, y, s: fftoday.fetch_draft(f, s)),
     "walter": (["standard"], lambda f, y, s: walter.fetch_draft(f, y, s)),
     "draftsharks": (FORMATS, lambda f, y, s: draftsharks.fetch_draft(f, s)),
+    # IDP view of the same board, for IDP leagues (tagged roster="idp")
+    "draftsharks-idp": (FORMATS, lambda f, y, s: draftsharks.fetch_draft(f, s, include_idp=True)),
+    "ringer": (["standard", "half_ppr", "ppr"], lambda f, y, s: ringer.fetch_draft(f, s)),
+    # labelled superflex control — same analysts and week as the 1QB boards
+    "ringer-superflex": (["half_ppr"], lambda f, y, s: ringer.fetch_draft(f, s, board="superflex")),
 }
 
 # source -> (formats, fetch(fmt, season, week, sess))
@@ -120,17 +125,36 @@ def import_inbox(season):
     return done
 
 
+# What each source actually publishes. Anything absent gets DEFAULT_TAGS
+# (1QB / expert / offense / redraft / overall). Verified by inspecting the live
+# sites in Aug 2026 — see README "Source audit".
+SOURCE_TAGS = {
+    "ffcalc": tags(basis="adp"),
+    "mfl": tags(basis="adp"),
+    "sharks": tags(basis="adp"),           # switched off their projection table
+    "underdog": tags(basis="adp", scope="bestball"),
+    "walter": tags(order="positional"),
+    "ringer-superflex": tags(qb="superflex"),
+    "draftsharks-idp": tags(roster="idp"),
+}
+
+
 def _now():
     return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
 def _save(season, scope, source, fmt, result):
+    # a source may refine its own tags at fetch time (e.g. a board that turns
+    # out to be positional this year); those win over the registry default
+    t = dict(SOURCE_TAGS.get(source, tags()))
+    t.update(result.get("tags", {}))
     payload = {
         "source": source,
         "format": fmt,
         "scope": scope,
         "season": season,
         "captured_at": _now(),
+        "tags": t,
         "meta": result.get("meta", {}),
         "players": result["players"],
     }

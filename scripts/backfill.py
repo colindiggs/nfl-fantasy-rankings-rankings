@@ -23,18 +23,25 @@ import time
 import capture
 import sleeper
 from common import get_logger
+from sources import fantasypros
 
 log = get_logger("backfill")
 
 WEEKLY_SOURCES = ["fantasypros"]
 DRAFT_SOURCES = ["fantasypros", "ffcalc", "mfl"]
 
-REGULAR_SEASON_WEEKS = 18
+# The NFL went from a 16-game/17-week season to 17 games/18 weeks in 2021.
+# Asking for week 18 of 2019 just yields empty snapshots and wasted fetches.
+FIRST_18_WEEK_SEASON = 2021
 
 
-def _weeks(arg):
+def weeks_in_season(season):
+    return 18 if season >= FIRST_18_WEEK_SEASON else 17
+
+
+def _weeks(arg, season):
     if not arg:
-        return list(range(1, REGULAR_SEASON_WEEKS + 1))
+        return list(range(1, weeks_in_season(season) + 1))
     if "-" in arg:
         lo, hi = arg.split("-", 1)
         return list(range(int(lo), int(hi) + 1))
@@ -63,7 +70,11 @@ def backfill(season, weeks, do_actuals=True, do_rankings=True, do_draft=True):
             ok, failed = capture.capture_weekly(season, w, only=set(WEEKLY_SOURCES))
             results["weekly"] += [f"wk{w} {o}" for o in ok]
             results["failed"] += [f"weekly wk{w} {f}" for f in failed]
-            time.sleep(1)  # be a good citizen — this is ~50 page fetches a week
+            # the per-URL page cache saves refetching QB/K/DST across formats,
+            # but each page is ~0.5MB — drop it between weeks or a long backfill
+            # accumulates gigabytes of held HTML
+            fantasypros.clear_cache()
+            time.sleep(1)  # be a good citizen
 
     return results
 
@@ -74,7 +85,7 @@ def main():
         print(__doc__)
         sys.exit(1)
     season = int(args[0])
-    weeks = _weeks(capture._flag("--weeks"))
+    weeks = _weeks(capture._flag("--weeks"), season)
     res = backfill(
         season, weeks,
         do_actuals="--skip-actuals" not in sys.argv,
