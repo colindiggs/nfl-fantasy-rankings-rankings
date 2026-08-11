@@ -7,8 +7,9 @@ import re
 from datetime import datetime, timezone
 from pathlib import Path
 
-from common import (DATA, DOCS, EXTRA_POSITIONS, FORMATS, POSITIONS,
-                    SKILL_POSITIONS, get_logger, read_json, write_json)
+from common import (DATA, DEFAULT_TAGS, DOCS, EXTRA_POSITIONS, FORMATS,
+                    POSITIONS, SKILL_POSITIONS, get_logger, matches_baseline,
+                    read_json, write_json)
 import sleeper
 import spec_engine
 
@@ -19,8 +20,12 @@ log = get_logger("compute")
 CODE_LABELS = {
     "fantasypros": "FantasyPros", "espn": "ESPN", "cbs": "CBS", "nfl": "NFL.com",
     "yahoo": "Yahoo", "pff": "PFF", "mfl": "MyFantasyLeague (ADP)",
-    "sharks": "FantasySharks", "fftoday": "FFToday", "walter": "WalterFootball",
-    "draftsharks": "Draft Sharks",
+    "sharks": "FantasySharks (ADP)", "fftoday": "FFToday",
+    "walter": "WalterFootball", "draftsharks": "Draft Sharks",
+    "draftsharks-idp": "Draft Sharks (IDP)", "ringer": "The Ringer",
+    "ringer-superflex": "The Ringer (Superflex)",
+    "ffcalc": "FF Calculator (ADP)", "underdog": "Underdog (Best Ball ADP)",
+    "rotoballer": "RotoBaller",
 }
 
 
@@ -36,6 +41,15 @@ def source_labels(seen_sources):
 
 TOP_N = {"QB": 24, "RB": 36, "WR": 48, "TE": 24, "K": 24, "DST": 24}
 HIT_N = 12  # top-12 hit rate window
+
+# sleeper_id -> position, needed to build the "top N by actual points" half of
+# each evaluation pool. Populated once from the player DB in main().
+POS_OF = {}
+
+
+def load_positions(players_db):
+    POS_OF.clear()
+    POS_OF.update({pid: p["pos"] for pid, p in players_db.items() if p.get("pos")})
 
 
 def _scoped(pos_metrics, positions):
@@ -95,27 +109,76 @@ def spearman(pred_ranks, actual_points):
     return round(num / (dp * da), 4)
 
 
-def evaluate(players, points_by_pid, top_n, hit_n=HIT_N):
-    """players: ordered [{sleeper_id,...}]; points_by_pid: pid -> float."""
-    pool = players[:top_n]
-    matched = [(i + 1, points_by_pid.get(p.get("sleeper_id"), 0.0) if p.get("sleeper_id") else 0.0)
-               for i, p in enumerate(pool)]
+def evaluate(players, points_by_pid, top_n, hit_n=HIT_N, pos=None):
+    """Score one positional ranking against actual points.
+
+    players: ordered [{sleeper_id,...}]; points_by_pid: pid -> float.
+
+    The evaluation pool is the UNION of the source's top N and the top N by
+    actual points, following FantasyPros' methodology. Slicing only the top N
+    by prediction makes a breakout invisible: if nobody ranked a player who
+    finished RB12, every source silently escapes the miss. Players in the pool
+    that a source didn't rank are imputed at "last rank it published + 1"
+    rather than scored as if predicted worst — they were unranked, not ranked
+    last, and a source with a short list shouldn't be punished as though it
+    actively ranked everyone it omitted.
+    """
+    ranked = [p for p in players if p.get("sleeper_id")]
+    pool = list(players[:top_n])
+    in_pool = {p.get("sleeper_id") for p in pool}
+
+    # top N by actual points AT THIS POSITION — filtering after the slice would
+    # take the top N scorers overall (mostly QBs) and leave almost nothing
+    at_pos = [(pid, v) for pid, v in points_by_pid.items()
+              if not pos or POS_OF.get(pid) == pos]
+    top_actual = sorted(at_pos, key=lambda kv: -kv[1])[:top_n]
+    ranked_by_id = {p["sleeper_id"]: i + 1 for i, p in enumerate(ranked)}
+    imputed_rank = len(ranked) + 1
+
+    entries = [(i + 1, points_by_pid.get(p.get("sleeper_id"), 0.0)) for i, p in enumerate(pool)]
+    added = 0
+    for pid, pts in top_actual:
+        if pid in in_pool:
+            continue
+        # in the pool on merit; use the source's own rank if it has one
+        entries.append((ranked_by_id.get(pid, imputed_rank), pts))
+        added += 1
+
     unmatched = sum(1 for p in pool if not p.get("sleeper_id"))
-    if len(matched) < 3:
+    ranked_entries = entries[:len(pool)]
+    if len(ranked_entries) < 3:
         return None
-    pred_ranks = [m[0] for m in matched]
-    pts = [m[1] for m in matched]
-    rho = spearman(pred_ranks, pts)
-    actual_ranks = _avg_rank(pts)
-    mae = sum(abs(p - a) for p, a in zip(pred_ranks, actual_ranks)) / len(pred_ranks)
-    hits = sum(1 for p, a in zip(pred_ranks, actual_ranks) if p <= hit_n and a <= hit_n)
-    return {
-        "spearman": rho,
-        "rank_mae": round(mae, 2),
-        "hit_rate": round(hits / min(hit_n, len(pred_ranks)), 3),
-        "n": len(matched),
+
+    def _stats(rows):
+        pr = [r[0] for r in rows]
+        pt = [r[1] for r in rows]
+        ar = _avg_rank(pt)
+        return {
+            "spearman": spearman(pr, pt),
+            "rank_mae": round(sum(abs(p - a) for p, a in zip(pr, ar)) / len(pr), 2),
+            "hit_rate": round(sum(1 for p, a in zip(pr, ar)
+                                  if p <= hit_n and a <= hit_n)
+                              / min(hit_n, len(pr)), 3),
+            "n": len(rows),
+        }
+
+    base = _stats(ranked_entries)
+    # Headline Spearman stays on the players the source actually ranked — that
+    # is what rank correlation means, and it keeps the number comparable across
+    # seasons. The union pool is reported alongside rather than folded in:
+    # Spearman treats a breakout the source ranked 150th as an extreme outlier,
+    # so mixing the pools would swing the headline wildly (0.32 -> 0.13 on 2025)
+    # for a reason that is really about coverage, not ordering. FantasyPros pair
+    # the union pool with points-space error, not rank correlation.
+    union = _stats(entries) if added else dict(base)
+    base.update({
+        "ranked": len(pool),
         "unmatched": unmatched,
-    }
+        "missed_top": added,          # top-N scorers the source left out of its top-N
+        "union": {"spearman": union["spearman"], "rank_mae": union["rank_mae"],
+                  "n": union["n"]},
+    })
+    return base
 
 
 def attach_ids(players, matchers):
@@ -136,6 +199,24 @@ def pos_lists(players):
         if p.get("pos") in out:
             out[p["pos"]].append(p)
     return out
+
+
+def tags_of(payload):
+    """Tags for a snapshot, defaulted for boards captured before tagging."""
+    t = dict(DEFAULT_TAGS)
+    t.update(payload.get("tags") or {})
+    return t
+
+
+def is_baseline(payload):
+    """Can this board be compared directly against the default league?
+
+    The default league is 1QB / half-PPR / K+DST / single flex redraft. A
+    superflex board, an IDP board, or a best-ball ADP is measuring a different
+    question, so none of them belong in the default consensus — but all stay
+    captured, tagged, and available behind a toggle.
+    """
+    return matches_baseline(tags_of(payload))
 
 
 def load_rankings(season, scope):
@@ -160,6 +241,7 @@ def main(season=None, is_current=True):
     if season is None:
         season = int(sleeper.get_state()["season"])
     players_db = sleeper.load_players()
+    load_positions(players_db)
     matchers = sleeper.build_matchers(players_db)
 
     # ---- actual points per completed week
@@ -192,6 +274,12 @@ def main(season=None, is_current=True):
         "leaderboard": {"weekly": {}, "predraft": {}},
     }
 
+    # which sources are directly comparable to the default league
+    baseline_sources = {}
+    for scope_name in ["predraft"] + [f"week{w:02d}" for w in weeks]:
+        for (source, _f), payload in load_rankings(season, scope_name).items():
+            baseline_sources.setdefault(source, is_baseline(payload))
+
     # ---- weekly rankings vs weekly points
     for fmt in FORMATS:
         summary["weekly"][fmt] = {}
@@ -205,7 +293,7 @@ def main(season=None, is_current=True):
                 pts = pts_for(w, fmt)
                 pos_metrics = {}
                 for pos in POSITIONS:
-                    m = evaluate(by_pos[pos], pts, TOP_N[pos])
+                    m = evaluate(by_pos[pos], pts, TOP_N[pos], pos=pos)
                     if m:
                         pos_metrics[pos] = m
                 if not pos_metrics:
@@ -234,7 +322,8 @@ def main(season=None, is_current=True):
                     cum["avg_spearman"] = cum[scope]["avg_spearman"]
                     cum["weeks"] = len(scores)
                 board.append({"source": source, "score": cum[scope]["avg_spearman"],
-                              "weeks": len(scores)})
+                              "weeks": len(scores),
+                              "baseline": baseline_sources.get(source, True)})
             board.sort(key=lambda x: -x["score"])
             summary["leaderboard"]["weekly"][fmt][scope] = board
 
@@ -260,7 +349,7 @@ def main(season=None, is_current=True):
                     cpts = cum_pts(w, fmt)
                     wk_metrics = {}
                     for pos in POSITIONS:
-                        m = evaluate(by_pos[pos], cpts, TOP_N[pos])
+                        m = evaluate(by_pos[pos], cpts, TOP_N[pos], pos=pos)
                         if m:
                             wk_metrics[pos] = m
                     sc = scope_scores(wk_metrics)
@@ -271,7 +360,7 @@ def main(season=None, is_current=True):
                 cpts = cum_pts(latest, fmt)
                 pos_metrics = {}
                 for pos in POSITIONS:
-                    m = evaluate(by_pos[pos], cpts, TOP_N[pos])
+                    m = evaluate(by_pos[pos], cpts, TOP_N[pos], pos=pos)
                     if m:
                         pos_metrics[pos] = m
                 overall = evaluate(ordered, cpts, PREDRAFT_TOP_OVERALL) if ordered else None
@@ -283,6 +372,7 @@ def main(season=None, is_current=True):
                         board.append({
                             "scope": scope,
                             "source": source,
+                            "baseline": is_baseline(payload),
                             "score": sc["avg_spearman"],
                             "overall": overall["spearman"] if overall else None,
                             "positions": sc["positions"],
@@ -299,6 +389,15 @@ def main(season=None, is_current=True):
         seen.update(summary["weekly"][fmt])
         seen.update(summary["predraft"][fmt])
     summary["labels"] = source_labels(seen)
+
+    # per-source tags, so the site can filter/badge instead of hardcoding
+    src_tags = {}
+    for scope_name in ["predraft"] + [f"week{w:02d}" for w in weeks]:
+        for (source, _f), payload in load_rankings(season, scope_name).items():
+            src_tags.setdefault(source, tags_of(payload))
+    summary["source_tags"] = src_tags
+    summary["baseline"] = {"qb": "1qb", "format": "half_ppr",
+                           "roster": "offense", "scope": "redraft"}
 
     write_json(DOCS / "data" / str(season) / "summary.json", summary)
     if is_current:
@@ -317,6 +416,8 @@ def main(season=None, is_current=True):
         for (source, f2), payload in predraft.items():
             if f2 != fmt:
                 continue
+            if not is_baseline(payload):
+                continue  # superflex / IDP / best-ball — different question
             if sum(1 for p in payload["players"] if p["rank"] == 1) > 1:
                 continue  # positional-only board — no overall order
             board = {}
