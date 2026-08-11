@@ -41,14 +41,11 @@ import json
 import re
 from pathlib import Path
 
-from common import fetch, get_logger
+from common import VALID_POS, fetch, get_logger, normalize_pos
 
 log = get_logger("spec_engine")
 
 SPEC_DIR = Path(__file__).resolve().parent / "sources" / "specs"
-
-POS_FIX = {"DEF": "DST", "PK": "K", "D/ST": "DST"}
-VALID_POS = {"QB", "RB", "WR", "TE", "K", "DST"}
 
 
 def load_specs():
@@ -83,14 +80,15 @@ def _clean(row):
     name = (row.get("name") or "").strip()
     if not name:
         return None
-    pos = (row.get("pos") or "").strip().upper() or None
-    if pos:
-        pos = POS_FIX.get(pos, pos)
-        pos = re.sub(r"\d+$", "", pos)  # "RB1" -> "RB"
-        if pos not in VALID_POS:
-            pos = None
+    raw = (row.get("pos") or "").strip().upper() or None
+    pos = normalize_pos(raw)
     team = (row.get("team") or "").strip().upper() or None
-    return {"rank": row["rank"], "name": htmllib.unescape(name), "team": team, "pos": pos}
+    out = {"rank": row["rank"], "name": htmllib.unescape(name), "team": team, "pos": pos}
+    if raw and not pos:
+        # e.g. IDP labels (LB/DL/DB) — kept so we can tell an IDP board apart
+        # from a board that simply failed to report positions
+        out["pos_raw"] = raw
+    return out
 
 
 def _parse_json(cfg, resp):

@@ -2,7 +2,7 @@
 
 Yahoo default leagues are half-PPR, and there is a single rank/ADP set.
 """
-from common import fetch, get_logger
+from common import fetch, get_logger, normalize_pos
 
 log = get_logger("yahoo")
 
@@ -38,7 +38,7 @@ def fetch_draft(fmt, sess=None):
                 "rank": len(out) + 1,
                 "name": name,
                 "team": (info.get("editorial_team_abbr") or "").upper() or None,
-                "pos": info.get("display_position"),
+                "pos": normalize_pos(info.get("display_position")),
             })
         if n < 60:
             break

@@ -4,7 +4,7 @@ The api-key is PFF's own public client credential shipped in their JS bundle;
 it may rotate — if this starts 403ing, re-extract CONSUMER_API_KEY from the bundle.
 Single board with PPR-flavored ADP; mapped to ppr.
 """
-from common import fetch, get_logger
+from common import fetch, get_logger, normalize_pos
 
 log = get_logger("pff")
 
@@ -25,7 +25,7 @@ def fetch_draft(fmt, sess=None):
             "rank": rank,
             "name": f"{r.get('firstName', '')} {r.get('lastName', '')}".strip(),
             "team": r.get("teamAbbreviation"),
-            "pos": r.get("position"),
+            "pos": normalize_pos(r.get("position")),
         })
     out.sort(key=lambda x: x["rank"])
     if len(out) < 50:

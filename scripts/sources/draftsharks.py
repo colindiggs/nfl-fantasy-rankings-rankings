@@ -1,7 +1,7 @@
 """DraftSharks redraft rankings — htmx table fragment, all formats, no login."""
 import re
 
-from common import fetch, get_logger
+from common import fetch, get_logger, normalize_pos
 
 log = get_logger("draftsharks")
 
@@ -28,11 +28,11 @@ def fetch_draft(fmt, sess=None):
             continue
         pos = POS_RE.search(block)
         team = TEAM_RE.search(block)
-        p = (pos.group(1).upper() if pos else None)
-        if p == "DEF":
-            p = "DST"
+        raw = (pos.group(1).upper() if pos else None)
+        p = normalize_pos(raw)
         out.append({"rank": int(rank.group(1)), "name": name.group(1),
-                    "team": team.group(1) if team else None, "pos": p})
+                    "team": team.group(1) if team else None, "pos": p,
+                    "pos_raw": raw if raw and not p else None})
     seen, deduped = set(), []
     for r in sorted(out, key=lambda x: x["rank"]):
         if r["rank"] not in seen:

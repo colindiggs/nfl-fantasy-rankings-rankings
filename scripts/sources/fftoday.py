@@ -4,7 +4,7 @@ Scoring: 1 = non-PPR, 2 = half-PPR, 3 = PPR.
 """
 import re
 
-from common import fetch, get_logger
+from common import fetch, get_logger, normalize_pos
 
 log = get_logger("fftoday")
 
@@ -37,8 +37,7 @@ def fetch_draft(fmt, sess=None):
     html = fetch(DRAFT_URL.format(scoring=SCORING[fmt]), sess=sess).text
     out = []
     for m in ROW_RE.finditer(html):
-        pos = re.match(r"[A-Z]+", m.group(2).upper()).group(0)
-        pos = "DST" if pos == "DEF" else pos
+        pos = normalize_pos(re.match(r"[A-Z]+", m.group(2).upper()).group(0))
         out.append({"rank": int(m.group(1)), "name": m.group(3).strip(),
                     "team": m.group(4), "pos": pos})
     seen, deduped = set(), []

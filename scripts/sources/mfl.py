@@ -2,7 +2,7 @@
 
 Formats: standard (IS_PPR=0) and PPR (IS_PPR=1); MFL has no half-PPR split.
 """
-from common import fetch, get_logger
+from common import fetch, get_logger, normalize_pos
 
 log = get_logger("mfl")
 
@@ -27,7 +27,7 @@ def _players(season, sess=None):
             if "," in name:  # "Last, First" -> "First Last"
                 last, first = [x.strip() for x in name.split(",", 1)]
                 name = f"{first} {last}"
-            pos = {"PK": "K", "Def": "DST"}.get(p["position"], p["position"])
+            pos = normalize_pos(p["position"])
             m[p["id"]] = {"name": name, "pos": pos, "team": p.get("team")}
         _players_cache[season] = m
     return _players_cache[season]

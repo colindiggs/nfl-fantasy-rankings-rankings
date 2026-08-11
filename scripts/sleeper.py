@@ -1,4 +1,5 @@
 """Sleeper API: NFL state, player database (for cross-site ID matching), weekly stats."""
+import teams
 from common import DATA, apply_alias, fetch, get_logger, norm_name, read_json, write_json
 
 log = get_logger("sleeper")
@@ -7,7 +8,9 @@ BASE = "https://api.sleeper.app/v1"
 
 PLAYERS_CACHE = DATA / "players" / "sleeper_players.json"
 
-KEEP_POS = {"QB", "RB", "WR", "TE", "K"}
+# Sleeper calls team defenses "DEF" and keys them by team code ("PHI"); we store
+# them under our canonical "DST" label.
+KEEP_POS = {"QB", "RB", "WR", "TE", "K", "DEF"}
 
 
 def get_state():
@@ -24,8 +27,19 @@ def refresh_players():
         pos = p.get("position")
         if pos not in KEEP_POS:
             continue
+        name = (p.get("full_name")
+                or f"{p.get('first_name','')} {p.get('last_name','')}".strip())
+        if pos == "DEF":
+            # defenses carry no full_name; first/last is "Philadelphia"/"Eagles"
+            pos = "DST"
+            team = teams.normalize_code(p.get("team") or pid)
+            if not team:
+                continue
+            trimmed[pid] = {"name": name, "pos": "DST", "team": team,
+                            "espn_id": None, "active": True}
+            continue
         trimmed[pid] = {
-            "name": p.get("full_name") or f"{p.get('first_name','')} {p.get('last_name','')}".strip(),
+            "name": name,
             "pos": pos,
             "team": p.get("team"),
             "espn_id": p.get("espn_id"),
@@ -48,8 +62,14 @@ def build_matchers(players):
     by_espn = {}
     by_namepos = {}
     by_name = {}
+    by_dst = {}
     ambiguous = set()
     for pid, p in players.items():
+        if p["pos"] == "DST":
+            code = teams.normalize_code(p.get("team") or pid)
+            if code:
+                by_dst[code] = pid
+            continue
         if p.get("espn_id"):
             by_espn[str(p["espn_id"])] = pid
         n = apply_alias(norm_name(p["name"]))
@@ -69,10 +89,20 @@ def build_matchers(players):
             by_name[n] = pid
     for n in ambiguous:
         by_name.pop(n, None)
-    return {"espn": by_espn, "namepos": by_namepos, "name": by_name, "db": players}
+    return {"espn": by_espn, "namepos": by_namepos, "name": by_name,
+            "dst": by_dst, "db": players}
 
 
-def match_player(matchers, name=None, pos=None, espn_id=None):
+def match_player(matchers, name=None, pos=None, espn_id=None, team=None):
+    # Defenses never match by person-name, so resolve them to a team code first.
+    # Try this whenever the row *looks* like a defense, since plenty of sources
+    # publish "Eagles D/ST" with no position column at all.
+    if pos == "DST" or (not pos and name and teams.resolve_dst(name=name)):
+        code = teams.resolve_dst(name=name, team=team if pos == "DST" else None)
+        if code:
+            return matchers["dst"].get(code)
+        if pos == "DST":
+            return None
     if espn_id and str(espn_id) in matchers["espn"]:
         return matchers["espn"][str(espn_id)]
     if name:

@@ -16,7 +16,23 @@ LOGS = ROOT / "logs"
 SEASON = None  # resolved at runtime from Sleeper state
 
 FORMATS = ["standard", "half_ppr", "ppr"]
-POSITIONS = ["QB", "RB", "WR", "TE"]
+
+# Positions scored by the benchmark. SKILL_POSITIONS drive the headline
+# leaderboard (comparable across every source); K/DST are scored identically but
+# reported separately — coverage is patchier and week-to-week results are far
+# more luck-driven, which is why FantasyPros' own accuracy competitions compute
+# them and then leave them out of "Overall".
+SKILL_POSITIONS = ["QB", "RB", "WR", "TE"]
+EXTRA_POSITIONS = ["K", "DST"]
+POSITIONS = SKILL_POSITIONS + EXTRA_POSITIONS
+
+# Everything sites call these two positions, mapped to our canonical labels.
+POS_FIX = {
+    "DEF": "DST", "D": "DST", "D/ST": "DST", "DST": "DST", "D-ST": "DST",
+    "TMDEF": "DST", "TEAM DEF": "DST", "DEFENSE": "DST",
+    "PK": "K", "K": "K", "KICKER": "K",
+}
+VALID_POS = set(POSITIONS)
 
 UA = (
     "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
@@ -105,6 +121,7 @@ ALIAS_GROUPS = [
     ["kenny gainwell", "kenneth gainwell"],
     ["kyle monangai", "kyle monanagi"],
     ["jonathon brooks", "jonathan brooks"],
+    ["andy borregales", "andres borregales"],  # brother Jose is also a K in the DB
 ]
 
 ALIASES = {}
@@ -115,3 +132,18 @@ for group in ALIAS_GROUPS:
 
 def apply_alias(n):
     return ALIASES.get(n, n)
+
+
+def normalize_pos(pos):
+    """Canonicalize a scraped position label, or None if it isn't one we score.
+
+    Handles the DEF/D/D-ST and PK spellings, and strips positional-rank suffixes
+    ("RB1" -> "RB", "DST3" -> "DST").
+    """
+    if not pos:
+        return None
+    p = str(pos).strip().upper().replace(".", "")
+    p = POS_FIX.get(p, p)
+    p = re.sub(r"\d+$", "", p).strip()
+    p = POS_FIX.get(p, p)
+    return p if p in VALID_POS else None
