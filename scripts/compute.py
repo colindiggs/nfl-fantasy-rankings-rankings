@@ -151,9 +151,14 @@ def load_rankings(season, scope):
     return out
 
 
-def main():
-    state = sleeper.get_state()
-    season = int(state["season"])
+def main(season=None, is_current=True):
+    """Build site data for one season.
+
+    Writes docs/data/{season}/*.json always, and mirrors the current season to
+    docs/data/*.json so the site's default load path is unchanged.
+    """
+    if season is None:
+        season = int(sleeper.get_state()["season"])
     players_db = sleeper.load_players()
     matchers = sleeper.build_matchers(players_db)
 
@@ -295,8 +300,10 @@ def main():
         seen.update(summary["predraft"][fmt])
     summary["labels"] = source_labels(seen)
 
-    write_json(DOCS / "data" / "summary.json", summary)
-    log.info("summary.json written (%d weeks evaluated)", len(weeks))
+    write_json(DOCS / "data" / str(season) / "summary.json", summary)
+    if is_current:
+        write_json(DOCS / "data" / "summary.json", summary)
+    log.info("%s/summary.json written (%d weeks evaluated)", season, len(weeks))
 
     # ---- consensus pre-draft board for the site (top 200, per-source ranks)
     # Players ranked by some sources but not others: a player's consensus rank is
@@ -346,9 +353,39 @@ def main():
             "sources": sorted(boards, key=lambda s: len(boards[s]), reverse=True),
             "players": rows[:200],
         }
-    write_json(DOCS / "data" / "predraft.json", comparison)
-    log.info("predraft.json written")
+    write_json(DOCS / "data" / str(season) / "predraft.json", comparison)
+    if is_current:
+        write_json(DOCS / "data" / "predraft.json", comparison)
+    log.info("%s/predraft.json written", season)
+    return summary
+
+
+def available_seasons():
+    """Seasons with any captured rankings, newest first."""
+    d = DATA / "rankings"
+    if not d.exists():
+        return []
+    return sorted((int(p.name) for p in d.iterdir()
+                   if p.is_dir() and p.name.isdigit()), reverse=True)
+
+
+def write_index(current):
+    seasons = available_seasons()
+    write_json(DOCS / "data" / "seasons.json",
+               {"current": current, "seasons": seasons})
+    log.info("seasons.json written: %s (current %s)", seasons, current)
 
 
 if __name__ == "__main__":
-    main()
+    import sys
+    args = [a for a in sys.argv[1:] if not a.startswith("--")]
+    current = int(sleeper.get_state()["season"])
+    if args and args[0] == "all":
+        targets = available_seasons()
+    elif args:
+        targets = [int(a) for a in args]
+    else:
+        targets = [current]
+    for s in targets:
+        main(season=s, is_current=(s == current))
+    write_index(current)

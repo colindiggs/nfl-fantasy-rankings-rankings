@@ -41,11 +41,23 @@ Standard, half-PPR, and PPR are evaluated separately; each format's leaderboard
 only includes sources that publish that format.
 
 ### Metrics
-Per source, per format, per week, positions QB/RB/WR/TE (top 24/36/48/24):
+Per source, per format, per week, positions QB/RB/WR/TE/K/DST (top 24/36/48/24/24/24):
 
 - **Spearman correlation** between predicted rank and actual points rank (headline metric)
 - **Rank MAE** — average absolute positional-rank error
 - **Top-12 hit rate** — how many predicted top-12 players finished top-12
+
+Scores are reported under two **scopes**, both computed and stored:
+
+| Scope | Positions | Why |
+|---|---|---|
+| `skill` | QB/RB/WR/TE | Every source publishes these, so it's comparable across the whole field and across seasons — the default view |
+| `all` | + K and DST | The full redraft roster, for sources that rank kickers and defenses |
+
+They're kept separate rather than blended because K/DST coverage is patchy and
+both positions are far more luck-driven week to week. FantasyPros' own accuracy
+competitions make the same call — they score K/DST and then leave them out of
+"Overall." The site exposes the choice as a toggle.
 
 The site also builds a **consensus draft board** (top 200 per format, with player
 headshots): each source's board is re-numbered over matched skill players, and a
@@ -79,9 +91,33 @@ cd scripts
 python capture.py predraft      # snapshot pre-draft boards
 python capture.py weekly [wk]   # snapshot weekly rankings
 python capture.py actuals [wk]  # pull actual points for a completed week
-python compute.py               # rebuild docs/data/*.json
+python compute.py [season|all]  # rebuild docs/data/{season}/*.json
 python runner.py tuesday        # full scheduled run (capture + compute + push)
 ```
+
+## Backfilling a past season
+
+```
+python backfill.py 2025          # actuals + weekly + pre-draft
+python backfill.py 2025 --weeks 1-9
+python compute.py 2025
+```
+
+Most ranking sites publish only the current week — once it passes, it's gone.
+Three sources genuinely serve history, so a backfilled season is thinner than a
+live-captured one:
+
+| Source | What's archived | How |
+|---|---|---|
+| FantasyPros | weekly **and** pre-draft ECR, all positions, all formats | `?week=N&year=YYYY` on the ranking pages |
+| FF Calculator | real mock-draft ADP for that season | `?year=YYYY` |
+| MyFantasyLeague | ADP export | per-season path |
+
+Everything captured is real published data — nothing is reconstructed. Verified
+*not* backfillable: FFToday weekly (accepts a `Season` param but returns an empty
+table for past seasons), CBS, NFL.com, ESPN, Yahoo, PFF, RotoBaller, The Ringer,
+Underdog, Draft Sharks, FantasySharks, WalterFootball. For extra historical depth
+the CSV inbox is the on-ramp.
 
 ## Adding a ranker (any ranker)
 
@@ -117,5 +153,13 @@ where it competes.
 - Scrapers validate row counts and fail loudly per source/format; one source
   breaking never blocks the others. Check `logs/run.log` after schema changes.
 - Player matching: ESPN by shared `espn_id` via Sleeper; FantasyPros/CBS by
-  normalized name + position (aliases in `scripts/common.py`).
-- K/DST are excluded from scoring in v1.
+  normalized name + position (aliases in `scripts/common.py`). Defenses resolve
+  by team code instead — `scripts/teams.py` maps every published form
+  ("Philadelphia Eagles", "Eagles D/ST", "Eagles", "PHI") onto the team code
+  Sleeper keys defenses by.
+- Sources publish boards in formats they don't always declare. Some are known to
+  diverge from the 1QB / half-PPR / K+DST baseline this benchmark targets:
+  **FantasySharks** orders by raw projected points rather than draft value (so
+  ~25 QBs lead the board), **MyFantasyLeague** ADP pools superflex leagues, and
+  **Draft Sharks** publishes an IDP board. Detection and labelling of this is in
+  progress; until then treat those three with care.
