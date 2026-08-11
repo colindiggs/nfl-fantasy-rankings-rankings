@@ -12,6 +12,10 @@ here is real published data, never reconstructed:
   fantasypros  weekly + pre-draft ECR, addressable by ?week=&year=
   ffcalc       real mock-draft ADP for a given season (?year=)
   mfl          MyFantasyLeague ADP export, per-season path
+  sleeper      their own weekly projections, ordered into rankings, 2018+
+  espn (wk)    weekly projections by scoringPeriodId, 2021+; half-PPR is
+               exactly (standard + PPR) / 2, which is arithmetic on their
+               own numbers rather than a third invented board
   espn         fantasy API keyed by season path — draft board, 2023+ only
                (2018-2022 respond but carry no draft ranks; 2017 and older 404)
 
@@ -25,12 +29,18 @@ Two dead ends worth not re-testing:
   the 2026 board (Gibbs first; 2025's was Chase). Silent, so it has to be
   checked against a known result rather than trusted.
 
-  The Wayback Machine looked promising (hundreds of captures across these
-  domains during the 2025 season) but does not hold up per page. FFToday's
-  archived weekly URLs drop the Season/GameWeek params, so the week would have
-  to be inferred from the capture date, and there is exactly ONE capture of the
-  weekly QB page in the whole 2025 season. Not enough to rebuild a season from,
-  and the inference would be guesswork.
+  The Wayback Machine holds real captures but not enough of them. FFToday's
+  archived weekly URLs DO carry GameWeek (an earlier probe used the wrong URL
+  form and concluded otherwise), covering 18 weeks of 2025 — but only PosIDs
+  10/30/50/80, so RB and TE are absent entirely. NFL.com has 2025 weeks 1, 4,
+  5, 9, 15 and 18 with varying positions. Both are partial enough that they
+  would skew per-position comparisons, and they are unnecessary now that
+  Sleeper and ESPN supply complete weekly boards.
+
+  FantasyPros individual experts (182 of them) are not publicly retrievable.
+  The ecrData blob exposes an `experts_available` list and a `filters` param,
+  but filtering is applied client-side: requesting ?filters=3900 returns the
+  same 45-expert consensus, byte for byte, as the unfiltered page.
 """
 import sys
 import time
@@ -38,16 +48,19 @@ import time
 import capture
 import sleeper
 from common import get_logger
-from sources import fantasypros
+from sources import espn, fantasypros, sleeper_proj
 
 log = get_logger("backfill")
 
-WEEKLY_SOURCES = ["fantasypros"]
+WEEKLY_SOURCES = ["fantasypros", "sleeper", "espn"]
 DRAFT_SOURCES = ["fantasypros", "ffcalc", "mfl", "espn"]
 
 # Some historical sources only reach back so far; skip them rather than log a
 # failure for every earlier season.
-SOURCE_FIRST_SEASON = {"espn": 2023}
+# A source can reach further back for one kind of data than another: ESPN's
+# draft board starts in 2023 but their weekly projections go to 2021.
+DRAFT_FIRST_SEASON = {"espn": 2023}
+WEEKLY_FIRST_SEASON = {"sleeper": 2018, "espn": 2021}
 
 # The NFL went from a 16-game/17-week season to 17 games/18 weeks in 2021.
 # Asking for week 18 of 2019 just yields empty snapshots and wasted fetches.
@@ -81,20 +94,24 @@ def backfill(season, weeks, do_actuals=True, do_rankings=True, do_draft=True):
 
     if do_draft:
         usable = {s for s in DRAFT_SOURCES
-                  if season >= SOURCE_FIRST_SEASON.get(s, 0)}
+                  if season >= DRAFT_FIRST_SEASON.get(s, 0)}
         ok, failed = capture.capture_predraft(season, only=usable)
         results["draft"] = ok
         results["failed"] += [f"predraft {f}" for f in failed]
 
     if do_rankings:
+        weekly = {s for s in WEEKLY_SOURCES
+                  if season >= WEEKLY_FIRST_SEASON.get(s, 0)}
         for w in weeks:
-            ok, failed = capture.capture_weekly(season, w, only=set(WEEKLY_SOURCES))
+            ok, failed = capture.capture_weekly(season, w, only=weekly)
             results["weekly"] += [f"wk{w} {o}" for o in ok]
             results["failed"] += [f"weekly wk{w} {f}" for f in failed]
             # the per-URL page cache saves refetching QB/K/DST across formats,
             # but each page is ~0.5MB — drop it between weeks or a long backfill
             # accumulates gigabytes of held HTML
             fantasypros.clear_cache()
+            sleeper_proj.clear_cache()
+            espn.clear_cache()
             time.sleep(1)  # be a good citizen
 
     return results

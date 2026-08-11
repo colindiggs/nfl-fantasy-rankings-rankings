@@ -21,8 +21,9 @@ fantasy points every week, and publishes a running leaderboard for the season.
 
 | Source | Std | Half | PPR | Weekly | How |
 |---|---|---|---|---|---|
-| FantasyPros | ✓ | ✓ | ✓ | ✓ | embedded ecrData JSON |
-| ESPN | ✓ | | ✓ | | fantasy API (`kona_player_info`), historical to 2023 |
+| FantasyPros | ✓ | ✓ | ✓ | ✓ | embedded ecrData JSON, archive back to 2013 |
+| Sleeper (projections) | ✓ | ✓ | ✓ | ✓ | `/projections/nfl/{season}/{week}`, 2018+ |
+| ESPN | ✓ | ✓* | ✓ | ✓ | fantasy API; draft board 2023+, **weekly projections 2021+** (*half-PPR derived) |
 | CBS Sports | ✓ | | ✓ | ✓ | HTML top-200 / positional pages |
 | NFL.com | ✓ | | | ✓ | server-rendered research pages |
 | Yahoo | | ✓ | | | public `pub-api-ro` JSON (default = half-PPR) |
@@ -107,7 +108,9 @@ python runner.py tuesday        # full scheduled run (capture + compute + push)
 
 | Data | Seasons | Sources |
 |---|---|---|
-| Weekly rankings | 2013–2025 (13) | **FantasyPros only** |
+| Weekly rankings | 2021–2025 | **FantasyPros, Sleeper, ESPN** |
+| Weekly rankings | 2018–2020 | FantasyPros, Sleeper |
+| Weekly rankings | 2013–2017 | FantasyPros only |
 | Pre-draft, PPR & Standard | 2023–2025 | FantasyPros, FF Calculator, MyFantasyLeague, ESPN |
 | Pre-draft, PPR & Standard | 2013–2022 | FantasyPros, FF Calculator, MyFantasyLeague |
 | Pre-draft, Half-PPR | 2013–2025 | FantasyPros, FF Calculator |
@@ -119,8 +122,28 @@ board. That's why a backfilled half-PPR season shows two sources while the same
 season in PPR shows four. The site says so under the controls rather than
 leaving it to be discovered.
 
-Weekly rankings stay single-source for history because no other site archives
-them; see the dead ends in `backfill.py`.
+Weekly history is multi-source from 2018 because two sites expose past weeks
+through their own APIs rather than an archive:
+
+- **Sleeper** publishes a projection for every player every week at
+  `/projections/nfl/{season}/{week}`, back to 2018. It is keyed by Sleeper
+  player_id — the same id space as our actuals — so matching is exact rather
+  than name-based.
+- **ESPN** exposes weekly projections by `scoringPeriodId` with the season in
+  the URL path, back to 2021. `leaguedefaults/1` scores standard and `/3`
+  scores PPR; half-PPR is exactly `(standard + PPR) / 2`, since half-PPR is
+  standard plus 0.5/reception and PPR is standard plus 1.0. That's arithmetic
+  on ESPN's own projection, not a third invented board.
+
+Both are tagged `basis="projection"` and badged in the UI. A projection ordered
+by points is a real ranking, but it answers "who scores most" rather than "who
+should you start", and the two come apart where usage is volatile.
+
+Dead ends are recorded in `backfill.py` so they aren't re-tested: the Wayback
+Machine (real captures, but FFToday's archive is missing RB and TE entirely and
+NFL.com covers 6 weeks of 2025), RotoBaller's ignored `season` param, and
+FantasyPros' 182 individual experts (the `filters` param is applied
+client-side, so every request returns the same 45-expert consensus).
 
 ## Backfilling a past season
 

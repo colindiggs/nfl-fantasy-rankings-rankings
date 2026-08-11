@@ -310,7 +310,7 @@ const SRC_SHORT = {
   fftoday: "FFT", walter: "Walter", rotoballer: "RBall", draftsharks: "DSharks",
   underdog: "UDog",
 };
-const SRC_ORDER = ["fantasypros", "cbs", "nfl", "fftoday", "espn", "yahoo", "pff",
+const SRC_ORDER = ["fantasypros", "espn", "sleeper", "cbs", "nfl", "fftoday", "yahoo", "pff",
                    "ringer", "rotoballer", "draftsharks", "sharks", "ffcalc", "mfl",
                    "underdog", "walter"];
 const SRC_COLOR = {};
@@ -344,6 +344,8 @@ function inView(s) {
 function tagPills(s) {
   const t = srcTags(s), out = [];
   if (t.basis === "adp") out.push(["ADP", "Market average draft position, not an expert opinion"]);
+  if (t.basis === "projection") out.push(["PROJECTION",
+    "Ranked by projected points rather than by expert opinion — it answers who scores most, not who you should start"]);
   if (t.scope === "bestball") out.push(["BEST BALL", "Best-ball ADP — no waivers, streaming or start/sit, and no K/DST"]);
   if (t.qb === "superflex") out.push(["SUPERFLEX", "Two-QB format — not comparable to a 1QB board"]);
   if (t.roster === "idp") out.push(["IDP", "Individual defensive players ranked alongside offense"]);
@@ -408,6 +410,7 @@ const SRC_MARK = {
   "draftsharks-idp": ["DShrk IDP", "#075f7c"], sharks: ["FShrk", "#2d6b8f"],
   fftoday: ["FFToday", "#8a6d1f"], walter: ["Walter", "#5c5c5c"],
   ffcalc: ["FFCalc", "#3b7dd8"], mfl: ["MFL", "#7a3fb0"], underdog: ["Underdog", "#111827"],
+  sleeper: ["Sleeper", "#00ceb8"],
 };
 
 function srcMark(s, withName) {

@@ -26,7 +26,7 @@ CODE_LABELS = {
     "draftsharks-idp": "Draft Sharks (IDP)", "ringer": "The Ringer",
     "ringer-superflex": "The Ringer (Superflex)",
     "ffcalc": "FF Calculator (ADP)", "underdog": "Underdog (Best Ball ADP)",
-    "rotoballer": "RotoBaller",
+    "rotoballer": "RotoBaller", "sleeper": "Sleeper (projections)",
 }
 
 
@@ -225,6 +225,14 @@ def evaluate(players, points_by_pid, top_n, hit_n=HIT_N, pos=None, kind=None, fm
 
 def attach_ids(players, matchers):
     for p in players:
+        # some sources (Sleeper's own projections) already carry the id, so
+        # there is nothing to guess
+        if p.get("sleeper_id"):
+            if not p.get("pos"):
+                db = matchers["db"].get(p["sleeper_id"])
+                if db:
+                    p["pos"] = db["pos"]
+            continue
         pid = sleeper.match_player(
             matchers, name=p.get("name"), pos=p.get("pos"),
             espn_id=p.get("espn_id"), team=p.get("team"))

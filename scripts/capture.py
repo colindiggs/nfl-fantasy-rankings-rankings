@@ -27,7 +27,7 @@ from common import DATA, FORMATS, get_logger, session, tags, write_json
 import sleeper
 import spec_engine
 from sources import (cbs, draftsharks, espn, fantasypros, fftoday, mfl,
-                     nfl_com, pff, ringer, sharks, walter, yahoo)
+                     nfl_com, pff, ringer, sharks, sleeper_proj, walter, yahoo)
 
 log = get_logger("capture")
 
@@ -59,6 +59,9 @@ WEEKLY_SOURCES = {
     "cbs": (["standard", "ppr"], lambda f, y, w, s: cbs.fetch_weekly(f, s)),
     "nfl": (["standard"], lambda f, y, w, s: nfl_com.fetch_weekly(f, w, s)),
     "fftoday": (FORMATS, lambda f, y, w, s: fftoday.fetch_weekly(f, y, w, s)),
+    # Sleeper's own projections, ordered into positional rankings
+    "sleeper": (FORMATS, lambda f, y, w, s: sleeper_proj.fetch_weekly(f, s, season=y, week=w)),
+    "espn": (FORMATS, lambda f, y, w, s: espn.fetch_weekly(f, y, w, s)),
 }
 
 
@@ -134,6 +137,9 @@ SOURCE_TAGS = {
     "sharks": tags(basis="adp"),           # switched off their projection table
     "underdog": tags(basis="adp", scope="bestball"),
     "walter": tags(order="positional"),
+    "sleeper": tags(basis="projection"),
+    # ESPN is deliberately absent: its draft board and its weekly
+    # projections carry different bases, so the adapter declares them
     "ringer-superflex": tags(qb="superflex"),
     "draftsharks-idp": tags(roster="idp"),
     "draftsharks": tags(roster="idp"),   # legacy snapshots
