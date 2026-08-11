@@ -7,6 +7,10 @@ Usage:
   python capture.py players           # refresh Sleeper player cache
   python capture.py inbox             # import manual CSV boards from data/inbox/
 
+Flags:
+  --season YYYY     target a season other than the current one (historical backfill)
+  --only a,b        restrict to named sources (most sources are current-season only)
+
 Sources come from three places, all equal citizens downstream:
   1. JSON specs in scripts/sources/specs/ (no code — see spec_engine.py)
   2. Python adapters in scripts/sources/ (for sites needing custom logic)
@@ -31,7 +35,7 @@ INBOX = DATA / "inbox"
 
 # Python adapters: source -> (formats, fetch(fmt, season, sess))
 DRAFT_SOURCES = {
-    "fantasypros": (FORMATS, lambda f, y, s: fantasypros.fetch_draft(f, s)),
+    "fantasypros": (FORMATS, lambda f, y, s: fantasypros.fetch_draft(f, s, season=y)),
     "espn": (["standard", "ppr"], lambda f, y, s: espn.fetch_draft(f, y, s)),
     "cbs": (["standard", "ppr"], lambda f, y, s: cbs.fetch_draft(f, s)),
     "nfl": (["standard"], lambda f, y, s: nfl_com.fetch_draft(f, s)),
@@ -46,7 +50,7 @@ DRAFT_SOURCES = {
 
 # source -> (formats, fetch(fmt, season, week, sess))
 WEEKLY_SOURCES = {
-    "fantasypros": (FORMATS, lambda f, y, w, s: fantasypros.fetch_weekly(f, s)),
+    "fantasypros": (FORMATS, lambda f, y, w, s: fantasypros.fetch_weekly(f, s, season=y, week=w)),
     "cbs": (["standard", "ppr"], lambda f, y, w, s: cbs.fetch_weekly(f, s)),
     "nfl": (["standard"], lambda f, y, w, s: nfl_com.fetch_weekly(f, w, s)),
     "fftoday": (FORMATS, lambda f, y, w, s: fftoday.fetch_weekly(f, y, w, s)),
@@ -135,10 +139,12 @@ def _save(season, scope, source, fmt, result):
     log.info("saved %s/%s %s: %d players", scope, source, fmt, len(result["players"]))
 
 
-def capture_predraft(season):
+def capture_predraft(season, only=None):
     sess = session()
     ok, failed = [], []
     for source, (formats, fn) in DRAFT_SOURCES.items():
+        if only and source not in only:
+            continue
         for fmt in formats:
             try:
                 _save(season, "predraft", source, fmt, fn(fmt, season, sess))
@@ -149,11 +155,13 @@ def capture_predraft(season):
     return ok, failed
 
 
-def capture_weekly(season, week):
+def capture_weekly(season, week, only=None):
     sess = session()
     scope = f"week{week:02d}"
     ok, failed = [], []
     for source, (formats, fn) in WEEKLY_SOURCES.items():
+        if only and source not in only:
+            continue
         for fmt in formats:
             try:
                 _save(season, scope, source, fmt, fn(fmt, season, week, sess))
@@ -173,26 +181,37 @@ def capture_actuals(season, week):
     log.info("saved actuals week %d: %d players", week, len(stats))
 
 
+def _flag(name):
+    """Pull '--name value' out of argv, or None."""
+    if name in sys.argv:
+        i = sys.argv.index(name)
+        if i + 1 < len(sys.argv):
+            return sys.argv[i + 1]
+    return None
+
+
 def main():
-    cmd = sys.argv[1] if len(sys.argv) > 1 else "predraft"
+    args = [a for a in sys.argv[1:] if not a.startswith("--")]
+    cmd = args[0] if args else "predraft"
     state = sleeper.get_state()
-    season = int(state["season"])
+    season = int(_flag("--season") or state["season"])
+    only = set((_flag("--only") or "").split(",")) - {""} or None
     if cmd == "players":
         sleeper.refresh_players()
     elif cmd == "predraft":
         sleeper.load_players()
-        ok, failed = capture_predraft(season)
-        print(f"predraft: {len(ok)} ok, {len(failed)} failed")
+        ok, failed = capture_predraft(season, only=only)
+        print(f"predraft {season}: {len(ok)} ok, {len(failed)} failed")
         for f in failed:
             print("  FAILED", f)
     elif cmd == "weekly":
-        week = int(sys.argv[2]) if len(sys.argv) > 2 else int(state.get("display_week") or state["week"])
-        ok, failed = capture_weekly(season, week)
-        print(f"weekly {week}: {len(ok)} ok, {len(failed)} failed")
+        week = int(args[1]) if len(args) > 1 else int(state.get("display_week") or state["week"])
+        ok, failed = capture_weekly(season, week, only=only)
+        print(f"weekly {season} wk{week}: {len(ok)} ok, {len(failed)} failed")
         for f in failed:
             print("  FAILED", f)
     elif cmd == "actuals":
-        week = int(sys.argv[2]) if len(sys.argv) > 2 else int(state["week"]) - 1
+        week = int(args[1]) if len(args) > 1 else int(state["week"]) - 1
         capture_actuals(season, week)
     elif cmd == "inbox":
         done = import_inbox(season)
