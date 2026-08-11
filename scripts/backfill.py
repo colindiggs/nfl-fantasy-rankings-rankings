@@ -13,7 +13,7 @@ here is real published data, never reconstructed:
   ffcalc       real mock-draft ADP for a given season (?year=)
   mfl          MyFantasyLeague ADP export, per-season path
   sleeper      their own weekly projections, ordered into rankings, 2018+
-  espn (wk)    weekly projections by scoringPeriodId, 2021+; half-PPR is
+  espn (wk)    weekly projections by scoringPeriodId, 2023+; half-PPR is
                exactly (standard + PPR) / 2, which is arithmetic on their
                own numbers rather than a third invented board
   espn         fantasy API keyed by season path — draft board, 2023+ only
@@ -60,7 +60,7 @@ DRAFT_SOURCES = ["fantasypros", "ffcalc", "mfl", "espn"]
 # A source can reach further back for one kind of data than another: ESPN's
 # draft board starts in 2023 but their weekly projections go to 2021.
 DRAFT_FIRST_SEASON = {"espn": 2023}
-WEEKLY_FIRST_SEASON = {"sleeper": 2018, "espn": 2021}
+WEEKLY_FIRST_SEASON = {"sleeper": 2018, "espn": 2023}
 
 # The NFL went from a 16-game/17-week season to 17 games/18 weeks in 2021.
 # Asking for week 18 of 2019 just yields empty snapshots and wasted fetches.

@@ -66,14 +66,24 @@ def load_positions(players_db):
     POS_OF.update({pid: p["pos"] for pid, p in players_db.items() if p.get("pos")})
 
 
+MIN_POOL = 8   # a Spearman over fewer players than this is mostly noise
+
+
 def _scoped(pos_metrics, positions):
-    """Average Spearman and Accuracy Gap over a position subset."""
-    rhos = [pos_metrics[p]["spearman"] for p in positions
-            if p in pos_metrics and pos_metrics[p]["spearman"] is not None]
+    """Average Spearman and Accuracy Gap over a position subset.
+
+    Positions whose scoreable pool fell below MIN_POOL are reported per
+    position but left out of the average — a rho computed over five players
+    swings wildly and would dominate a six-position mean.
+    """
+    usable = [p for p in positions
+              if p in pos_metrics and pos_metrics[p].get("n", 0) >= MIN_POOL]
+    rhos = [pos_metrics[p]["spearman"] for p in usable
+            if pos_metrics[p]["spearman"] is not None]
     if not rhos:
         return None
-    gaps = [pos_metrics[p]["accuracy_gap"] for p in positions
-            if p in pos_metrics and pos_metrics[p].get("accuracy_gap") is not None]
+    gaps = [pos_metrics[p]["accuracy_gap"] for p in usable
+            if pos_metrics[p].get("accuracy_gap") is not None]
     out = {"avg_spearman": round(sum(rhos) / len(rhos), 4), "positions": len(rhos)}
     if gaps:
         out["accuracy_gap"] = round(sum(gaps) / len(gaps), 2)
@@ -142,9 +152,34 @@ def evaluate(players, points_by_pid, top_n, hit_n=HIT_N, pos=None, kind=None, fm
     last, and a source with a short list shouldn't be punished as though it
     actively ranked everyone it omitted.
     """
-    ranked = [p for p in players if p.get("sleeper_id")]
-    pool = list(players[:top_n])
+    # A player we could not resolve to an id cannot be scored — we don't know
+    # what he did. Scoring him 0.0 instead silently inflates the result: those
+    # rows sit deep in a source's list, so "ranked low, scored nothing" reads
+    # as a correct call. ESPN's 2022 board matched only 128 of 484 rows and
+    # posted a weekly RB Spearman of 0.81 on the strength of that alone, which
+    # is not achievable by any real projection. Drop them and report the count.
+    # Two kinds of row cannot be scored fairly and are excluded rather than
+    # counted as zero:
+    #
+    #   no id        we don't know who it is, so we don't know what he did
+    #   no stat line he never took the field that week
+    #
+    # The second matters more than it looks. Sources differ in whether they
+    # list inactive players at all: FantasyPros drop them from the weekly
+    # board, ESPN's projections include everyone. Zero-filling rewards ESPN for
+    # "correctly" ranking a player who was never going to play, an advantage
+    # FantasyPros structurally cannot earn. It is not a small effect — ESPN's
+    # 2022 top-36 RB pool held 10 such rows and posted a weekly RB Spearman of
+    # 0.81, against 0.01 for FantasyPros on the same week and the same actuals.
+    scoreable = [p for p in players
+                 if p.get("sleeper_id") and p["sleeper_id"] in points_by_pid]
+    ranked = scoreable
+    pool = list(scoreable[:top_n])
     in_pool = {p.get("sleeper_id") for p in pool}
+    head = players[:top_n]
+    dropped = sum(1 for p in head if not p.get("sleeper_id"))
+    did_not_play = sum(1 for p in head
+                       if p.get("sleeper_id") and p["sleeper_id"] not in points_by_pid)
 
     # top N by actual points AT THIS POSITION — filtering after the slice would
     # take the top N scorers overall (mostly QBs) and leave almost nothing
@@ -163,7 +198,7 @@ def evaluate(players, points_by_pid, top_n, hit_n=HIT_N, pos=None, kind=None, fm
         entries.append((ranked_by_id.get(pid, imputed_rank), pts))
         added += 1
 
-    unmatched = sum(1 for p in pool if not p.get("sleeper_id"))
+    unmatched = dropped
     ranked_entries = entries[:len(pool)]
     if len(ranked_entries) < 3:
         return None
@@ -214,6 +249,7 @@ def evaluate(players, points_by_pid, top_n, hit_n=HIT_N, pos=None, kind=None, fm
     base.update({
         "ranked": len(pool),
         "unmatched": unmatched,
+        "did_not_play": did_not_play,
         "missed_top": added,          # top-N scorers the source left out of its top-N
         "accuracy_gap": gap,          # mean |implied points - actual points|
         "calibration": calib,

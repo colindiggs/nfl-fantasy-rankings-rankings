@@ -108,8 +108,8 @@ python runner.py tuesday        # full scheduled run (capture + compute + push)
 
 | Data | Seasons | Sources |
 |---|---|---|
-| Weekly rankings | 2021–2025 | **FantasyPros, Sleeper, ESPN** |
-| Weekly rankings | 2018–2020 | FantasyPros, Sleeper |
+| Weekly rankings | 2023–2025 | **FantasyPros, Sleeper, ESPN** |
+| Weekly rankings | 2018–2022 | FantasyPros, Sleeper |
 | Weekly rankings | 2013–2017 | FantasyPros only |
 | Pre-draft, PPR & Standard | 2023–2025 | FantasyPros, FF Calculator, MyFantasyLeague, ESPN |
 | Pre-draft, PPR & Standard | 2013–2022 | FantasyPros, FF Calculator, MyFantasyLeague |
@@ -130,7 +130,8 @@ through their own APIs rather than an archive:
   player_id — the same id space as our actuals — so matching is exact rather
   than name-based.
 - **ESPN** exposes weekly projections by `scoringPeriodId` with the season in
-  the URL path, back to 2021. `leaguedefaults/1` scores standard and `/3`
+  the URL path, used from 2023 (2021–22 respond but are survivorship-biased —
+  see below). `leaguedefaults/1` scores standard and `/3`
   scores PPR; half-PPR is exactly `(standard + PPR) / 2`, since half-PPR is
   standard plus 0.5/reception and PPR is standard plus 1.0. That's arithmetic
   on ESPN's own projection, not a third invented board.
@@ -138,6 +139,32 @@ through their own APIs rather than an archive:
 Both are tagged `basis="projection"` and badged in the UI. A projection ordered
 by points is a real ranking, but it answers "who scores most" rather than "who
 should you start", and the two come apart where usage is volatile.
+
+### Rows that can't be scored fairly
+
+Two kinds of row are excluded from scoring rather than counted as zero, and
+both are reported per position (`unmatched`, `did_not_play`):
+
+- **No id** — we don't know who it is, so we don't know what he did.
+- **No stat line** — he never took the field. This one matters more than it
+  looks: sources differ in whether they list inactive players at all.
+  FantasyPros drop them from the weekly board; ESPN's projections include
+  everyone. Zero-filling rewards ESPN for "correctly" ranking a player who was
+  never going to play, an advantage FantasyPros structurally cannot earn. It's
+  not subtle — ESPN's 2022 top-36 RB pool held 10 such rows and posted a weekly
+  RB Spearman of 0.81 against FantasyPros' 0.01 on the same week and the same
+  actuals.
+
+A position whose scoreable pool falls below 8 players is still reported but
+left out of the leaderboard average, since a rho over five players swings
+wildly enough to dominate a six-position mean.
+
+**ESPN weekly is used from 2023 only.** 2021 and 2022 respond, but the player
+set returned for those seasons skews toward players prominent today — 12 of the
+top-24 projected QBs in 2022 week 3 never played that week. The survivors are a
+biased sample of players who were good in that era, which inflated weekly
+Spearman to ~0.43 against ~0.26 for every other source. From 2023 the
+did-not-play counts are ~0 and it tracks the field normally.
 
 Dead ends are recorded in `backfill.py` so they aren't re-tested: the Wayback
 Machine (real captures, but FFToday's archive is missing RB and TE entirely and

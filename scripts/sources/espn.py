@@ -57,7 +57,15 @@ def fetch_draft(fmt, season, sess=None):
 #
 # ESPN publish a projection for every player every week, addressable by
 # scoringPeriodId, and the season lives in the URL path — so unlike almost
-# every other site, past weeks are still retrievable. Verified back to 2021.
+# every other site, past weeks are still retrievable.
+#
+# 2021 and 2022 respond, and are deliberately NOT used. The player set they
+# return for those seasons skews toward players prominent today rather than
+# then: 12 of the top-24 projected QBs in 2022 week 3 never took the field that
+# week. What survives is a small, survivorship-biased pool of players who were
+# good in that era, which inflated weekly Spearman to 0.43 against 0.26 for
+# every other source on the same weeks. 2023 onward returns dnp counts of ~0
+# and tracks the field normally.
 #
 # leaguedefaults/1 scores standard, /3 scores PPR. Half-PPR is exactly the
 # midpoint: half = std + 0.5*rec and ppr = std + 1.0*rec, so (std + ppr) / 2
@@ -69,7 +77,7 @@ WEEK_URL = ("https://lm-api-reads.fantasy.espn.com/apis/v3/games/ffl/seasons/"
 
 LEAGUE_DEFAULT = {"standard": 1, "ppr": 3}
 
-WEEKLY_FIRST_SEASON = 2021
+WEEKLY_FIRST_SEASON = 2023
 
 # any valid sort works; this shape is the one ESPN accepts (limit alone 400s)
 _WEEK_FILTER = {"players": {"limit": 500,
