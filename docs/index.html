@@ -113,6 +113,9 @@ tbody tr:hover { background: var(--rowhover); }
 #tooltip .tt-week { color: var(--muted); margin-bottom: 4px; }
 #tooltip .row { display: flex; justify-content: space-between; gap: 12px; }
 svg text { fill: var(--muted); font-size: 11px; font-family: system-ui, sans-serif; }
+circle.wk-dot { cursor: pointer; }
+circle.wk-dot:hover { stroke: var(--ink); stroke-width: 3; }
+.quad-note { font-size: 11px; font-weight: 600; }
 a { color: var(--accent); }
 
 /* consensus board */
@@ -165,6 +168,11 @@ th .mark { margin: 0 auto; }
 .bar-val { width: 72px; text-align: right; color: var(--ink-2); font-variant-numeric: tabular-nums; flex: none; }
 .bar-group { margin-bottom: 18px; }
 .bar-group h4 { margin: 0 0 8px; font-size: .85rem; font-weight: 600; color: var(--ink); display: flex; align-items: center; }
+.chart-note { color: var(--muted); font-size: .78rem; margin: 0 0 14px; display: flex; align-items: center; }
+.chart-note .arrow { color: var(--s3); margin-right: 6px; font-size: .7rem; }
+.note-sep { width: 1px; height: 12px; background: var(--border); margin: 0 12px; display: inline-block; }
+th.sortable { cursor: pointer; user-select: none; }
+th.sortable:hover { color: var(--ink); }
 .spread-cell { display: flex; align-items: center; gap: 8px; }
 .spread-num { color: var(--muted); font-size: .74rem; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .tag-pill {
@@ -266,19 +274,15 @@ td.na { text-align: right; color: var(--grid); }
   </div>
 
   <div class="card">
-    <h2>Where each source went wrong</h2>
-    <p class="sub">Accuracy gap by position — the average distance, in fantasy points, between what a
-    source's rank implied a player would score and what he actually scored. Shorter bars are better.
-    This is where kickers and defenses earn their reputation.</p>
+    <h2>Average error by position</h2>
+    <p class="sub">Fantasy points between what a source's rank implied a player would score and what he
+    actually scored, averaged over the season.</p>
     <div id="pos-breakdown"></div>
   </div>
 
   <div class="card">
-    <h2>Predicted rank vs. actual finish</h2>
-    <p class="sub">Every ranked player-week as one dot: predicted rank across, where he actually
-    finished up. The dashed diagonal is a perfect call. Dots <b>below</b> the line are players the
-    source was too low on, <b>above</b> it are players it was too high on. A tight cloud along the
-    diagonal means a well-calibrated board; a wide one means the ordering was closer to noise.</p>
+    <h2>Projected rank vs. actual finish</h2>
+    <p class="sub">One dot per ranked player-week.</p>
     <div class="calib-controls" id="calib-controls"></div>
     <div class="chartbox"><div id="calib-chart"></div></div>
   </div>
@@ -321,6 +325,8 @@ let FMT = "half_ppr", POS = "ALL", QUERY = "", SEASON = null;
 // average.
 const SCOPE = "all";
 let ROSTER = "offense";   // "offense" = team DST (default), "idp" = IDP leagues
+// board sort: key is "avg", "cov", or a source slug; dir 1 = best first
+let SORT = {key: "avg", dir: 1};
 
 const srcTags = s => (SUMMARY && SUMMARY.source_tags && SUMMARY.source_tags[s]) || {};
 
@@ -395,13 +401,13 @@ function faceHtml(p) {
    body, CBS a 26px gif), so each source gets a branded monogram chip instead —
    always renders, no third-party request, readable in both themes. */
 const SRC_MARK = {
-  fantasypros: ["FP", "#0b6ab0"], espn: ["E", "#d50a0a"], cbs: ["CBS", "#0072ce"],
-  nfl: ["NFL", "#013369"], yahoo: ["Y!", "#6001d2"], ringer: ["R", "#e4002b"],
-  "ringer-superflex": ["R+", "#a1002b"], pff: ["PFF", "#f26722"],
-  rotoballer: ["RB", "#1b8a3f"], draftsharks: ["DS", "#0a7ea4"],
-  "draftsharks-idp": ["DS+", "#075f7c"], sharks: ["FS", "#2d6b8f"],
-  fftoday: ["FFT", "#8a6d1f"], walter: ["WF", "#5c5c5c"],
-  ffcalc: ["FFC", "#3b7dd8"], mfl: ["MFL", "#7a3fb0"], underdog: ["UD", "#111827"],
+  fantasypros: ["FPros", "#0b6ab0"], espn: ["ESPN", "#d50a0a"], cbs: ["CBS", "#0072ce"],
+  nfl: ["NFL", "#013369"], yahoo: ["Yahoo", "#6001d2"], ringer: ["Ringer", "#e4002b"],
+  "ringer-superflex": ["Ringer SF", "#a1002b"], pff: ["PFF", "#f26722"],
+  rotoballer: ["RotoB", "#1b8a3f"], draftsharks: ["DShrk", "#0a7ea4"],
+  "draftsharks-idp": ["DShrk IDP", "#075f7c"], sharks: ["FShrk", "#2d6b8f"],
+  fftoday: ["FFToday", "#8a6d1f"], walter: ["Walter", "#5c5c5c"],
+  ffcalc: ["FFCalc", "#3b7dd8"], mfl: ["MFL", "#7a3fb0"], underdog: ["Underdog", "#111827"],
 };
 
 function srcMark(s, withName) {
@@ -440,10 +446,26 @@ function renderBoard() {
   if (QUERY) rows = rows.filter(p => p.name.toLowerCase().includes(QUERY));
   // scale to the widest rank actually displayed — against a fixed 200 the
   // top of the board collapses into an unreadable sliver
+  // Sort by consensus, coverage, or any single source's ranking. Players a
+  // source didn't rank always sort last: "unranked" is missing data, not a
+  // good or bad score, so it shouldn't win either end of the table.
+  rows = rows.slice().sort((a, b) => {
+    const get = r => SORT.key === "avg" ? r.avg
+                   : SORT.key === "cov" ? -r.n
+                   : (r.ranks[SORT.key] != null ? r.ranks[SORT.key] : Infinity);
+    const va = get(a), vb = get(b);
+    if (va === Infinity && vb === Infinity) return a.avg - b.avg;
+    if (va === Infinity) return 1;
+    if (vb === Infinity) return -1;
+    return (va - vb) * SORT.dir;
+  });
+  const caret = k => SORT.key === k ? (SORT.dir === 1 ? " \u25b2" : " \u25bc") : "";
   const maxRank = Math.max(10, ...rows.map(r => r.max));
   let html = '<table><thead><tr><th class="num">#</th><th class="pcol">Player</th>' +
-    '<th class="num" title="Mean rank across the sources that rank him">Avg</th><th title="Best and worst rank any source gave him">Spread</th><th class="num" title="How many sources rank him, out of those with a board this format">Cov</th>' +
-    sources.map(s => `<th class="rk" title="${esc(srcName(s))}">${srcMark(s)}</th>`).join("") +
+    `<th class="num sortable" data-sort="avg" title="Mean rank across the sources that rank him. Click to sort.">Avg${caret("avg")}</th>` +
+    '<th title="Best and worst rank any source gave him">Spread</th>' +
+    `<th class="num sortable" data-sort="cov" title="How many sources rank him. Click to sort.">Cov${caret("cov")}</th>` +
+    sources.map(s => `<th class="rk sortable" data-sort="${esc(s)}" title="${esc(srcName(s))} \u2014 click to sort by this source">${srcMark(s)}${caret(s)}</th>`).join("") +
     "</tr></thead><tbody>";
   rows.forEach((p, i) => {
     const left = (p.min - 1) / maxRank * 100, width = Math.max(2, (p.max - p.min) / maxRank * 100);
@@ -545,7 +567,11 @@ function renderTrend() {
     const d = pts.map((p, i) => `${i ? "L" : "M"}${x(p[0]).toFixed(1)},${y(p[1]).toFixed(1)}`).join(" ");
     g += `<path d="${d}" fill="none" stroke="${SRC_COLOR[s]}" stroke-width="2" stroke-linejoin="round"/>`;
     pts.forEach(p => {
-      g += `<circle cx="${x(p[0]).toFixed(1)}" cy="${y(p[1]).toFixed(1)}" r="4" fill="${SRC_COLOR[s]}" stroke="var(--surface)" stroke-width="2"/>`;
+      g += `<circle class="wk-dot" data-src="${esc(s)}" data-week="${p[0]}" ` +
+           `cx="${x(p[0]).toFixed(1)}" cy="${y(p[1]).toFixed(1)}" r="5" ` +
+           `fill="${SRC_COLOR[s]}" stroke="var(--surface)" stroke-width="2">` +
+           `<title>${esc(srcName(s))} \u00b7 week ${p[0]} \u00b7 ${p[1].toFixed(3)}` +
+           ` \u2014 click to inspect this week</title></circle>`;
     });
     const last = pts[pts.length - 1];
     g += `<text x="${W - R + 8}" y="${y(last[1]) + 4}" style="fill:var(--ink-2)">${esc(srcName(s))}</text>`;
@@ -603,6 +629,23 @@ function renderBaselineNote() {
     ? "IDP leagues — individual defensive players ranked alongside offense"
     : "1QB redraft with a team defense and a single RB/WR/TE flex";
   let html = `Scoring every board against <b>${esc(lens)}</b>.`;
+  // Coverage varies a lot by format on historical seasons: ESPN and
+  // MyFantasyLeague publish standard and PPR but no half-PPR, so a backfilled
+  // half-PPR season looks thinner than it is. Point that out rather than
+  // leaving it to be discovered.
+  const countFmt = f => new Set([
+    ...Object.keys(SUMMARY.predraft[f] || {}),
+    ...Object.keys(SUMMARY.weekly[f] || {})].filter(inView)).size;
+  const here = countFmt(FMT);
+  const better = ["ppr", "standard", "half_ppr"]
+    .filter(f => f !== FMT).map(f => [f, countFmt(f)])
+    .filter(([, n]) => n > here).sort((a, b) => b[1] - a[1])[0];
+  if (better) {
+    const nice = {ppr: "PPR", standard: "Standard", half_ppr: "Half PPR"}[better[0]];
+    html += ` This season has <b>${here}</b> ${here === 1 ? "source" : "sources"} in ` +
+      `${{ppr: "PPR", standard: "Standard", half_ppr: "Half PPR"}[FMT]}; ` +
+      `<b>${nice}</b> has ${better[1]}.`;
+  }
   if (hidden.length) {
     // in IDP mode nearly everything is excluded, so name a few and count the rest
     const show = hidden.slice(0, 4);
@@ -647,7 +690,9 @@ function renderPosBreakdown() {
     return;
   }
   const max = Math.max(...sources.flatMap(s => Object.values(gaps[s])));
-  $("#pos-breakdown").innerHTML = sources.map(s => {
+  const legend = '<p class="chart-note"><span class="arrow">\u25c0</span> shorter bar = smaller error = more accurate' +
+    '<span class="note-sep"></span>bars are error, so less is better</p>';
+  $("#pos-breakdown").innerHTML = legend + sources.map(s => {
     const rows = ALL_POS.filter(pos => gaps[s][pos] != null).map(pos => {
       const v = gaps[s][pos];
       const w = Math.max(1, v / max * 100);
@@ -661,18 +706,30 @@ function renderPosBreakdown() {
 }
 
 /* ---------- calibration scatter ---------- */
-let CALIB_SRC = null, CALIB_POS = "RB";
+let CALIB_SRC = null, CALIB_POS = "RB", CALIB_WEEK = null;
 
 function calibrationPairs(source, pos) {
   const entry = (SUMMARY.weekly[FMT] || {})[source];
   if (!entry) return [];
   const pts = [];
-  Object.values(entry.weeks || {}).forEach(wk => {
-    const m = (wk.positions || {})[pos];
+  Object.entries(entry.weeks || {}).forEach(([wk, data]) => {
+    if (CALIB_WEEK != null && Number(wk) !== CALIB_WEEK) return;
+    const m = (data.positions || {})[pos];
     if (m && m.calibration) m.calibration.forEach(c => pts.push(c));
   });
   return pts;
 }
+
+/* clicking a point on the week-by-week chart drills into that source-week */
+document.addEventListener("click", e => {
+  const dot = e.target.closest("circle.wk-dot");
+  if (!dot) return;
+  CALIB_SRC = dot.dataset.src;
+  CALIB_WEEK = Number(dot.dataset.week);
+  renderCalibration();
+  const el = document.getElementById("calib-chart");
+  if (el) el.scrollIntoView({behavior: "smooth", block: "center"});
+});
 
 function renderCalibration() {
   const weekly = SUMMARY.weekly[FMT] || {};
@@ -688,7 +745,10 @@ function renderCalibration() {
       (s === CALIB_SRC ? "active" : "") + '">' + esc(srcName(s)) + "</button>").join("") +
     '<span class="calib-sep"></span>' +
     ALL_POS.map(pp => '<button data-cpos="' + pp + '" class="' +
-      (pp === CALIB_POS ? "active" : "") + '">' + pp + "</button>").join("");
+      (pp === CALIB_POS ? "active" : "") + '">' + pp + "</button>").join("") +
+    '<span class="calib-sep"></span>' +
+    '<button data-callweeks="1" class="' + (CALIB_WEEK == null ? "active" : "") + '">' +
+    (CALIB_WEEK == null ? "All weeks" : "Week " + CALIB_WEEK + " \u2014 show all") + "</button>";
 
   const pairs = calibrationPairs(CALIB_SRC, CALIB_POS);
   if (pairs.length < 5) {
@@ -716,9 +776,22 @@ function renderCalibration() {
          '" r="3" fill="' + POS_COLOR[CALIB_POS] + '" opacity="0.4"/>';
   });
   g += '<text x="' + (L + pw / 2) + '" y="' + (H - 6) +
-       '" text-anchor="middle" style="fill:var(--ink-2)">Predicted rank \u2192</text>';
+       '" text-anchor="middle" style="fill:var(--ink-2)">Projected rank \u2192 (1 = ranked best)</text>';
   g += '<text x="15" y="' + (T + ph / 2) + '" text-anchor="middle" transform="rotate(-90 15 ' +
-       (T + ph / 2) + ')" style="fill:var(--ink-2)">Actual finish \u2192</text>';
+       (T + ph / 2) + ')" style="fill:var(--ink-2)">\u2190 Actual finish (1 = scored most)</text>';
+  // quadrant annotations. Above the diagonal = finished better than ranked.
+  g += '<text class="quad-note" x="' + (W - R - 14) + '" y="' + (T + 22) +
+       '" text-anchor="end" style="fill:var(--s3)">Beat their ranking \u2014 sleepers</text>';
+  g += '<text class="quad-note" x="' + (W - R - 14) + '" y="' + (T + 38) +
+       '" text-anchor="end" style="fill:var(--muted)">ranked low, scored high</text>';
+  g += '<text class="quad-note" x="' + (L + 14) + '" y="' + (H - B - 26) +
+       '" style="fill:var(--s8)">Missed their ranking \u2014 busts</text>';
+  g += '<text class="quad-note" x="' + (L + 14) + '" y="' + (H - B - 10) +
+       '" style="fill:var(--muted)">ranked high, scored low</text>';
+  // label the diagonal itself
+  g += '<text class="quad-note" x="' + x(hi * 0.62) + '" y="' + (y(hi * 0.62) - 8) +
+       '" text-anchor="middle" style="fill:var(--baseline)" transform="rotate(45 ' +
+       x(hi * 0.62) + ' ' + y(hi * 0.62) + ')">exactly as ranked</text>';
 
   const mean = a => a.reduce((s, v) => s + v, 0) / a.length;
   const mx = mean(pairs.map(c => c[0])), my = mean(pairs.map(c => c[1]));
@@ -730,12 +803,13 @@ function renderCalibration() {
     '<svg viewBox="0 0 ' + W + " " + H + '" style="width:100%;height:auto;display:block">' + g + "</svg>" +
     '<p class="sub" style="margin-top:10px">' + pairs.length.toLocaleString() +
     " player-weeks \u00b7 correlation <b>" + r.toFixed(2) +
-    "</b> \u00b7 a perfectly calibrated board would sit on the dashed line.</p>";
+    "</b> \u00b7 tight along the line = well calibrated, scattered = closer to noise.</p>";
 }
 
 document.addEventListener("click", e => {
   const b = e.target.closest("#calib-controls button");
   if (!b) return;
+  if (b.dataset.callweeks) CALIB_WEEK = null;
   if (b.dataset.csrc) CALIB_SRC = b.dataset.csrc;
   if (b.dataset.cpos) CALIB_POS = b.dataset.cpos;
   renderCalibration();
@@ -765,6 +839,13 @@ document.getElementById("posfilter").addEventListener("click", e => {
   const b = e.target.closest("button"); if (!b) return;
   POS = b.dataset.pos;
   document.querySelectorAll("#posfilter button").forEach(x => x.classList.toggle("active", x === b));
+  renderBoard();
+});
+document.addEventListener("click", e => {
+  const th = e.target.closest("#board th.sortable");
+  if (!th) return;
+  const key = th.dataset.sort;
+  SORT = (SORT.key === key) ? {key, dir: -SORT.dir} : {key, dir: 1};
   renderBoard();
 });
 document.getElementById("search").addEventListener("input", e => {

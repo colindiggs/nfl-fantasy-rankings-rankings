@@ -95,6 +95,25 @@ python compute.py [season|all]  # rebuild docs/data/{season}/*.json
 python runner.py tuesday        # full scheduled run (capture + compute + push)
 ```
 
+## What history actually exists
+
+| Data | Seasons | Sources |
+|---|---|---|
+| Weekly rankings | 2013–2025 (13) | **FantasyPros only** |
+| Pre-draft, PPR & Standard | 2023–2025 | FantasyPros, FF Calculator, MyFantasyLeague, ESPN |
+| Pre-draft, PPR & Standard | 2013–2022 | FantasyPros, FF Calculator, MyFantasyLeague |
+| Pre-draft, Half-PPR | 2013–2025 | FantasyPros, FF Calculator |
+| Current season (2026) | — | 17 sources |
+
+Half-PPR history is thinner than PPR/Standard because **ESPN and
+MyFantasyLeague publish standard and PPR only** — neither offers a half-PPR
+board. That's why a backfilled half-PPR season shows two sources while the same
+season in PPR shows four. The site says so under the controls rather than
+leaving it to be discovered.
+
+Weekly rankings stay single-source for history because no other site archives
+them; see the dead ends in `backfill.py`.
+
 ## Backfilling a past season
 
 ```
@@ -191,9 +210,14 @@ Every source was re-inspected against its live site:
 - **FantasySharks** — was pulling `projections.php`, ordered by raw projected
   points pooled across positions, so ~25 QBs led the board. That's a projections
   table, not a draft board. Now uses `adp.php` (Gibbs #1, QB4 at 45).
-- **Draft Sharks** — *not* superflex-contaminated; their superflex slugs exist
-  separately and differ clearly. IDP rows were crowding offense down to 83
-  players in the top 250. Captured as two views now.
+- **Draft Sharks** — captured as an IDP board only. Their rankings interleave
+  LB/DL/DB into a single value-based overall order (LB 10th, DL 13th, DB 18th).
+  An offence-only view was tried and withdrawn: stripping IDP and renumbering
+  still leaves Josh Allen 7th, Brock Bowers 8th, Trey McBride 9th and kicker
+  Brandon Aubrey **12th overall**. Peers put QB4 between 36 and 67; this board
+  had it at 28 with TE1 at 8. A kicker in the top 12 is the tell — it is a
+  legitimate board for the league it targets and misleading in any other, so it
+  is tagged `roster=idp` and kept out of the default consensus.
 - **MyFantasyLeague** — QB-heavier than peers (QB4 at pick 23) but a genuine 1QB
   board, not superflex.
 - **Underdog** — best-ball ADP: no K or DST at all, and QB4 goes at pick 67

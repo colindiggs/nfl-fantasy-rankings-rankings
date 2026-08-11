@@ -45,9 +45,9 @@ DRAFT_SOURCES = {
     "sharks": (FORMATS, lambda f, y, s: sharks.fetch_draft(f, s)),
     "fftoday": (FORMATS, lambda f, y, s: fftoday.fetch_draft(f, s)),
     "walter": (["standard"], lambda f, y, s: walter.fetch_draft(f, y, s)),
-    "draftsharks": (FORMATS, lambda f, y, s: draftsharks.fetch_draft(f, s)),
-    # IDP view of the same board, for IDP leagues (tagged roster="idp")
-    "draftsharks-idp": (FORMATS, lambda f, y, s: draftsharks.fetch_draft(f, s, include_idp=True)),
+    # Draft Sharks rank IDP alongside offence in one value-based order, so the
+    # board is only meaningful as an IDP board — see sources/draftsharks.py
+    "draftsharks-idp": (FORMATS, lambda f, y, s: draftsharks.fetch_draft(f, s)),
     "ringer": (["standard", "half_ppr", "ppr"], lambda f, y, s: ringer.fetch_draft(f, s)),
     # labelled superflex control — same analysts and week as the 1QB boards
     "ringer-superflex": (["half_ppr"], lambda f, y, s: ringer.fetch_draft(f, s, board="superflex")),
@@ -136,6 +136,7 @@ SOURCE_TAGS = {
     "walter": tags(order="positional"),
     "ringer-superflex": tags(qb="superflex"),
     "draftsharks-idp": tags(roster="idp"),
+    "draftsharks": tags(roster="idp"),   # legacy snapshots
 }
 
 

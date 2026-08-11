@@ -4,14 +4,16 @@ Their default board interleaves IDP (LB/DL/DB) into one overall order, which
 crowded offence down to ~83 players inside the top 250 and made the board look
 broken. It is not: with IDP removed it is a clean 1QB board.
 
-Two views are captured, because both are real leagues someone plays:
+Only the board as published is captured, tagged roster="idp".
 
-  draftsharks       offence + K/DST, IDP rows dropped, re-ranked 1..N
-  draftsharks-idp   the board exactly as published, IDP included
-
-The published order is preserved in both; the offence view only removes rows
-and renumbers, so a player's position relative to other offensive players is
-untouched.
+An offence-only view was tried and withdrawn. Stripping the IDP rows and
+renumbering does NOT yield a 1QB redraft board, because the underlying order
+is value-based across every position: after removing IDP it still reads Gibbs,
+Nacua, Bijan, Chase, McCaffrey, Smith-Njigba, Josh Allen (7), Brock Bowers (8),
+Trey McBride (9), Lamar Jackson (10), Drake Maye (11), Brandon Aubrey (12).
+A kicker twelfth overall is the tell — no 1QB redraft board looks like that.
+Peers put QB4 between 36 and 67; this board had it at 28 with TE1 at 8. It is a
+legitimate board for the league it targets, and misleading in any other.
 
 pprSuperflexSlug also accepts superflex variants ("superflex",
 "half-ppr-superflex", "ppr-superflex"). We deliberately use the 1QB slugs —
@@ -68,24 +70,11 @@ def clear_cache():
     _cache.clear()
 
 
-def fetch_draft(fmt, sess=None, include_idp=False):
+def fetch_draft(fmt, sess=None):
     rows = _rows(fmt, sess=sess)
     idp_seen = sum(1 for r in rows if (r.get("pos_raw") or "") in IDP_POSITIONS)
-    if include_idp:
-        players = [dict(r) for r in rows]
-        meta = {"count": len(players), "idp_rows": idp_seen, "view": "idp"}
-        return {"players": players, "meta": meta, "tags": tags(roster="idp")}
-    players = []
-    for r in rows:
-        if not r.get("pos") or (r.get("pos_raw") or "") in IDP_POSITIONS:
-            continue
-        p = {k: v for k, v in r.items() if k != "pos_raw"}
-        p["rank"] = len(players) + 1        # renumber over offence only
-        p["published_rank"] = r["rank"]     # keep what they actually printed
-        players.append(p)
-    if len(players) < 50:
-        raise RuntimeError(f"DraftSharks parse yielded only {len(players)} rows")
-    return {"players": players,
-            "meta": {"count": len(players), "idp_rows_dropped": idp_seen,
-                     "view": "offense"},
-            "tags": tags()}
+    if len(rows) < 50:
+        raise RuntimeError(f"DraftSharks parse yielded only {len(rows)} rows")
+    return {"players": [dict(r) for r in rows],
+            "meta": {"count": len(rows), "idp_rows": idp_seen, "view": "idp"},
+            "tags": tags(roster="idp")}
