@@ -329,6 +329,10 @@ let ROSTER = "offense";   // "offense" = team DST (default), "idp" = IDP leagues
 let SORT = {key: "avg", dir: 1};
 
 const srcTags = s => (SUMMARY && SUMMARY.source_tags && SUMMARY.source_tags[s]) || {};
+// a source can be an expert board pre-draft and a projection weekly (ESPN is),
+// so weekly views badge from the weekly tags
+const weeklyTags = s => (SUMMARY && SUMMARY.weekly_tags && SUMMARY.weekly_tags[s])
+                        || srcTags(s);
 
 /* A source belongs in the current view when its roster type matches and it
    isn't answering a different question (superflex / best ball). */
@@ -341,8 +345,9 @@ function inView(s) {
 }
 
 /* Short badges explaining why a source is what it is. */
-function tagPills(s) {
-  const t = srcTags(s), out = [];
+function tagPills(s, scope) {
+  const t = scope === "weekly" ? weeklyTags(s) : srcTags(s);
+  const out = [];
   if (t.basis === "adp") out.push(["ADP", "Market average draft position, not an expert opinion"]);
   if (t.basis === "projection") out.push(["PROJECTION",
     "Ranked by projected points rather than by expert opinion — it answers who scores most, not who you should start"]);
@@ -504,7 +509,7 @@ function renderWeeklyBoard() {
     '<th class="num" title="Rank correlation with actual finish. 1.0 = perfect ordering.">Spearman</th>' +
     '<th class="num">Weeks</th></tr></thead><tbody>';
   board.forEach((r, i) => {
-    html += `<tr><td>${i + 1}</td><td>${srcMark(r.source, true)}${tagPills(r.source)}</td>` +
+    html += `<tr><td>${i + 1}</td><td>${srcMark(r.source, true)}${tagPills(r.source, "weekly")}</td>` +
             `<td class="num">${r.accuracy_gap != null ? r.accuracy_gap.toFixed(1) : "—"}</td>` +
             `<td class="num">${r.score.toFixed(3)}</td><td class="num">${r.weeks}</td></tr>`;
   });

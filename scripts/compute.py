@@ -486,12 +486,20 @@ def main(season=None, is_current=True):
         seen.update(summary["predraft"][fmt])
     summary["labels"] = source_labels(seen)
 
-    # per-source tags, so the site can filter/badge instead of hardcoding
-    src_tags = {}
-    for scope_name in ["predraft"] + [f"week{w:02d}" for w in weeks]:
-        for (source, _f), payload in load_rankings(season, scope_name).items():
-            src_tags.setdefault(source, tags_of(payload))
+    # Per-source tags so the site can badge instead of hardcoding. Kept
+    # separately per scope: a source can be one thing pre-draft and another
+    # weekly. ESPN is exactly that — a curated draft board, but weekly
+    # projections — and one merged map would mislabel whichever came second.
+    src_tags, weekly_tags = {}, {}
+    for (source, _f), payload in load_rankings(season, "predraft").items():
+        src_tags.setdefault(source, tags_of(payload))
+    for w in weeks:
+        for (source, _f), payload in load_rankings(season, f"week{w:02d}").items():
+            weekly_tags.setdefault(source, tags_of(payload))
+    for source, t in weekly_tags.items():
+        src_tags.setdefault(source, t)
     summary["source_tags"] = src_tags
+    summary["weekly_tags"] = weekly_tags
     summary["curve_window"] = (read_json(DATA / "rankvalue.json") or {}).get("default_window")
     summary["baseline"] = {"qb": "1qb", "format": "half_ppr",
                            "roster": "offense", "scope": "redraft"}
