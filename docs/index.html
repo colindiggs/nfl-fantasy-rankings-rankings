@@ -12,6 +12,8 @@
   --grid: #e1e0d9; --baseline: #c3c2b7; --border: rgba(11,11,11,0.10);
   --s1: #2a78d6; --s2: #eb6834; --s3: #1baf7a; --s4: #eda100;
   --s5: #e87ba4; --s6: #008300; --s7: #4a3aa7; --s8: #e34948;
+  --accent: #2a78d6; --chip: #f0efec; --rowhover: rgba(42,120,214,0.06);
+  --shadow: 0 1px 3px rgba(11,11,11,0.06), 0 4px 16px rgba(11,11,11,0.04);
 }
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
@@ -21,6 +23,8 @@
     --grid: #2c2c2a; --baseline: #383835; --border: rgba(255,255,255,0.10);
     --s1: #3987e5; --s2: #d95926; --s3: #199e70; --s4: #c98500;
     --s5: #d55181; --s6: #008300; --s7: #9085e9; --s8: #e66767;
+    --accent: #3987e5; --chip: #242423; --rowhover: rgba(57,135,229,0.10);
+    --shadow: none;
   }
 }
 :root[data-theme="dark"] {
@@ -30,6 +34,8 @@
   --grid: #2c2c2a; --baseline: #383835; --border: rgba(255,255,255,0.10);
   --s1: #3987e5; --s2: #d95926; --s3: #199e70; --s4: #c98500;
   --s5: #d55181; --s6: #008300; --s7: #9085e9; --s8: #e66767;
+  --accent: #3987e5; --chip: #242423; --rowhover: rgba(57,135,229,0.10);
+  --shadow: none;
 }
 * { box-sizing: border-box; }
 body {
@@ -37,48 +43,119 @@ body {
   font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
   line-height: 1.5;
 }
-.wrap { max-width: 1080px; margin: 0 auto; padding: 24px 16px 64px; }
-h1 { font-size: 1.6rem; margin: 0 0 4px; }
-.sub { color: var(--ink-2); margin: 0 0 20px; font-size: .95rem; }
-.card {
-  background: var(--surface); border: 1px solid var(--border);
-  border-radius: 10px; padding: 18px; margin-bottom: 20px;
+.wrap { max-width: 1160px; margin: 0 auto; padding: 28px 18px 72px; }
+
+/* header */
+.hero { margin-bottom: 20px; }
+.hero h1 { font-size: 1.9rem; margin: 0 0 6px; letter-spacing: -0.02em; }
+.hero .tag { color: var(--ink-2); margin: 0 0 12px; font-size: 1rem; max-width: 640px; }
+.hero .chips { display: flex; gap: 8px; flex-wrap: wrap; }
+.hero .chip {
+  background: var(--chip); border: 1px solid var(--border); border-radius: 999px;
+  padding: 3px 12px; font-size: .8rem; color: var(--ink-2);
 }
-h2 { font-size: 1.1rem; margin: 0 0 10px; }
-.tabs { display: flex; gap: 6px; margin-bottom: 16px; flex-wrap: wrap; }
+.hero .chip b { color: var(--ink); font-weight: 600; }
+
+/* format tabs */
+.tabs { display: flex; gap: 6px; margin: 18px 0 16px; flex-wrap: wrap; }
 .tabs button {
   background: var(--surface); color: var(--ink-2); border: 1px solid var(--border);
-  border-radius: 999px; padding: 6px 16px; cursor: pointer; font: inherit; font-size: .9rem;
+  border-radius: 999px; padding: 7px 18px; cursor: pointer; font: inherit; font-size: .92rem;
 }
-.tabs button.active { color: var(--ink); border-color: var(--ink-2); font-weight: 600; }
+.tabs button.active { color: #fff; background: var(--accent); border-color: var(--accent); font-weight: 600; }
+
+.card {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: 14px; padding: 20px; margin-bottom: 22px; box-shadow: var(--shadow);
+}
+h2 { font-size: 1.15rem; margin: 0 0 4px; letter-spacing: -0.01em; }
+.sub { color: var(--ink-2); margin: 0 0 14px; font-size: .9rem; }
+
 table { border-collapse: collapse; width: 100%; font-size: .92rem; }
-th, td { text-align: left; padding: 6px 10px; border-bottom: 1px solid var(--grid); }
-th { color: var(--muted); font-weight: 600; font-size: .8rem; text-transform: uppercase; letter-spacing: .04em; }
+th, td { text-align: left; padding: 7px 10px; border-bottom: 1px solid var(--grid); white-space: nowrap; }
+th { color: var(--muted); font-weight: 600; font-size: .75rem; text-transform: uppercase; letter-spacing: .05em; }
 td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; }
-.dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 7px; vertical-align: baseline; background: var(--muted); }
-.legend { display: flex; gap: 16px; font-size: .85rem; color: var(--ink-2); margin: 8px 0 0; flex-wrap: wrap; }
+tbody tr:hover { background: var(--rowhover); }
+.dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 7px; background: var(--muted); flex: none; }
+.srccell { display: inline-flex; align-items: center; }
+.legend { display: flex; gap: 16px; font-size: .85rem; color: var(--ink-2); margin: 10px 0 0; flex-wrap: wrap; }
 .legend span { display: inline-flex; align-items: center; }
 .empty { color: var(--muted); font-style: italic; padding: 12px 0; }
 .scroll-x { overflow-x: auto; }
-.meta { color: var(--muted); font-size: .8rem; margin-top: 24px; }
+.meta { color: var(--muted); font-size: .8rem; margin-top: 26px; line-height: 1.7; }
+
+/* chart */
 .chartbox { position: relative; }
 #tooltip {
   position: absolute; pointer-events: none; display: none;
   background: var(--surface); border: 1px solid var(--border); border-radius: 8px;
-  padding: 8px 10px; font-size: .82rem; box-shadow: 0 2px 10px rgba(0,0,0,.15); z-index: 5;
-  min-width: 130px;
+  padding: 8px 10px; font-size: .82rem; box-shadow: 0 2px 10px rgba(0,0,0,.18); z-index: 5;
+  min-width: 140px;
 }
 #tooltip .tt-week { color: var(--muted); margin-bottom: 4px; }
 #tooltip .row { display: flex; justify-content: space-between; gap: 12px; }
 svg text { fill: var(--muted); font-size: 11px; font-family: system-ui, sans-serif; }
-a { color: var(--s1); }
+a { color: var(--accent); }
+
+/* consensus board */
+.board-controls { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; margin-bottom: 12px; }
+.posfilter { display: flex; gap: 5px; flex-wrap: wrap; }
+.posfilter button {
+  background: var(--chip); color: var(--ink-2); border: 1px solid var(--border);
+  border-radius: 8px; padding: 4px 11px; cursor: pointer; font: inherit; font-size: .82rem;
+}
+.posfilter button.active { color: var(--ink); border-color: var(--ink-2); font-weight: 600; }
+#search {
+  background: var(--surface); color: var(--ink); border: 1px solid var(--border);
+  border-radius: 8px; padding: 6px 12px; font: inherit; font-size: .88rem; width: 200px;
+}
+#search::placeholder { color: var(--muted); }
+.board-wrap { overflow: auto; max-height: 72vh; border: 1px solid var(--grid); border-radius: 10px; }
+.board-wrap table { font-size: .88rem; }
+.board-wrap thead th { position: sticky; top: 0; background: var(--surface); z-index: 3; box-shadow: 0 1px 0 var(--grid); }
+.board-wrap th.pcol, .board-wrap td.pcol {
+  position: sticky; left: 0; background: var(--surface); z-index: 2; min-width: 210px;
+  box-shadow: 1px 0 0 var(--grid);
+}
+.board-wrap thead th.pcol { z-index: 4; }
+tbody tr:hover td.pcol { background: color-mix(in srgb, var(--surface) 94%, var(--accent)); }
+.pcell { display: flex; align-items: center; gap: 10px; }
+.face {
+  width: 34px; height: 34px; border-radius: 50%; object-fit: cover; object-position: top;
+  background: var(--chip); flex: none; border: 1px solid var(--border);
+}
+.face-fallback {
+  width: 34px; height: 34px; border-radius: 50%; background: var(--chip); color: var(--ink-2);
+  display: inline-flex; align-items: center; justify-content: center; font-size: .72rem;
+  font-weight: 600; flex: none; border: 1px solid var(--border);
+}
+.pname { font-weight: 600; line-height: 1.2; }
+.pmeta { color: var(--muted); font-size: .76rem; line-height: 1.2; }
+.posbadge {
+  display: inline-block; font-size: .68rem; font-weight: 700; border-radius: 5px;
+  padding: 1px 6px; margin-right: 5px; color: #fff;
+}
+.pos-QB { background: var(--s7); } .pos-RB { background: var(--s3); }
+.pos-WR { background: var(--s1); } .pos-TE { background: var(--s2); }
+.pos-K  { background: var(--s4); } .pos-DST{ background: var(--muted); }
+.range { display: inline-block; width: 90px; height: 6px; background: var(--chip); border-radius: 3px; position: relative; vertical-align: middle; }
+.range i { position: absolute; top: 0; height: 6px; background: var(--accent); opacity: .55; border-radius: 3px; }
+.cov { color: var(--muted); font-size: .78rem; }
+td.best { color: var(--s6); font-weight: 700; }
+td.worst { color: var(--s8); font-weight: 700; }
+td.rk { text-align: right; font-variant-numeric: tabular-nums; color: var(--ink-2); }
+th.rk { text-align: right; }
+td.na { text-align: right; color: var(--grid); }
 </style>
 </head>
 <body>
 <div class="wrap">
-  <h1>NFL Rankings of Rankings</h1>
-  <p class="sub">Which site's fantasy football rankings actually predict performance? Expert rankings are
-  snapshotted before games, then scored against real fantasy points every week.</p>
+  <div class="hero">
+    <h1>NFL Rankings of Rankings</h1>
+    <p class="tag">Who actually knows football? Every major fantasy ranking, snapshotted before games are
+    played, then scored against real fantasy points all season long.</p>
+    <div class="chips" id="hero-chips"></div>
+  </div>
 
   <div class="tabs" id="fmt-tabs">
     <button data-fmt="ppr" class="active">PPR</button>
@@ -87,9 +164,24 @@ a { color: var(--s1); }
   </div>
 
   <div class="card">
+    <h2>Consensus draft board</h2>
+    <p class="sub">Top 200 by average rank across every source that ranks the player. <b>Coverage</b> shows how
+    many sources rank him — a thin consensus is visible, not hidden. Green = a player's best rank, red = his worst.</p>
+    <div class="board-controls">
+      <div class="posfilter" id="posfilter">
+        <button data-pos="ALL" class="active">All</button>
+        <button data-pos="QB">QB</button><button data-pos="RB">RB</button>
+        <button data-pos="WR">WR</button><button data-pos="TE">TE</button>
+      </div>
+      <input id="search" type="search" placeholder="Search players…">
+    </div>
+    <div class="board-wrap" id="board"></div>
+  </div>
+
+  <div class="card">
     <h2>In-season leaderboard</h2>
-    <p class="sub" style="margin-bottom:8px">Average Spearman correlation between each source's weekly positional
-    rankings (QB/RB/WR/TE) and that week's actual fantasy points. 1.0 = perfect ordering.</p>
+    <p class="sub">Average Spearman correlation between each source's weekly positional rankings (QB/RB/WR/TE)
+    and that week's actual fantasy points. 1.0 = perfect ordering.</p>
     <div id="weekly-board"></div>
   </div>
 
@@ -104,40 +196,39 @@ a { color: var(--s1); }
 
   <div class="card">
     <h2>Pre-draft rankings vs. season results</h2>
-    <p class="sub" style="margin-bottom:8px">Each source's pre-draft board (frozen at kickoff) scored against
-    cumulative fantasy points. Score = average Spearman across QB/RB/WR/TE; overall = top-150 board order
-    (blank for sources that only rank within positions).</p>
+    <p class="sub">Each source's pre-draft board (frozen at kickoff) scored against cumulative fantasy points.
+    Score = average Spearman across QB/RB/WR/TE; overall = top-150 board order (blank for sources that only
+    rank within positions).</p>
     <div id="predraft-board"></div>
-  </div>
-
-  <div class="card">
-    <h2>Pre-draft boards side by side</h2>
-    <div class="scroll-x" id="predraft-compare"></div>
   </div>
 
   <p class="meta" id="meta"></p>
 </div>
 
 <script>
-const SRC_LABEL = {
-  fantasypros: "FantasyPros", espn: "ESPN", cbs: "CBS", nfl: "NFL.com",
-  yahoo: "Yahoo", ringer: "The Ringer", pff: "PFF", ffcalc: "FF Calculator (ADP)",
-  mfl: "MyFantasyLeague (ADP)", sharks: "FantasySharks", fftoday: "FFToday",
-  walter: "WalterFootball", rotoballer: "RotoBaller", draftsharks: "Draft Sharks",
-  underdog: "Underdog (ADP)",
+{
+  const t = new URLSearchParams(location.search).get("theme");
+  if (t === "light" || t === "dark") document.documentElement.dataset.theme = t;
+}
+const SRC_LABEL = {};
+const SRC_SHORT = {
+  fantasypros: "FPros", espn: "ESPN", cbs: "CBS", nfl: "NFL", yahoo: "Yahoo",
+  ringer: "Ringer", pff: "PFF", ffcalc: "FFC", mfl: "MFL", sharks: "Sharks",
+  fftoday: "FFT", walter: "Walter", rotoballer: "RBall", draftsharks: "DSharks",
+  underdog: "UDog",
 };
-// weekly-capable sources take the first palette slots so the trend chart
-// (max 4 series) always gets distinct, CVD-safe colors; the rest get dots only
 const SRC_ORDER = ["fantasypros", "cbs", "nfl", "fftoday", "espn", "yahoo", "pff",
                    "ringer", "rotoballer", "draftsharks", "sharks", "ffcalc", "mfl",
                    "underdog", "walter"];
 const SRC_COLOR = {};
 SRC_ORDER.forEach((s, i) => { SRC_COLOR[s] = i < 8 ? `var(--s${i + 1})` : "var(--muted)"; });
 function dotStyle(s) { return `style="background:${SRC_COLOR[s] || "var(--muted)"}"`; }
-let SUMMARY = null, PREDRAFT = null, FMT = "ppr";
+let SUMMARY = null, PREDRAFT = null, FMT = "ppr", POS = "ALL", QUERY = "";
 
 const $ = s => document.querySelector(s);
 const srcName = s => (SUMMARY && SUMMARY.labels && SUMMARY.labels[s]) || SRC_LABEL[s] || s;
+const srcShort = s => SRC_SHORT[s] || srcName(s).slice(0, 6);
+const esc = t => String(t).replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
 
 function orderSources(list) {
   return [...list].sort((a, b) => {
@@ -146,6 +237,62 @@ function orderSources(list) {
   });
 }
 
+function initials(name) {
+  return name.split(/\s+/).map(w => w[0]).slice(0, 2).join("").toUpperCase();
+}
+
+function faceHtml(p) {
+  if (!p.id || p.pos === "DST") return `<span class="face-fallback">${esc(initials(p.name))}</span>`;
+  return `<img class="face" loading="lazy" src="https://sleepercdn.com/content/nfl/players/thumb/${p.id}.jpg"
+    alt="" onerror="this.outerHTML='<span class=&quot;face-fallback&quot;>${esc(initials(p.name))}</span>'">`;
+}
+
+function renderHero() {
+  const nSrc = SUMMARY.labels ? Object.keys(SUMMARY.labels).length : 0;
+  const updated = (SUMMARY.generated_at || "").slice(0, 10);
+  $("#hero-chips").innerHTML =
+    `<span class="chip"><b>${SUMMARY.season}</b> season</span>` +
+    `<span class="chip"><b>${nSrc}</b> ranking sources</span>` +
+    `<span class="chip"><b>${SUMMARY.weeks_evaluated.length}</b> weeks scored</span>` +
+    `<span class="chip">updated <b>${updated}</b></span>`;
+}
+
+/* ---------- consensus board ---------- */
+function renderBoard() {
+  const data = PREDRAFT && PREDRAFT.formats[FMT];
+  if (!data || !data.players || !data.players.length) {
+    $("#board").innerHTML = '<div class="empty" style="padding:14px">No boards captured for this format yet.</div>';
+    return;
+  }
+  const sources = orderSources(data.sources);
+  let rows = data.players;
+  if (POS !== "ALL") rows = rows.filter(p => p.pos === POS);
+  if (QUERY) rows = rows.filter(p => p.name.toLowerCase().includes(QUERY));
+  const maxRank = 200;
+  let html = '<table><thead><tr><th class="num">#</th><th class="pcol">Player</th>' +
+    '<th class="num">Avg</th><th>Spread</th><th class="num">Cov</th>' +
+    sources.map(s => `<th class="rk" title="${esc(srcName(s))}">${esc(srcShort(s))}</th>`).join("") +
+    "</tr></thead><tbody>";
+  rows.forEach((p, i) => {
+    const left = (p.min - 1) / maxRank * 100, width = Math.max(2, (p.max - p.min) / maxRank * 100);
+    html += `<tr><td class="num">${i + 1}</td>` +
+      `<td class="pcol"><span class="pcell">${faceHtml(p)}<span><span class="pname">${esc(p.name)}</span><br>` +
+      `<span class="pmeta"><span class="posbadge pos-${p.pos}">${p.pos}</span>${esc(p.team || "")}</span></span></span></td>` +
+      `<td class="num"><b>${p.avg}</b></td>` +
+      `<td><span class="range" title="best ${p.min} · worst ${p.max}"><i style="left:${left}%;width:${width}%"></i></span></td>` +
+      `<td class="num"><span class="cov">${p.n}/${sources.length}</span></td>`;
+    sources.forEach(s => {
+      const r = p.ranks[s];
+      if (r == null) { html += '<td class="na">–</td>'; return; }
+      const cls = (r === p.min && p.max !== p.min) ? "rk best" : (r === p.max && p.max !== p.min) ? "rk worst" : "rk";
+      html += `<td class="${cls}">${r}</td>`;
+    });
+    html += "</tr>";
+  });
+  $("#board").innerHTML = html + "</tbody></table>";
+}
+
+/* ---------- leaderboards ---------- */
 function renderWeeklyBoard() {
   const board = (SUMMARY.leaderboard.weekly[FMT] || []);
   if (!board.length) {
@@ -154,7 +301,7 @@ function renderWeeklyBoard() {
   }
   let html = '<table><thead><tr><th>#</th><th>Source</th><th class="num">Avg Spearman</th><th class="num">Weeks</th></tr></thead><tbody>';
   board.forEach((r, i) => {
-    html += `<tr><td>${i + 1}</td><td><span class="dot" ${dotStyle(r.source)}></span>${srcName(r.source)}</td>` +
+    html += `<tr><td>${i + 1}</td><td><span class="srccell"><span class="dot" ${dotStyle(r.source)}></span>${esc(srcName(r.source))}</span></td>` +
             `<td class="num">${r.score.toFixed(3)}</td><td class="num">${r.weeks}</td></tr>`;
   });
   $("#weekly-board").innerHTML = html + "</tbody></table>";
@@ -168,7 +315,7 @@ function renderPredraftBoard() {
   }
   let html = '<table><thead><tr><th>#</th><th>Source</th><th class="num">Avg pos Spearman</th><th class="num">Overall</th><th class="num">Through week</th></tr></thead><tbody>';
   board.forEach((r, i) => {
-    html += `<tr><td>${i + 1}</td><td><span class="dot" ${dotStyle(r.source)}></span>${srcName(r.source)}</td>` +
+    html += `<tr><td>${i + 1}</td><td><span class="srccell"><span class="dot" ${dotStyle(r.source)}></span>${esc(srcName(r.source))}</span></td>` +
             `<td class="num">${r.score.toFixed(3)}</td>` +
             `<td class="num">${r.overall != null ? r.overall.toFixed(3) : "—"}</td>` +
             `<td class="num">${r.through_week}</td></tr>`;
@@ -176,13 +323,13 @@ function renderPredraftBoard() {
   $("#predraft-board").innerHTML = html + "</tbody></table>";
 }
 
+/* ---------- trend chart ---------- */
 function renderTrend() {
   const weekly = SUMMARY.weekly[FMT] || {};
   const sources = orderSources(Object.keys(weekly).filter(s => Object.keys(weekly[s].weeks || {}).length));
   const weeks = SUMMARY.weeks_evaluated || [];
-  const legend = $("#trend-legend");
-  legend.innerHTML = sources.map(s =>
-    `<span><span class="dot" ${dotStyle(s)}></span>${srcName(s)}</span>`).join("");
+  $("#trend-legend").innerHTML = sources.map(s =>
+    `<span><span class="dot" ${dotStyle(s)}></span>${esc(srcName(s))}</span>`).join("");
   if (!sources.length || !weeks.length) {
     $("#trend-chart").innerHTML = '<div class="empty">Chart appears once weekly scores exist.</div>';
     return;
@@ -216,14 +363,14 @@ function renderTrend() {
       g += `<circle cx="${x(p[0]).toFixed(1)}" cy="${y(p[1]).toFixed(1)}" r="4" fill="${SRC_COLOR[s]}" stroke="var(--surface)" stroke-width="2"/>`;
     });
     const last = pts[pts.length - 1];
-    g += `<text x="${W - R + 8}" y="${y(last[1]) + 4}" style="fill:var(--ink-2)">${srcName(s)}</text>`;
+    g += `<text x="${W - R + 8}" y="${y(last[1]) + 4}" style="fill:var(--ink-2)">${esc(srcName(s))}</text>`;
   });
   $("#trend-chart").innerHTML =
     `<svg viewBox="0 0 ${W} ${H}" style="width:100%;height:auto;display:block" id="trend-svg">${g}</svg>`;
-  attachHover(weeks, sources, weekly, x, W, H, L, R);
+  attachHover(weeks, sources, weekly, x, W);
 }
 
-function attachHover(weeks, sources, weekly, x, W, H, L, R) {
+function attachHover(weeks, sources, weekly, x, W) {
   const svg = $("#trend-svg"), tip = $("#tooltip"), box = $("#chartbox");
   svg.addEventListener("mousemove", e => {
     const r = svg.getBoundingClientRect();
@@ -234,45 +381,27 @@ function attachHover(weeks, sources, weekly, x, W, H, L, R) {
     let rows = "";
     orderSources(sources).forEach(s => {
       const v = weekly[s].weeks[String(best)]?.avg_spearman;
-      if (v != null) rows += `<div class="row"><span><span class="dot" ${dotStyle(s)}></span>${srcName(s)}</span><b>${v.toFixed(3)}</b></div>`;
+      if (v != null) rows += `<div class="row"><span><span class="dot" ${dotStyle(s)}></span>${esc(srcName(s))}</span><b>${v.toFixed(3)}</b></div>`;
     });
     tip.innerHTML = `<div class="tt-week">Week ${best}</div>${rows}`;
     tip.style.display = "block";
     const bx = box.getBoundingClientRect();
     let px = e.clientX - bx.left + 14;
-    if (px + 160 > bx.width) px -= 180;
+    if (px + 170 > bx.width) px -= 190;
     tip.style.left = px + "px";
     tip.style.top = (e.clientY - bx.top + 10) + "px";
   });
   svg.addEventListener("mouseleave", () => { tip.style.display = "none"; });
 }
 
-function renderCompare() {
-  const cols = (PREDRAFT && PREDRAFT.formats[FMT]) || {};
-  const sources = orderSources(Object.keys(cols));
-  if (!sources.length) {
-    $("#predraft-compare").innerHTML = '<div class="empty">No pre-draft boards captured for this format.</div>';
-    return;
-  }
-  const depth = 50;
-  let html = '<table><thead><tr><th class="num">#</th>' +
-    sources.map(s => `<th><span class="dot" ${dotStyle(s)}></span>${srcName(s)}</th>`).join("") + "</tr></thead><tbody>";
-  for (let i = 0; i < depth; i++) {
-    html += `<tr><td class="num">${i + 1}</td>` + sources.map(s => {
-      const p = cols[s]?.[i];
-      return `<td>${p ? `${p.name} <span style="color:var(--muted)">${p.pos || ""}${p.team ? " · " + p.team : ""}</span>` : ""}</td>`;
-    }).join("") + "</tr>";
-  }
-  $("#predraft-compare").innerHTML = html + "</tbody></table>";
-}
-
 function renderAll() {
-  renderWeeklyBoard(); renderTrend(); renderPredraftBoard(); renderCompare();
-  $("#meta").textContent =
-    `Season ${SUMMARY.season} · ${SUMMARY.weeks_evaluated.length} week(s) evaluated · updated ${SUMMARY.generated_at} UTC · ` +
-    `15 sources: FantasyPros, ESPN, CBS, NFL.com, Yahoo, The Ringer, PFF, RotoBaller, Draft Sharks, ` +
-    `FantasySharks, FFToday, WalterFootball, plus market ADP from FF Calculator, MyFantasyLeague, and Underdog. ` +
-    `Actual points from Sleeper. Coverage varies by scoring format — each tab shows only sources that publish it.`;
+  renderHero(); renderBoard(); renderWeeklyBoard(); renderTrend(); renderPredraftBoard();
+  $("#meta").innerHTML =
+    `Sources: FantasyPros, ESPN, CBS, NFL.com, Yahoo, The Ringer, PFF, RotoBaller, Draft Sharks, FantasySharks, ` +
+    `FFToday, WalterFootball, plus market ADP from FF Calculator, MyFantasyLeague, and Underdog. ` +
+    `Actual fantasy points from Sleeper. Coverage varies by scoring format — each tab shows only sources that ` +
+    `publish it. Rankings are snapshotted before games; scoring is Spearman rank correlation vs. real results. ` +
+    `Generated ${esc(SUMMARY.generated_at)} UTC · <a href="https://github.com/colindiggs/nfl-fantasy-rankings-rankings">methodology &amp; data</a>`;
 }
 
 document.getElementById("fmt-tabs").addEventListener("click", e => {
@@ -280,6 +409,16 @@ document.getElementById("fmt-tabs").addEventListener("click", e => {
   FMT = b.dataset.fmt;
   document.querySelectorAll("#fmt-tabs button").forEach(x => x.classList.toggle("active", x === b));
   renderAll();
+});
+document.getElementById("posfilter").addEventListener("click", e => {
+  const b = e.target.closest("button"); if (!b) return;
+  POS = b.dataset.pos;
+  document.querySelectorAll("#posfilter button").forEach(x => x.classList.toggle("active", x === b));
+  renderBoard();
+});
+document.getElementById("search").addEventListener("input", e => {
+  QUERY = e.target.value.trim().toLowerCase();
+  renderBoard();
 });
 
 Promise.all([

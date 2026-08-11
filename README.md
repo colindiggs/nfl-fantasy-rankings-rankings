@@ -47,6 +47,14 @@ Per source, per format, per week, positions QB/RB/WR/TE (top 24/36/48/24):
 - **Rank MAE** — average absolute positional-rank error
 - **Top-12 hit rate** — how many predicted top-12 players finished top-12
 
+The site also builds a **consensus draft board** (top 200 per format, with player
+headshots): each source's board is re-numbered over matched skill players, and a
+player's consensus rank is the mean of ranks from the sources that rank him.
+Partial coverage is handled by transparency, not imputation — every row shows
+"ranked by n of N sources" plus his best/worst rank spread, so a player ranked
+5th by two sites isn't silently treated like one ranked 5th by ten. Rows need
+at least two ranking sources to appear.
+
 Weekly leaderboard = average Spearman across positions and weeks. Pre-draft boards
 are frozen at kickoff and scored against cumulative season points: the headline
 pre-draft score is average positional Spearman (comparable across all sources);

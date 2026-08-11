@@ -254,21 +254,54 @@ def main():
     write_json(DOCS / "data" / "summary.json", summary)
     log.info("summary.json written (%d weeks evaluated)", len(weeks))
 
-    # ---- side-by-side predraft comparison for the site
+    # ---- consensus pre-draft board for the site (top 200, per-source ranks)
+    # Players ranked by some sources but not others: a player's consensus rank is
+    # the mean of ranks from the sources that DO rank him, shown with coverage
+    # (n of N sources) so thin consensus is visible rather than hidden. Players
+    # need >= 2 ranking sources to appear.
+    SHOW_POS = ("QB", "RB", "WR", "TE", "K", "DST")
     comparison = {"season": season, "formats": {}}
     for fmt in FORMATS:
-        cols = {}
+        boards = {}
         for (source, f2), payload in predraft.items():
             if f2 != fmt:
                 continue
             if sum(1 for p in payload["players"] if p["rank"] == 1) > 1:
-                continue  # positional-only board — no overall order to show
-            cols[source] = [
-                {"rank": p["rank"], "name": p["name"], "pos": p.get("pos"), "team": p.get("team")}
-                for p in sorted(payload["players"], key=lambda x: x["rank"])
-                if p.get("pos") in ("QB", "RB", "WR", "TE", "K", "DST")
-            ][:100]
-        comparison["formats"][fmt] = cols
+                continue  # positional-only board — no overall order
+            board = {}
+            for p in sorted(payload["players"], key=lambda x: x["rank"]):
+                pid = p.get("sleeper_id")
+                if pid and p.get("pos") in SHOW_POS and pid not in board:
+                    board[pid] = {"rank": len(board) + 1, "p": p}
+                if len(board) >= 200:
+                    break
+            boards[source] = board
+        players = {}
+        for source, board in boards.items():
+            for pid, entry in board.items():
+                db = players_db.get(pid, {})
+                rec = players.setdefault(pid, {
+                    "id": pid,
+                    "name": db.get("name") or entry["p"]["name"],
+                    "pos": db.get("pos") or entry["p"]["pos"],
+                    "team": db.get("team") or entry["p"].get("team"),
+                    "ranks": {}})
+                rec["ranks"][source] = entry["rank"]
+        rows = []
+        for rec in players.values():
+            ranks = list(rec["ranks"].values())
+            if len(ranks) < 2:
+                continue
+            rec["avg"] = round(sum(ranks) / len(ranks), 1)
+            rec["n"] = len(ranks)
+            rec["min"] = min(ranks)
+            rec["max"] = max(ranks)
+            rows.append(rec)
+        rows.sort(key=lambda r: (r["avg"], -r["n"]))
+        comparison["formats"][fmt] = {
+            "sources": sorted(boards, key=lambda s: len(boards[s]), reverse=True),
+            "players": rows[:200],
+        }
     write_json(DOCS / "data" / "predraft.json", comparison)
     log.info("predraft.json written")
 
