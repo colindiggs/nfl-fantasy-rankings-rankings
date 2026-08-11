@@ -151,6 +151,20 @@ tbody tr:hover td.pcol { background: color-mix(in srgb, var(--surface) 94%, var(
   letter-spacing: .02em; flex: none; line-height: 1;
 }
 th .mark { margin: 0 auto; }
+.calib-controls { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; margin-bottom: 12px; }
+.calib-controls button {
+  background: var(--chip); color: var(--ink-2); border: 1px solid var(--border);
+  border-radius: 8px; padding: 4px 11px; cursor: pointer; font: inherit; font-size: .82rem;
+}
+.calib-controls button.active { color: var(--ink); border-color: var(--ink-2); font-weight: 600; }
+.calib-sep { width: 12px; }
+.bar-row { display: flex; align-items: center; gap: 10px; margin-bottom: 7px; font-size: .85rem; }
+.bar-label { width: 42px; color: var(--ink-2); font-weight: 600; flex: none; }
+.bar-track { flex: 1; background: var(--grid); border-radius: 4px; height: 15px; }
+.bar-fill { height: 15px; border-radius: 4px; display: block; }
+.bar-val { width: 72px; text-align: right; color: var(--ink-2); font-variant-numeric: tabular-nums; flex: none; }
+.bar-group { margin-bottom: 18px; }
+.bar-group h4 { margin: 0 0 8px; font-size: .85rem; font-weight: 600; color: var(--ink); display: flex; align-items: center; }
 .spread-cell { display: flex; align-items: center; gap: 8px; }
 .spread-num { color: var(--muted); font-size: .74rem; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .tag-pill {
@@ -201,19 +215,10 @@ td.na { text-align: right; color: var(--grid); }
       </div>
     </div>
     <div class="ctl">
-      <label for="scope-tabs">Positions scored</label>
-      <div class="tabs small" id="scope-tabs">
-        <button data-scope="skill" class="active"
-          title="QB, RB, WR and TE only — every source ranks these, so scores stay comparable across the whole field">QB/RB/WR/TE</button>
-        <button data-scope="all"
-          title="Adds kickers and defenses, for the sources that rank them">+ K &amp; DST</button>
-      </div>
-    </div>
-    <div class="ctl">
-      <label for="roster-tabs">Roster</label>
-      <div class="tabs small" id="roster-tabs">
+      <label for="roster-tabs">Defense</label>
+      <div class="tabs" id="roster-tabs">
         <button data-roster="offense" class="active"
-          title="Standard redraft: offense plus a team defense">Team DST</button>
+          title="Team defense — standard redraft">DST</button>
         <button data-roster="idp"
           title="Individual defensive players ranked alongside offense">IDP</button>
       </div>
@@ -259,6 +264,24 @@ td.na { text-align: right; color: var(--grid); }
   </div>
 
   <div class="card">
+    <h2>Where each source went wrong</h2>
+    <p class="sub">Accuracy gap by position — the average distance, in fantasy points, between what a
+    source's rank implied a player would score and what he actually scored. Shorter bars are better.
+    This is where kickers and defenses earn their reputation.</p>
+    <div id="pos-breakdown"></div>
+  </div>
+
+  <div class="card">
+    <h2>Predicted rank vs. actual finish</h2>
+    <p class="sub">Every ranked player-week as one dot: predicted rank across, where he actually
+    finished up. The dashed diagonal is a perfect call. Dots <b>below</b> the line are players the
+    source was too low on, <b>above</b> it are players it was too high on. A tight cloud along the
+    diagonal means a well-calibrated board; a wide one means the ordering was closer to noise.</p>
+    <div class="calib-controls" id="calib-controls"></div>
+    <div class="chartbox"><div id="calib-chart"></div></div>
+  </div>
+
+  <div class="card">
     <h2>Pre-draft rankings vs. season results</h2>
     <p class="sub">Each source's pre-draft board (frozen at kickoff) scored against cumulative fantasy points.
     Score = average positional Spearman over the selected position set; overall = top-150 board order (blank
@@ -289,7 +312,12 @@ SRC_ORDER.forEach((s, i) => { SRC_COLOR[s] = i < 8 ? `var(--s${i + 1})` : "var(-
 function dotStyle(s) { return `style="background:${SRC_COLOR[s] || "var(--muted)"}"`; }
 // Half PPR / 1QB / K+DST / single flex is the default league lens.
 let SUMMARY = null, PREDRAFT = null, SEASONS = null;
-let FMT = "half_ppr", POS = "ALL", QUERY = "", SCOPE = "skill", SEASON = null;
+let FMT = "half_ppr", POS = "ALL", QUERY = "", SEASON = null;
+// The league scores QB/RB/WR/TE/K/DST, so the leaderboard does too. Both scopes
+// are still computed and stored; per-position detail lives in the charts below,
+// which is where the K/DST noise is actually legible rather than hidden in an
+// average.
+const SCOPE = "all";
 let ROSTER = "offense";   // "offense" = team DST (default), "idp" = IDP leagues
 
 const srcTags = s => (SUMMARY && SUMMARY.source_tags && SUMMARY.source_tags[s]) || {};
@@ -443,9 +471,14 @@ function renderWeeklyBoard() {
       "No games played yet this season.");
     return;
   }
-  let html = '<table><thead><tr><th>#</th><th>Source</th><th class="num">Avg Spearman</th><th class="num">Weeks</th></tr></thead><tbody>';
+  const anyGap = board.some(r => r.accuracy_gap != null);
+  let html = '<table><thead><tr><th>#</th><th>Source</th>' +
+    '<th class="num" title="Mean |points implied by the predicted rank - points actually scored|. Lower is better.">Accuracy gap</th>' +
+    '<th class="num" title="Rank correlation with actual finish. 1.0 = perfect ordering.">Spearman</th>' +
+    '<th class="num">Weeks</th></tr></thead><tbody>';
   board.forEach((r, i) => {
     html += `<tr><td>${i + 1}</td><td>${srcMark(r.source, true)}${tagPills(r.source)}</td>` +
+            `<td class="num">${r.accuracy_gap != null ? r.accuracy_gap.toFixed(1) : "—"}</td>` +
             `<td class="num">${r.score.toFixed(3)}</td><td class="num">${r.weeks}</td></tr>`;
   });
   $("#weekly-board").innerHTML = html + "</tbody></table>";
@@ -458,9 +491,13 @@ function renderPredraftBoard() {
       "Pre-draft boards are scored once week 1 is in the books.");
     return;
   }
-  let html = '<table><thead><tr><th>#</th><th>Source</th><th class="num">Avg pos Spearman</th><th class="num">Overall</th><th class="num">Through week</th></tr></thead><tbody>';
+  let html = '<table><thead><tr><th>#</th><th>Source</th>' +
+    '<th class="num" title="Mean |points implied by the predicted rank - points actually scored|. Lower is better.">Accuracy gap</th>' +
+    '<th class="num">Avg pos Spearman</th><th class="num">Overall</th>' +
+    '<th class="num">Through week</th></tr></thead><tbody>';
   board.forEach((r, i) => {
     html += `<tr><td>${i + 1}</td><td>${srcMark(r.source, true)}${tagPills(r.source)}</td>` +
+            `<td class="num">${r.accuracy_gap != null ? r.accuracy_gap.toFixed(1) : "—"}</td>` +
             `<td class="num">${r.score.toFixed(3)}</td>` +
             `<td class="num">${r.overall != null ? r.overall.toFixed(3) : "—"}</td>` +
             `<td class="num">${r.through_week}</td></tr>`;
@@ -574,9 +611,138 @@ function renderBaselineNote() {
   $("#baseline-note").innerHTML = html;
 }
 
+/* ---------- accuracy gap by position ---------- */
+const POS_COLOR = {QB: "var(--s7)", RB: "var(--s3)", WR: "var(--s1)",
+                   TE: "var(--s2)", K: "var(--s4)", DST: "var(--muted)"};
+const ALL_POS = ["QB", "RB", "WR", "TE", "K", "DST"];
+
+/* source -> pos -> mean accuracy gap across the season's scored weeks */
+function seasonPositionGaps() {
+  const weekly = SUMMARY.weekly[FMT] || {};
+  const out = {};
+  Object.keys(weekly).filter(inView).forEach(s => {
+    const acc = {};
+    Object.values(weekly[s].weeks || {}).forEach(wk => {
+      ALL_POS.forEach(pos => {
+        const m = (wk.positions || {})[pos];
+        if (m && m.accuracy_gap != null) (acc[pos] = acc[pos] || []).push(m.accuracy_gap);
+      });
+    });
+    const means = {};
+    Object.entries(acc).forEach(([pos, xs]) => {
+      means[pos] = xs.reduce((a, b) => a + b, 0) / xs.length;
+    });
+    if (Object.keys(means).length) out[s] = means;
+  });
+  return out;
+}
+
+function renderPosBreakdown() {
+  const gaps = seasonPositionGaps();
+  const sources = orderSources(Object.keys(gaps));
+  if (!sources.length) {
+    $("#pos-breakdown").innerHTML = emptyWithHistory("No scored weeks for this season yet.");
+    return;
+  }
+  const max = Math.max(...sources.flatMap(s => Object.values(gaps[s])));
+  $("#pos-breakdown").innerHTML = sources.map(s => {
+    const rows = ALL_POS.filter(pos => gaps[s][pos] != null).map(pos => {
+      const v = gaps[s][pos];
+      const w = Math.max(1, v / max * 100);
+      return '<div class="bar-row"><span class="bar-label">' + pos + '</span>' +
+        '<span class="bar-track"><span class="bar-fill" style="width:' + w +
+        '%;background:' + POS_COLOR[pos] + '"></span></span>' +
+        '<span class="bar-val">' + v.toFixed(1) + ' pts</span></div>';
+    }).join("");
+    return '<div class="bar-group"><h4>' + srcMark(s) + esc(srcName(s)) + "</h4>" + rows + "</div>";
+  }).join("");
+}
+
+/* ---------- calibration scatter ---------- */
+let CALIB_SRC = null, CALIB_POS = "RB";
+
+function calibrationPairs(source, pos) {
+  const entry = (SUMMARY.weekly[FMT] || {})[source];
+  if (!entry) return [];
+  const pts = [];
+  Object.values(entry.weeks || {}).forEach(wk => {
+    const m = (wk.positions || {})[pos];
+    if (m && m.calibration) m.calibration.forEach(c => pts.push(c));
+  });
+  return pts;
+}
+
+function renderCalibration() {
+  const weekly = SUMMARY.weekly[FMT] || {};
+  const sources = orderSources(Object.keys(weekly).filter(inView));
+  if (!sources.length) {
+    $("#calib-controls").innerHTML = "";
+    $("#calib-chart").innerHTML = emptyWithHistory("No scored weeks for this season yet.");
+    return;
+  }
+  if (!sources.includes(CALIB_SRC)) CALIB_SRC = sources[0];
+  $("#calib-controls").innerHTML =
+    sources.map(s => '<button data-csrc="' + esc(s) + '" class="' +
+      (s === CALIB_SRC ? "active" : "") + '">' + esc(srcName(s)) + "</button>").join("") +
+    '<span class="calib-sep"></span>' +
+    ALL_POS.map(pp => '<button data-cpos="' + pp + '" class="' +
+      (pp === CALIB_POS ? "active" : "") + '">' + pp + "</button>").join("");
+
+  const pairs = calibrationPairs(CALIB_SRC, CALIB_POS);
+  if (pairs.length < 5) {
+    $("#calib-chart").innerHTML = '<div class="empty">Not enough data for this combination.</div>';
+    return;
+  }
+  const W = 940, H = 420, L = 54, R = 22, T = 16, B = 46;
+  const pw = W - L - R, ph = H - T - B;
+  const hi = Math.max(10, Math.ceil(Math.max(...pairs.flatMap(c => c)) / 10) * 10);
+  const x = v => L + pw * (v / hi);
+  const y = v => T + ph * (v / hi);
+  const step = Math.max(5, Math.round(hi / 6 / 5) * 5);
+  let g = "";
+  for (let v = 0; v <= hi; v += step) {
+    g += '<line x1="' + L + '" y1="' + y(v) + '" x2="' + (W - R) + '" y2="' + y(v) + '" stroke="var(--grid)"/>' +
+         '<text x="' + (L - 8) + '" y="' + (y(v) + 4) + '" text-anchor="end">' + v + "</text>" +
+         '<line x1="' + x(v) + '" y1="' + T + '" x2="' + x(v) + '" y2="' + (H - B) + '" stroke="var(--grid)"/>' +
+         '<text x="' + x(v) + '" y="' + (H - B + 16) + '" text-anchor="middle">' + v + "</text>";
+  }
+  // the perfect-prediction diagonal
+  g += '<line x1="' + x(0) + '" y1="' + y(0) + '" x2="' + x(hi) + '" y2="' + y(hi) +
+       '" stroke="var(--baseline)" stroke-width="2" stroke-dasharray="5 4"/>';
+  pairs.forEach(c => {
+    g += '<circle cx="' + x(c[0]).toFixed(1) + '" cy="' + y(c[1]).toFixed(1) +
+         '" r="3" fill="' + POS_COLOR[CALIB_POS] + '" opacity="0.4"/>';
+  });
+  g += '<text x="' + (L + pw / 2) + '" y="' + (H - 6) +
+       '" text-anchor="middle" style="fill:var(--ink-2)">Predicted rank \u2192</text>';
+  g += '<text x="15" y="' + (T + ph / 2) + '" text-anchor="middle" transform="rotate(-90 15 ' +
+       (T + ph / 2) + ')" style="fill:var(--ink-2)">Actual finish \u2192</text>';
+
+  const mean = a => a.reduce((s, v) => s + v, 0) / a.length;
+  const mx = mean(pairs.map(c => c[0])), my = mean(pairs.map(c => c[1]));
+  const num = pairs.reduce((s, c) => s + (c[0] - mx) * (c[1] - my), 0);
+  const den = Math.sqrt(pairs.reduce((s, c) => s + Math.pow(c[0] - mx, 2), 0) *
+                        pairs.reduce((s, c) => s + Math.pow(c[1] - my, 2), 0));
+  const r = den ? num / den : 0;
+  $("#calib-chart").innerHTML =
+    '<svg viewBox="0 0 ' + W + " " + H + '" style="width:100%;height:auto;display:block">' + g + "</svg>" +
+    '<p class="sub" style="margin-top:10px">' + pairs.length.toLocaleString() +
+    " player-weeks \u00b7 correlation <b>" + r.toFixed(2) +
+    "</b> \u00b7 a perfectly calibrated board would sit on the dashed line.</p>";
+}
+
+document.addEventListener("click", e => {
+  const b = e.target.closest("#calib-controls button");
+  if (!b) return;
+  if (b.dataset.csrc) CALIB_SRC = b.dataset.csrc;
+  if (b.dataset.cpos) CALIB_POS = b.dataset.cpos;
+  renderCalibration();
+});
+
 function renderAll() {
   renderHero(); renderBaselineNote(); renderBoard();
-  renderWeeklyBoard(); renderTrend(); renderPredraftBoard();
+  renderWeeklyBoard(); renderTrend(); renderPosBreakdown();
+  renderCalibration(); renderPredraftBoard();
   $("#meta").innerHTML =
     `Sources: FantasyPros, ESPN, CBS, NFL.com, Yahoo, The Ringer, PFF, RotoBaller, Draft Sharks, FantasySharks, ` +
     `FFToday, WalterFootball, plus market ADP from FF Calculator, MyFantasyLeague, and Underdog. ` +
@@ -600,12 +766,6 @@ document.getElementById("posfilter").addEventListener("click", e => {
 document.getElementById("search").addEventListener("input", e => {
   QUERY = e.target.value.trim().toLowerCase();
   renderBoard();
-});
-document.getElementById("scope-tabs").addEventListener("click", e => {
-  const b = e.target.closest("button"); if (!b) return;
-  SCOPE = b.dataset.scope;
-  document.querySelectorAll("#scope-tabs button").forEach(x => x.classList.toggle("active", x === b));
-  renderAll();
 });
 document.getElementById("roster-tabs").addEventListener("click", e => {
   const b = e.target.closest("button"); if (!b) return;

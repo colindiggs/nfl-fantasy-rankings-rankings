@@ -12,10 +12,25 @@ here is real published data, never reconstructed:
   fantasypros  weekly + pre-draft ECR, addressable by ?week=&year=
   ffcalc       real mock-draft ADP for a given season (?year=)
   mfl          MyFantasyLeague ADP export, per-season path
+  espn         fantasy API keyed by season path — draft board, 2023+ only
+               (2018-2022 respond but carry no draft ranks; 2017 and older 404)
 
 Verified NOT backfillable (current-season only): FFToday weekly (serves an
-empty table for past seasons), CBS, NFL.com, ESPN, Yahoo, PFF, RotoBaller,
-The Ringer, Underdog, Draft Sharks, FantasySharks, WalterFootball.
+empty table for past seasons), CBS, NFL.com, Yahoo, PFF, RotoBaller, The
+Ringer, Underdog, Draft Sharks, FantasySharks, WalterFootball.
+
+Two dead ends worth not re-testing:
+
+  RotoBaller accepts a `season` param and ignores it — asking for 2025 returns
+  the 2026 board (Gibbs first; 2025's was Chase). Silent, so it has to be
+  checked against a known result rather than trusted.
+
+  The Wayback Machine looked promising (hundreds of captures across these
+  domains during the 2025 season) but does not hold up per page. FFToday's
+  archived weekly URLs drop the Season/GameWeek params, so the week would have
+  to be inferred from the capture date, and there is exactly ONE capture of the
+  weekly QB page in the whole 2025 season. Not enough to rebuild a season from,
+  and the inference would be guesswork.
 """
 import sys
 import time
@@ -28,7 +43,11 @@ from sources import fantasypros
 log = get_logger("backfill")
 
 WEEKLY_SOURCES = ["fantasypros"]
-DRAFT_SOURCES = ["fantasypros", "ffcalc", "mfl"]
+DRAFT_SOURCES = ["fantasypros", "ffcalc", "mfl", "espn"]
+
+# Some historical sources only reach back so far; skip them rather than log a
+# failure for every earlier season.
+SOURCE_FIRST_SEASON = {"espn": 2023}
 
 # The NFL went from a 16-game/17-week season to 17 games/18 weeks in 2021.
 # Asking for week 18 of 2019 just yields empty snapshots and wasted fetches.
@@ -61,7 +80,9 @@ def backfill(season, weeks, do_actuals=True, do_rankings=True, do_draft=True):
                 log.warning("actuals %s wk%s failed: %s", season, w, e)
 
     if do_draft:
-        ok, failed = capture.capture_predraft(season, only=set(DRAFT_SOURCES))
+        usable = {s for s in DRAFT_SOURCES
+                  if season >= SOURCE_FIRST_SEASON.get(s, 0)}
+        ok, failed = capture.capture_predraft(season, only=usable)
         results["draft"] = ok
         results["failed"] += [f"predraft {f}" for f in failed]
 

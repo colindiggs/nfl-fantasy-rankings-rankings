@@ -10,6 +10,7 @@ from pathlib import Path
 from common import (DATA, DEFAULT_TAGS, DOCS, EXTRA_POSITIONS, FORMATS,
                     POSITIONS, SKILL_POSITIONS, get_logger, matches_baseline,
                     read_json, write_json)
+import rankvalue
 import sleeper
 import spec_engine
 
@@ -47,18 +48,36 @@ HIT_N = 12  # top-12 hit rate window
 POS_OF = {}
 
 
+# Rank-value curves, loaded once per run. Lets us score in POINTS space the way
+# FantasyPros do, not just rank-correlation space.
+CURVE = {}
+
+
+def load_curve():
+    CURVE.clear()
+    payload = read_json(DATA / "rankvalue.json") or {}
+    win = (payload.get("windows") or {}).get(payload.get("default_window", "3yr")) or {}
+    CURVE.update(win.get("curves") or {})
+    return CURVE
+
+
 def load_positions(players_db):
     POS_OF.clear()
     POS_OF.update({pid: p["pos"] for pid, p in players_db.items() if p.get("pos")})
 
 
 def _scoped(pos_metrics, positions):
-    """Average Spearman over a position subset, plus how many positions it used."""
+    """Average Spearman and Accuracy Gap over a position subset."""
     rhos = [pos_metrics[p]["spearman"] for p in positions
             if p in pos_metrics and pos_metrics[p]["spearman"] is not None]
     if not rhos:
         return None
-    return {"avg_spearman": round(sum(rhos) / len(rhos), 4), "positions": len(rhos)}
+    gaps = [pos_metrics[p]["accuracy_gap"] for p in positions
+            if p in pos_metrics and pos_metrics[p].get("accuracy_gap") is not None]
+    out = {"avg_spearman": round(sum(rhos) / len(rhos), 4), "positions": len(rhos)}
+    if gaps:
+        out["accuracy_gap"] = round(sum(gaps) / len(gaps), 2)
+    return out
 
 
 def scope_scores(pos_metrics):
@@ -109,7 +128,7 @@ def spearman(pred_ranks, actual_points):
     return round(num / (dp * da), 4)
 
 
-def evaluate(players, points_by_pid, top_n, hit_n=HIT_N, pos=None):
+def evaluate(players, points_by_pid, top_n, hit_n=HIT_N, pos=None, kind=None, fmt=None):
     """Score one positional ranking against actual points.
 
     players: ordered [{sleeper_id,...}]; points_by_pid: pid -> float.
@@ -163,6 +182,27 @@ def evaluate(players, points_by_pid, top_n, hit_n=HIT_N, pos=None):
         }
 
     base = _stats(ranked_entries)
+
+    # ---- points space: FantasyPros' "Accuracy Gap".
+    # Each predicted rank implies the points that rank slot has historically
+    # produced; the gap is how far that lands from what the player actually
+    # scored. Weighting is automatic — missing at RB2 costs far more than at
+    # RB45, which rank correlation cannot express.
+    gap = None
+    if kind and fmt and pos:
+        gaps = []
+        for pr, pts in entries:
+            proj = rankvalue.points_for_rank(CURVE, kind, fmt, pos, int(round(pr)))
+            if proj is not None:
+                gaps.append(abs(proj - pts))
+        if gaps:
+            gap = round(sum(gaps) / len(gaps), 2)
+
+    # ---- calibration: predicted rank vs where the player actually finished,
+    # for the scatter on the site. Capped so summary.json stays small.
+    actual_rank_of = _avg_rank([e[1] for e in entries])
+    calib = [[int(round(e[0])), round(actual_rank_of[i], 1)]
+             for i, e in enumerate(entries)][:80]
     # Headline Spearman stays on the players the source actually ranked — that
     # is what rank correlation means, and it keeps the number comparable across
     # seasons. The union pool is reported alongside rather than folded in:
@@ -175,6 +215,8 @@ def evaluate(players, points_by_pid, top_n, hit_n=HIT_N, pos=None):
         "ranked": len(pool),
         "unmatched": unmatched,
         "missed_top": added,          # top-N scorers the source left out of its top-N
+        "accuracy_gap": gap,          # mean |implied points - actual points|
+        "calibration": calib,
         "union": {"spearman": union["spearman"], "rank_mae": union["rank_mae"],
                   "n": union["n"]},
     })
@@ -242,6 +284,7 @@ def main(season=None, is_current=True):
         season = int(sleeper.get_state()["season"])
     players_db = sleeper.load_players()
     load_positions(players_db)
+    load_curve()
     matchers = sleeper.build_matchers(players_db)
 
     # ---- actual points per completed week
@@ -293,7 +336,7 @@ def main(season=None, is_current=True):
                 pts = pts_for(w, fmt)
                 pos_metrics = {}
                 for pos in POSITIONS:
-                    m = evaluate(by_pos[pos], pts, TOP_N[pos], pos=pos)
+                    m = evaluate(by_pos[pos], pts, TOP_N[pos], pos=pos, kind="weekly", fmt=fmt)
                     if m:
                         pos_metrics[pos] = m
                 if not pos_metrics:
@@ -321,9 +364,17 @@ def main(season=None, is_current=True):
                 if scope == "skill":
                     cum["avg_spearman"] = cum[scope]["avg_spearman"]
                     cum["weeks"] = len(scores)
-                board.append({"source": source, "score": cum[scope]["avg_spearman"],
-                              "weeks": len(scores),
-                              "baseline": baseline_sources.get(source, True)})
+                wk_gaps = [wk["scopes"][scope].get("accuracy_gap")
+                           for wk in entry["weeks"].values()
+                           if wk["scopes"].get(scope)
+                           and wk["scopes"][scope].get("accuracy_gap") is not None]
+                row = {"source": source, "score": cum[scope]["avg_spearman"],
+                       "weeks": len(scores),
+                       "baseline": baseline_sources.get(source, True)}
+                if wk_gaps:
+                    row["accuracy_gap"] = round(sum(wk_gaps) / len(wk_gaps), 2)
+                    cum[scope]["accuracy_gap"] = row["accuracy_gap"]
+                board.append(row)
             board.sort(key=lambda x: -x["score"])
             summary["leaderboard"]["weekly"][fmt][scope] = board
 
@@ -349,7 +400,7 @@ def main(season=None, is_current=True):
                     cpts = cum_pts(w, fmt)
                     wk_metrics = {}
                     for pos in POSITIONS:
-                        m = evaluate(by_pos[pos], cpts, TOP_N[pos], pos=pos)
+                        m = evaluate(by_pos[pos], cpts, TOP_N[pos], pos=pos, kind="season", fmt=fmt)
                         if m:
                             wk_metrics[pos] = m
                     sc = scope_scores(wk_metrics)
@@ -360,7 +411,7 @@ def main(season=None, is_current=True):
                 cpts = cum_pts(latest, fmt)
                 pos_metrics = {}
                 for pos in POSITIONS:
-                    m = evaluate(by_pos[pos], cpts, TOP_N[pos], pos=pos)
+                    m = evaluate(by_pos[pos], cpts, TOP_N[pos], pos=pos, kind="season", fmt=fmt)
                     if m:
                         pos_metrics[pos] = m
                 overall = evaluate(ordered, cpts, PREDRAFT_TOP_OVERALL) if ordered else None
@@ -373,6 +424,7 @@ def main(season=None, is_current=True):
                             "scope": scope,
                             "source": source,
                             "baseline": is_baseline(payload),
+                            "accuracy_gap": sc.get("accuracy_gap"),
                             "score": sc["avg_spearman"],
                             "overall": overall["spearman"] if overall else None,
                             "positions": sc["positions"],
@@ -396,6 +448,7 @@ def main(season=None, is_current=True):
         for (source, _f), payload in load_rankings(season, scope_name).items():
             src_tags.setdefault(source, tags_of(payload))
     summary["source_tags"] = src_tags
+    summary["curve_window"] = (read_json(DATA / "rankvalue.json") or {}).get("default_window")
     summary["baseline"] = {"qb": "1qb", "format": "half_ppr",
                            "roster": "offense", "scope": "redraft"}
 
