@@ -248,9 +248,11 @@ td.na { text-align: right; color: var(--grid); }
 
   <div class="card">
     <h2>In-season leaderboard</h2>
-    <p class="sub">Average Spearman correlation between each source's weekly positional rankings and that
-    week's actual fantasy points. 1.0 = perfect ordering. Use the toggle above to score QB/RB/WR/TE only
-    (comparable across every source) or to fold in K and DST for the sources that rank them.</p>
+    <p class="sub">Two views of the same thing, across QB/RB/WR/TE/K/DST.
+    <b>Accuracy gap</b> is the average distance in fantasy points between what a source's rank implied a
+    player would score and what he actually scored — lower is better, and it penalises a miss at RB2 far
+    more than one at RB45. <b>Spearman</b> is rank correlation, where 1.0 is perfect ordering. They can
+    disagree, which is usually worth a look.</p>
     <div id="weekly-board"></div>
   </div>
 
@@ -283,9 +285,9 @@ td.na { text-align: right; color: var(--grid); }
 
   <div class="card">
     <h2>Pre-draft rankings vs. season results</h2>
-    <p class="sub">Each source's pre-draft board (frozen at kickoff) scored against cumulative fantasy points.
-    Score = average positional Spearman over the selected position set; overall = top-150 board order (blank
-    for sources that only rank within positions).</p>
+    <p class="sub">Each source's pre-draft board (frozen at kickoff) scored against cumulative season points.
+    Accuracy gap is in fantasy points over the full season, so the numbers are much larger than the weekly
+    table above. Overall = top-150 board order, blank for sources that only rank within positions.</p>
     <div id="predraft-board"></div>
   </div>
 
@@ -357,7 +359,7 @@ function weekScore(entry, w) {
   return sc ? sc.avg_spearman : (SCOPE === "skill" ? wk.avg_spearman : null);
 }
 
-const $ = s => document.querySelector(s);
+const $ = s => document.querySelector(s) || {};
 const srcName = s => (SUMMARY && SUMMARY.labels && SUMMARY.labels[s]) || SRC_LABEL[s] || s;
 const srcShort = s => SRC_SHORT[s] || srcName(s).slice(0, 6);
 const esc = t => String(t).replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
@@ -740,9 +742,11 @@ document.addEventListener("click", e => {
 });
 
 function renderAll() {
-  renderHero(); renderBaselineNote(); renderBoard();
-  renderWeeklyBoard(); renderTrend(); renderPosBreakdown();
-  renderCalibration(); renderPredraftBoard();
+  // isolate each panel: one failing render shouldn't blank the whole page
+  [renderHero, renderBaselineNote, renderBoard, renderWeeklyBoard, renderTrend,
+   renderPosBreakdown, renderCalibration, renderPredraftBoard].forEach(fn => {
+    try { fn(); } catch (err) { console.error(fn.name, err); }
+  });
   $("#meta").innerHTML =
     `Sources: FantasyPros, ESPN, CBS, NFL.com, Yahoo, The Ringer, PFF, RotoBaller, Draft Sharks, FantasySharks, ` +
     `FFToday, WalterFootball, plus market ADP from FF Calculator, MyFantasyLeague, and Underdog. ` +
@@ -810,7 +814,10 @@ fetch("data/seasons.json").then(r => r.json())
   .then(idx => {
     SEASONS = idx;
     if (idx && idx.seasons && idx.seasons.length) {
-      return loadSeason(idx.current).then(renderSeasonSelect);
+      // ?season=2025 deep-links a specific year; otherwise the current one
+      const want = Number(new URLSearchParams(location.search).get("season"));
+      const pick = idx.seasons.includes(want) ? want : idx.current;
+      return loadSeason(pick).then(renderSeasonSelect);
     }
     // no season index (older build) — fall back to the flat files
     return Promise.all([
