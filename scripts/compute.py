@@ -7,7 +7,8 @@ import re
 from datetime import datetime, timezone
 from pathlib import Path
 
-from common import DATA, DOCS, FORMATS, POSITIONS, get_logger, read_json, write_json
+from common import (DATA, DOCS, EXTRA_POSITIONS, FORMATS, POSITIONS,
+                    SKILL_POSITIONS, get_logger, read_json, write_json)
 import sleeper
 import spec_engine
 
@@ -33,8 +34,30 @@ def source_labels(seen_sources):
             labels[s] = s.replace("-", " ").replace("_", " ").title()
     return labels
 
-TOP_N = {"QB": 24, "RB": 36, "WR": 48, "TE": 24}
+TOP_N = {"QB": 24, "RB": 36, "WR": 48, "TE": 24, "K": 24, "DST": 24}
 HIT_N = 12  # top-12 hit rate window
+
+
+def _scoped(pos_metrics, positions):
+    """Average Spearman over a position subset, plus how many positions it used."""
+    rhos = [pos_metrics[p]["spearman"] for p in positions
+            if p in pos_metrics and pos_metrics[p]["spearman"] is not None]
+    if not rhos:
+        return None
+    return {"avg_spearman": round(sum(rhos) / len(rhos), 4), "positions": len(rhos)}
+
+
+def scope_scores(pos_metrics):
+    """Both leaderboard lenses for one source-week.
+
+    'skill' is QB/RB/WR/TE — every source publishes these, so it stays
+    comparable across the whole field and across seasons. 'all' folds in K and
+    DST for sources that rank them. Kept separate rather than blended because
+    K/DST coverage is patchy and those positions are far more luck-driven;
+    the site exposes the choice as a toggle.
+    """
+    return {"skill": _scoped(pos_metrics, SKILL_POSITIONS),
+            "all": _scoped(pos_metrics, POSITIONS)}
 
 PREDRAFT_TOP_OVERALL = 150
 
@@ -98,7 +121,8 @@ def evaluate(players, points_by_pid, top_n, hit_n=HIT_N):
 def attach_ids(players, matchers):
     for p in players:
         pid = sleeper.match_player(
-            matchers, name=p.get("name"), pos=p.get("pos"), espn_id=p.get("espn_id"))
+            matchers, name=p.get("name"), pos=p.get("pos"),
+            espn_id=p.get("espn_id"), team=p.get("team"))
         p["sleeper_id"] = pid
         if pid and not p.get("pos"):
             p["pos"] = matchers["db"][pid]["pos"]
@@ -181,21 +205,33 @@ def main():
                         pos_metrics[pos] = m
                 if not pos_metrics:
                     continue
-                rhos = [m["spearman"] for m in pos_metrics.values() if m["spearman"] is not None]
+                scopes = scope_scores(pos_metrics)
                 entry = summary["weekly"][fmt].setdefault(source, {"weeks": {}})
                 entry["weeks"][str(w)] = {
                     "positions": pos_metrics,
-                    "avg_spearman": round(sum(rhos) / len(rhos), 4) if rhos else None,
+                    "scopes": scopes,
+                    # kept for backwards compatibility with the existing site
+                    "avg_spearman": scopes["skill"]["avg_spearman"] if scopes["skill"] else None,
                 }
-        # cumulative score per source
-        board = []
-        for source, entry in summary["weekly"][fmt].items():
-            scores = [wk["avg_spearman"] for wk in entry["weeks"].values() if wk["avg_spearman"] is not None]
-            if scores:
-                entry["cumulative"] = {"avg_spearman": round(sum(scores) / len(scores), 4), "weeks": len(scores)}
-                board.append({"source": source, "score": entry["cumulative"]["avg_spearman"], "weeks": len(scores)})
-        board.sort(key=lambda x: -x["score"])
-        summary["leaderboard"]["weekly"][fmt] = board
+        # cumulative score per source, per scope
+        summary["leaderboard"]["weekly"][fmt] = {}
+        for scope in ("skill", "all"):
+            board = []
+            for source, entry in summary["weekly"][fmt].items():
+                scores = [wk["scopes"][scope]["avg_spearman"] for wk in entry["weeks"].values()
+                          if wk["scopes"].get(scope)]
+                if not scores:
+                    continue
+                cum = entry.setdefault("cumulative", {})
+                cum[scope] = {"avg_spearman": round(sum(scores) / len(scores), 4),
+                              "weeks": len(scores)}
+                if scope == "skill":
+                    cum["avg_spearman"] = cum[scope]["avg_spearman"]
+                    cum["weeks"] = len(scores)
+                board.append({"source": source, "score": cum[scope]["avg_spearman"],
+                              "weeks": len(scores)})
+            board.sort(key=lambda x: -x["score"])
+            summary["leaderboard"]["weekly"][fmt][scope] = board
 
     # ---- pre-draft rankings vs cumulative season points
     latest = weeks[-1] if weeks else None
@@ -217,13 +253,16 @@ def main():
                     (p for p in plist if p.get("pos") in POSITIONS), key=lambda x: x["rank"])
                 for w in weeks:
                     cpts = cum_pts(w, fmt)
-                    pos_rhos = []
+                    wk_metrics = {}
                     for pos in POSITIONS:
                         m = evaluate(by_pos[pos], cpts, TOP_N[pos])
-                        if m and m["spearman"] is not None:
-                            pos_rhos.append(m["spearman"])
+                        if m:
+                            wk_metrics[pos] = m
+                    sc = scope_scores(wk_metrics)
                     src_entry["series"][str(w)] = (
-                        round(sum(pos_rhos) / len(pos_rhos), 4) if pos_rhos else None)
+                        sc["skill"]["avg_spearman"] if sc["skill"] else None)
+                    src_entry.setdefault("series_all", {})[str(w)] = (
+                        sc["all"]["avg_spearman"] if sc["all"] else None)
                 cpts = cum_pts(latest, fmt)
                 pos_metrics = {}
                 for pos in POSITIONS:
@@ -231,19 +270,24 @@ def main():
                     if m:
                         pos_metrics[pos] = m
                 overall = evaluate(ordered, cpts, PREDRAFT_TOP_OVERALL) if ordered else None
-                src_entry["latest"] = {"through_week": latest, "overall": overall, "positions": pos_metrics}
-                rhos = [m["spearman"] for m in pos_metrics.values() if m["spearman"] is not None]
-                if rhos:
-                    board.append({
-                        "source": source,
-                        "score": round(sum(rhos) / len(rhos), 4),
-                        "overall": overall["spearman"] if overall else None,
-                        "positions": len(rhos),
-                        "through_week": latest,
-                    })
+                scopes = scope_scores(pos_metrics)
+                src_entry["latest"] = {"through_week": latest, "overall": overall,
+                                       "positions": pos_metrics, "scopes": scopes}
+                for scope, sc in scopes.items():
+                    if sc:
+                        board.append({
+                            "scope": scope,
+                            "source": source,
+                            "score": sc["avg_spearman"],
+                            "overall": overall["spearman"] if overall else None,
+                            "positions": sc["positions"],
+                            "through_week": latest,
+                        })
             summary["predraft"][fmt][source] = src_entry
-        board.sort(key=lambda x: -x["score"])
-        summary["leaderboard"]["predraft"][fmt] = board
+        summary["leaderboard"]["predraft"][fmt] = {}
+        for scope in ("skill", "all"):
+            rows = sorted((r for r in board if r["scope"] == scope), key=lambda x: -x["score"])
+            summary["leaderboard"]["predraft"][fmt][scope] = rows
 
     seen = set()
     for fmt in FORMATS:
