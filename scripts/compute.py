@@ -563,6 +563,12 @@ def main(season=None, is_current=True):
     if is_current:
         write_json(DOCS / "data" / "predraft.json", comparison)
     log.info("%s/predraft.json written", season)
+
+    if is_current:
+        # cross-season player history for the site's drill-in panel; imported
+        # lazily because player_history itself imports this module
+        import player_history
+        player_history.main()
     return summary
 
 
@@ -606,3 +612,7 @@ if __name__ == "__main__":
     for s in targets:
         main(season=s, is_current=(s == current))
     write_index(current)
+    if current not in targets:
+        # backfill-only run: main() skipped the player-history refresh
+        import player_history
+        player_history.main()

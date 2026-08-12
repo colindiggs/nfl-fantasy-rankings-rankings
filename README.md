@@ -14,6 +14,7 @@ fantasy points every week, and publishes a running leaderboard for the season.
 | `scripts/sleeper.py` | Sleeper API: player DB (cross-site ID matching) and actual weekly fantasy points in standard / half-PPR / PPR |
 | `scripts/capture.py` | CLI: `predraft` / `weekly` / `actuals` snapshots → `data/` |
 | `scripts/compute.py` | Scores every ranking vs. actual points; writes `docs/data/*.json` for the site |
+| `scripts/player_history.py` | Cross-season per-player record (`docs/data/players.json`): pre-draft consensus rank vs. season finish, weekly consensus rank vs. weekly finish, over/under rates, rank-implied vs. actual points. Feeds the board's click-to-drill panel; refreshed by `compute.py` on current-season runs |
 | `scripts/runner.py` | Scheduled entry point: captures, computes, commits, pushes |
 | `docs/` | Static GitHub Pages site (leaderboard, weekly trend, pre-draft comparison) |
 

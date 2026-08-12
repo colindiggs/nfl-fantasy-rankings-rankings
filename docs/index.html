@@ -21,7 +21,8 @@
   --s5: #2a8f9d; --s6: #2f855a; --s7: #c94f6d; --s8: #c53030;
   --accent: #0b6e4f; --accent-ink: #ffffff;
   --chip: #f1efe9; --rowhover: rgba(11,110,79,0.06);
-  --r: 4px;
+  --r: 4px;      /* controls, chips, tooltips */
+  --r-sm: 2px;   /* inline badges and data bars */
 }
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
@@ -68,7 +69,7 @@ button, input, select { font-family: var(--font-sans); }
 .hero .chips { display: flex; gap: 8px; flex-wrap: wrap; }
 .hero .chip {
   font-family: var(--font-mono); font-size: .72rem;
-  background: var(--chip); border: 1px solid var(--border); border-radius: 999px;
+  background: var(--chip); border: 1px solid var(--border); border-radius: var(--r);
   padding: 3px 12px; color: var(--ink-2);
 }
 .hero .chip b { color: var(--ink); font-weight: 700; }
@@ -109,6 +110,15 @@ button, input, select { font-family: var(--font-sans); }
 }
 h2 { font-size: 1.1875rem; margin: 0 0 4px; letter-spacing: -0.01em; font-weight: 700; }
 .sub { color: var(--ink-2); margin: 0 0 14px; font-size: .875rem; max-width: 860px; }
+.takeaway {
+  color: var(--ink-2); font-size: .875rem; max-width: 860px;
+  margin: 14px 0 4px; padding: 8px 0 8px 14px; border-left: 3px solid var(--accent);
+}
+.takeaway::before {
+  content: "Takeaway"; display: block; font-family: var(--font-mono);
+  font-size: .66rem; text-transform: uppercase; letter-spacing: .1em;
+  color: var(--accent); font-weight: 600; margin-bottom: 4px;
+}
 
 table { border-collapse: collapse; width: 100%; font-size: .875rem; background: var(--surface); }
 th, td { text-align: left; padding: 6px 10px; border-bottom: 1px solid var(--grid); white-space: nowrap; }
@@ -124,7 +134,7 @@ td.num, td.rk, .bar-val, .spread-num, .cov, #tooltip b {
 tbody tr:hover { background: var(--rowhover); }
 .rnk-chip {
   display: inline-block; min-width: 20px; text-align: center; padding: 0 4px;
-  background: var(--ink); color: var(--page); border-radius: 3px; font-weight: 700;
+  background: var(--ink); color: var(--page); border-radius: var(--r-sm); font-weight: 700;
 }
 .dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 7px; background: var(--muted); flex: none; }
 .srccell { display: inline-flex; align-items: center; }
@@ -179,7 +189,7 @@ a { color: var(--accent); }
 tbody tr:hover td.pcol { background: color-mix(in srgb, var(--surface) 94%, var(--accent)); }
 .pcell { display: flex; align-items: center; gap: 10px; }
 .face {
-  width: 34px; height: 34px; border-radius: 50%; object-fit: cover; object-position: top;
+  width: 42px; height: 42px; border-radius: 50%; object-fit: cover; object-position: top;
   background: var(--chip); flex: none; border: 1px solid var(--border);
 }
 /* team logos want padding and no crop, unlike headshots */
@@ -187,7 +197,8 @@ tbody tr:hover td.pcol { background: color-mix(in srgb, var(--surface) 94%, var(
 .mark {
   display: inline-flex; align-items: center; justify-content: center;
   min-width: 26px; height: 18px; padding: 0 5px; margin-right: 7px;
-  border-radius: 3px; color: #fff; font-size: .62rem; font-weight: 700;
+  border-radius: var(--r); background: var(--chip); border: 1px solid var(--border);
+  color: var(--ink-2); font-size: .62rem; font-weight: 700;
   letter-spacing: .02em; flex: none; line-height: 1; font-family: var(--font-mono);
 }
 th .mark { margin: 0 auto; }
@@ -195,8 +206,8 @@ th .mark { margin: 0 auto; }
 .calib-sep { width: 12px; }
 .bar-row { display: flex; align-items: center; gap: 10px; margin-bottom: 6px; font-size: .8125rem; }
 .bar-label { width: 42px; color: var(--ink-2); font-weight: 600; flex: none; font-family: var(--font-mono); font-size: .75rem; }
-.bar-track { flex: 1; background: var(--chip); border-radius: 2px; height: 14px; }
-.bar-fill { height: 14px; border-radius: 2px; display: block; }
+.bar-track { flex: 1; background: var(--chip); border-radius: var(--r-sm); height: 14px; }
+.bar-fill { height: 14px; border-radius: var(--r-sm); display: block; }
 .bar-val { width: 72px; text-align: right; color: var(--ink-2); flex: none; font-size: .75rem; }
 .bar-group { margin-bottom: 20px; }
 .bar-group h4 { margin: 0 0 8px; font-size: .8125rem; font-weight: 700; color: var(--ink); display: flex; align-items: center; }
@@ -208,20 +219,20 @@ th.sortable:hover { color: var(--ink); }
 .spread-cell { display: flex; align-items: center; gap: 8px; }
 .spread-num { color: var(--muted); font-size: .72rem; white-space: nowrap; }
 .tag-pill {
-  display: inline-block; font-size: .62rem; font-weight: 600; border-radius: 3px;
+  display: inline-block; font-size: .62rem; font-weight: 600; border-radius: var(--r-sm);
   padding: 1px 6px; margin-left: 6px; background: none; color: var(--muted);
   border: 1px solid var(--baseline); text-transform: uppercase; letter-spacing: .05em;
   font-family: var(--font-mono);
 }
 .face-fallback {
-  width: 34px; height: 34px; border-radius: 50%; background: var(--chip); color: var(--ink-2);
+  width: 42px; height: 42px; border-radius: 50%; background: var(--chip); color: var(--ink-2);
   display: inline-flex; align-items: center; justify-content: center; font-size: .72rem;
   font-weight: 600; flex: none; border: 1px solid var(--border);
 }
 .pname { font-weight: 700; line-height: 1.25; }
 .pmeta { color: var(--muted); font-size: .72rem; line-height: 1.4; }
 .posbadge {
-  display: inline-block; font-size: .64rem; font-weight: 700; border-radius: 2px;
+  display: inline-block; font-size: .64rem; font-weight: 700; border-radius: var(--r-sm);
   padding: 0 5px; margin-right: 5px; color: var(--pos, var(--ink-2));
   border: 1px solid var(--pos, var(--ink-2)); background: none;
   font-family: var(--font-mono); letter-spacing: .03em;
@@ -229,9 +240,24 @@ th.sortable:hover { color: var(--ink); }
 .pos-QB { --pos: var(--s7); } .pos-RB { --pos: var(--s3); }
 .pos-WR { --pos: var(--s1); } .pos-TE { --pos: var(--s2); }
 .pos-K  { --pos: var(--s4); } .pos-DST{ --pos: var(--muted); }
-.range { display: inline-block; width: 78px; height: 6px; background: var(--chip); border-radius: 2px; position: relative; vertical-align: middle; flex: none; }
-.range i { position: absolute; top: 0; height: 6px; background: var(--accent); opacity: .85; border-radius: 2px; min-width: 3px; }
+.range { display: inline-block; width: 78px; height: 6px; background: var(--chip); border-radius: var(--r-sm); position: relative; vertical-align: middle; flex: none; }
+.range i { position: absolute; top: 0; height: 6px; background: var(--accent); opacity: .85; border-radius: var(--r-sm); min-width: 3px; }
 .cov { color: var(--muted); font-size: .75rem; }
+
+/* player drill-in */
+.board-wrap tbody tr[data-pid] { cursor: pointer; }
+tr.detail-row:hover, tr.detail-row:hover td.pcol { background: none; }
+.detail-td { background: var(--page); padding: 14px 16px 16px; white-space: normal; }
+.phist { position: sticky; left: 16px; display: inline-block; max-width: min(880px, 86vw); }
+.phist-head { font-weight: 700; font-size: .8125rem; margin-bottom: 2px; }
+.phist-sub { color: var(--muted); font-size: .72rem; margin-bottom: 10px; font-family: var(--font-mono); }
+.phist table { width: auto; background: none; font-size: .75rem; }
+.phist th { border-bottom: 1px solid var(--ink); font-size: .62rem; }
+.phist td, .phist th { padding: 4px 9px; }
+.phist td { border-bottom: 1px solid var(--grid); }
+.phist .delta-pos { color: var(--s6); font-weight: 700; }
+.phist .delta-neg { color: var(--s8); font-weight: 700; }
+.phist-note { color: var(--ink-2); font-size: .8125rem; margin: 10px 0 0; max-width: 760px; }
 td.best { color: var(--s6); font-weight: 700; }
 td.worst { color: var(--s8); font-weight: 700; }
 td.rk { text-align: right; color: var(--ink-2); }
@@ -252,8 +278,8 @@ td.na { text-align: right; color: var(--baseline); }
   <div class="hero">
     <p class="eyebrow">Fantasy football &middot; accuracy benchmark</p>
     <h1>NFL Rankings of Rankings</h1>
-    <p class="tag">Who actually knows football? Every major fantasy ranking, snapshotted before games are
-    played, then scored against real fantasy points all season long.</p>
+    <p class="tag">Expert rankings from major fantasy sites are snapshotted before games are played,
+    then scored against actual fantasy points. Sources are compared only on weeks and formats they publish.</p>
     <div class="chips" id="hero-chips"></div>
   </div>
 
@@ -284,8 +310,9 @@ td.na { text-align: right; color: var(--baseline); }
 
   <div class="card">
     <h2>Consensus draft board</h2>
-    <p class="sub">Top 200 by average rank across every source that ranks the player. <b>Coverage</b> shows how
-    many sources rank him — a thin consensus is visible, not hidden. Green = a player's best rank, red = his worst.</p>
+    <p class="sub">Top 200 by mean rank across the sources that rank each player. <b>Cov</b> = number of
+    sources ranking the player (minimum 2 to appear). Green marks a player's best rank across sources; red his
+    worst. Click a row for the player's multi-season record.</p>
     <div class="board-controls">
       <div class="posfilter" id="posfilter">
         <button data-pos="ALL" class="active">All</button>
@@ -300,16 +327,20 @@ td.na { text-align: right; color: var(--baseline); }
 
   <div class="card">
     <h2>In-season leaderboard</h2>
-    <p class="sub">Two views of the same thing, across QB/RB/WR/TE/K/DST.
-    <b>Accuracy gap</b> is the average distance in fantasy points between what a source's rank implied a
-    player would score and what he actually scored — lower is better, and it penalises a miss at RB2 far
-    more than one at RB45. <b>Spearman</b> is rank correlation, where 1.0 is perfect ordering. They can
-    disagree, which is usually worth a look.</p>
+    <p class="sub">Positions QB/RB/WR/TE/K/DST, averaged over scored weeks.
+    <b>Accuracy gap</b>: mean absolute difference, in fantasy points, between the points implied by a
+    source's rank and the points actually scored. Lower is better. <b>Spearman</b>: rank correlation
+    between predicted and actual positional order; 1.0 is a perfect ordering.</p>
     <div id="weekly-board"></div>
+    <p class="takeaway">The two metrics weight errors differently: Spearman treats every rank inversion
+    equally, while the accuracy gap scales with the points at stake, so a miss at RB2 costs more than one
+    at RB45. A source can lead one metric and trail the other.</p>
   </div>
 
   <div class="card">
     <h2>Week-by-week accuracy</h2>
+    <p class="sub">Mean Spearman correlation per week, averaged across positions. Click a point to load
+    that source-week in the scatter plot below.</p>
     <div class="chartbox" id="chartbox">
       <div id="trend-chart"></div>
       <div id="tooltip"></div>
@@ -319,23 +350,25 @@ td.na { text-align: right; color: var(--baseline); }
 
   <div class="card">
     <h2>Average error by position</h2>
-    <p class="sub">Fantasy points between what a source's rank implied a player would score and what he
-    actually scored, averaged over the season.</p>
+    <p class="sub">Mean accuracy gap per position, in fantasy points, averaged over the season's scored
+    weeks. Lower is better.</p>
     <div id="pos-breakdown"></div>
   </div>
 
   <div class="card">
     <h2>Projected rank vs. actual finish</h2>
-    <p class="sub">One dot per ranked player-week.</p>
+    <p class="sub">One point per ranked player-week. The dashed diagonal is y&nbsp;=&nbsp;x: a player
+    finishing exactly at his projected rank.</p>
     <div class="calib-controls" id="calib-controls"></div>
     <div class="chartbox"><div id="calib-chart"></div></div>
   </div>
 
   <div class="card">
     <h2>Pre-draft rankings vs. season results</h2>
-    <p class="sub">Each source's pre-draft board (frozen at kickoff) scored against cumulative season points.
-    Accuracy gap is in fantasy points over the full season, so the numbers are much larger than the weekly
-    table above. Overall = top-150 board order, blank for sources that only rank within positions.</p>
+    <p class="sub">Each source's pre-draft board, frozen at kickoff, scored against cumulative season
+    points. Accuracy gap is measured over full-season totals and is therefore on a larger scale than the
+    weekly table. Overall = Spearman over the top-150 board order; blank for sources that publish
+    positional ranks only.</p>
     <div id="predraft-board"></div>
   </div>
 
@@ -450,22 +483,23 @@ function faceHtml(p) {
 }
 
 /* Source marks. Favicons proved unreliable at this size (ESPN serves an empty
-   body, CBS a 26px gif), so each source gets a branded monogram chip instead —
-   always renders, no third-party request, readable in both themes. */
+   body, CBS a 26px gif), so each source gets a neutral monogram chip instead —
+   always renders, no third-party request, readable in both themes. Chips are
+   deliberately uncolored: color is reserved for data (chart series, positions). */
 const SRC_MARK = {
-  fantasypros: ["FPros", "#0b6ab0"], espn: ["ESPN", "#d50a0a"], cbs: ["CBS", "#0072ce"],
-  nfl: ["NFL", "#013369"], yahoo: ["Yahoo", "#6001d2"], ringer: ["Ringer", "#e4002b"],
-  "ringer-superflex": ["Ringer SF", "#a1002b"], pff: ["PFF", "#f26722"],
-  rotoballer: ["RotoB", "#1b8a3f"], draftsharks: ["DShrk", "#0a7ea4"],
-  "draftsharks-idp": ["DShrk IDP", "#075f7c"], sharks: ["FShrk", "#2d6b8f"],
-  fftoday: ["FFToday", "#8a6d1f"], walter: ["Walter", "#5c5c5c"],
-  ffcalc: ["FFCalc", "#3b7dd8"], mfl: ["MFL", "#7a3fb0"], underdog: ["Underdog", "#111827"],
-  sleeper: ["Sleeper", "#00ceb8"],
+  fantasypros: "FPros", espn: "ESPN", cbs: "CBS",
+  nfl: "NFL", yahoo: "Yahoo", ringer: "Ringer",
+  "ringer-superflex": "Ringer SF", pff: "PFF",
+  rotoballer: "RotoB", draftsharks: "DShrk",
+  "draftsharks-idp": "DShrk IDP", sharks: "FShrk",
+  fftoday: "FFToday", walter: "Walter",
+  ffcalc: "FFCalc", mfl: "MFL", underdog: "Underdog",
+  sleeper: "Sleeper",
 };
 
 function srcMark(s, withName) {
-  const [txt, color] = SRC_MARK[s] || [(SRC_SHORT[s] || s).slice(0, 2).toUpperCase(), "#6b7280"];
-  const chip = `<span class="mark" style="background:${color}">${esc(txt)}</span>`;
+  const txt = SRC_MARK[s] || (SRC_SHORT[s] || s).slice(0, 2).toUpperCase();
+  const chip = `<span class="mark">${esc(txt)}</span>`;
   return withName ? `<span class="srccell">${chip}${esc(srcName(s))}</span>` : chip;
 }
 
@@ -491,7 +525,7 @@ function renderBoard() {
   // the consensus is built from 1QB offense boards only; in the IDP lens there
   // is no consensus to show, so say so instead of showing contradictory data
   if (ROSTER !== "offense") {
-    $("#board").innerHTML = '<div class="empty" style="padding:14px">The consensus board compares 1QB offense boards, and Draft Sharks is the only IDP source — one board isn’t a consensus. Its accuracy is scored in the leaderboards below; switch Defense back to DST to see the draft board.</div>';
+    $("#board").innerHTML = '<div class="empty" style="padding:14px">The consensus board aggregates 1QB offense boards only. One IDP source is captured (Draft Sharks), which is not sufficient to form a consensus; its accuracy is reported in the leaderboards below. Switch Defense to DST to view the board.</div>';
     return;
   }
   const data = PREDRAFT && PREDRAFT.formats[FMT];
@@ -537,7 +571,8 @@ function renderBoard() {
     const spread = `<span class="spread-cell"><span class="range" title="Best rank ${p.min}, worst ${p.max}"><i style="left:${left}%;width:${width}%"></i></span><span class="spread-num">${p.min}–${p.max}</span></span>`;
     const rnk = i < 3 && SORT.key === "avg" && SORT.dir === 1
       ? `<span class="rnk-chip">${i + 1}</span>` : String(i + 1);
-    html += `<tr><td class="num">${rnk}</td>` +
+    html += `<tr data-pid="${esc(p.id || "")}" tabindex="0" role="button" aria-expanded="false"` +
+      ` title="Click for multi-season history"><td class="num">${rnk}</td>` +
       `<td class="pcol"><span class="pcell">${faceHtml(p)}<span><span class="pname">${esc(p.name)}</span><br>` +
       `<span class="pmeta"><span class="posbadge pos-${p.pos}">${p.pos}</span>${esc(p.team || "")}</span></span></span></td>` +
       `<td class="num"><b>${p.avg}</b></td>` +
@@ -579,7 +614,7 @@ function renderPredraftBoard() {
   const board = boardFor("predraft");
   if (!board.length) {
     $("#predraft-board").innerHTML = emptyWithHistory(
-      "Pre-draft boards are scored once week 1 is in the books.");
+      "Pre-draft boards are scored after week 1 completes.");
     return;
   }
   let html = '<div class="scroll-x"><table><thead><tr><th>#</th><th>Source</th>' +
@@ -602,8 +637,9 @@ function renderTrend() {
   const sources = orderSources(Object.keys(weekly)
     .filter(s => Object.keys(weekly[s].weeks || {}).length && inView(s)));
   const weeks = SUMMARY.weeks_evaluated || [];
+  // legend dots use the series color so the key maps to the lines
   $("#trend-legend").innerHTML = sources.map(s =>
-    `<span>${srcMark(s)}${esc(srcName(s))}</span>`).join("");
+    `<span><span class="dot" ${dotStyle(s)}></span>${esc(srcName(s))}</span>`).join("");
   if (!sources.length || !weeks.length) {
     $("#trend-chart").innerHTML = emptyWithHistory("No weekly scores for this season yet.");
     return;
@@ -766,8 +802,7 @@ function renderPosBreakdown() {
     return;
   }
   const max = Math.max(...sources.flatMap(s => Object.values(gaps[s])));
-  const legend = '<p class="chart-note"><span class="arrow">\u25c0</span> shorter bar = smaller error = more accurate' +
-    '<span class="note-sep"></span>bars are error, so less is better</p>';
+  const legend = '<p class="chart-note">Bar length is mean absolute error in fantasy points; shorter is more accurate.</p>';
   $("#pos-breakdown").innerHTML = legend + sources.map(s => {
     const rows = ALL_POS.filter(pos => gaps[s][pos] != null).map(pos => {
       const v = gaps[s][pos];
@@ -857,17 +892,17 @@ function renderCalibration() {
        (T + ph / 2) + ')" style="fill:var(--ink-2)">\u2190 Actual finish (1 = scored most)</text>';
   // quadrant annotations. Above the diagonal = finished better than ranked.
   g += '<text class="quad-note" x="' + (W - R - 14) + '" y="' + (T + 22) +
-       '" text-anchor="end" style="fill:var(--s3)">Beat their ranking \u2014 sleepers</text>';
+       '" text-anchor="end" style="fill:var(--s3)">Outperformed projection</text>';
   g += '<text class="quad-note" x="' + (W - R - 14) + '" y="' + (T + 38) +
-       '" text-anchor="end" style="fill:var(--muted)">ranked low, scored high</text>';
+       '" text-anchor="end" style="fill:var(--muted)">actual finish better than projected rank</text>';
   g += '<text class="quad-note" x="' + (L + 14) + '" y="' + (H - B - 26) +
-       '" style="fill:var(--s8)">Missed their ranking \u2014 busts</text>';
+       '" style="fill:var(--s8)">Underperformed projection</text>';
   g += '<text class="quad-note" x="' + (L + 14) + '" y="' + (H - B - 10) +
-       '" style="fill:var(--muted)">ranked high, scored low</text>';
+       '" style="fill:var(--muted)">actual finish worse than projected rank</text>';
   // label the diagonal itself
   g += '<text class="quad-note" x="' + x(hi * 0.62) + '" y="' + (y(hi * 0.62) - 8) +
        '" text-anchor="middle" style="fill:var(--baseline)" transform="rotate(45 ' +
-       x(hi * 0.62) + ' ' + y(hi * 0.62) + ')">exactly as ranked</text>';
+       x(hi * 0.62) + ' ' + y(hi * 0.62) + ')">y = x</text>';
 
   const mean = a => a.reduce((s, v) => s + v, 0) / a.length;
   const mx = mean(pairs.map(c => c[0])), my = mean(pairs.map(c => c[1]));
@@ -877,9 +912,9 @@ function renderCalibration() {
   const r = den ? num / den : 0;
   $("#calib-chart").innerHTML =
     '<svg viewBox="0 0 ' + W + " " + H + '" style="width:100%;height:auto;display:block">' + g + "</svg>" +
-    '<p class="sub" style="margin-top:10px">' + pairs.length.toLocaleString() +
-    " player-weeks \u00b7 correlation <b>" + r.toFixed(2) +
-    "</b> \u00b7 tight along the line = well calibrated, scattered = closer to noise.</p>";
+    '<p class="sub" style="margin-top:10px">n = ' + pairs.length.toLocaleString() +
+    " player-weeks \u00b7 Pearson r = <b>" + r.toFixed(2) +
+    "</b>. Concentration along the diagonal indicates calibrated ranks; dispersion indicates low predictive signal.</p>";
 }
 
 document.addEventListener("click", e => {
@@ -889,6 +924,109 @@ document.addEventListener("click", e => {
   if (b.dataset.csrc) CALIB_SRC = b.dataset.csrc;
   if (b.dataset.cpos) CALIB_POS = b.dataset.cpos;
   renderCalibration();
+});
+
+/* ---------- player drill-in: multi-season record ---------- */
+const FMT_LABEL = {ppr: "PPR", standard: "Standard", half_ppr: "Half PPR"};
+let PLAYERS = null, PLAYERS_REQ = null;
+
+function fetchPlayers() {
+  if (PLAYERS) return Promise.resolve(PLAYERS);
+  PLAYERS_REQ = PLAYERS_REQ || fetch("data/players.json").then(r => r.json())
+    .then(d => { PLAYERS = d; return d; }).catch(() => null);
+  return PLAYERS_REQ;
+}
+
+function fmtDelta(d) {
+  if (d == null) return "—";
+  const cls = d > 0 ? "delta-pos" : d < 0 ? "delta-neg" : "";
+  const txt = (d > 0 ? "+" : "") + d;
+  return cls ? `<span class="${cls}">${txt}</span>` : txt;
+}
+
+function playerDetailHtml(pid) {
+  const p = PLAYERS && PLAYERS.players && PLAYERS.players[pid];
+  if (!p) return '<div class="empty">No multi-season data for this player.</div>';
+  const years = Object.keys(p.seasons).sort();
+  let rows = "", nBoth = 0, sumDelta = 0, over = 0, under = 0, nWk = 0,
+      ppgDiffSum = 0, ppgN = 0;
+  years.forEach(y => {
+    const r = p.seasons[y][FMT];
+    if (!r) return;
+    const delta = (r.pre != null && r.fin != null) ? r.pre - r.fin : null;
+    if (delta != null) { nBoth++; sumDelta += delta; }
+    const wk = r.wk || {};
+    if (wk.n) { over += wk.over; under += wk.under; nWk += wk.n; }
+    if (wk.ppg_proj != null) { ppgDiffSum += (wk.ppg_act - wk.ppg_proj) * wk.n; ppgN += wk.n; }
+    rows += `<tr><td>${y}</td>` +
+      `<td class="num">${r.pre != null ? p.pos + r.pre : "—"}</td>` +
+      `<td class="num">${r.fin != null ? p.pos + r.fin : "—"}</td>` +
+      `<td class="num">${fmtDelta(delta)}</td>` +
+      `<td class="num">${r.pts != null ? r.pts.toFixed(1) : "—"}</td>` +
+      `<td class="num">${r.gp != null ? r.gp : "—"}</td>` +
+      `<td class="num">${wk.proj != null ? wk.proj.toFixed(1) : "—"}</td>` +
+      `<td class="num">${wk.act != null ? wk.act.toFixed(1) : "—"}</td>` +
+      `<td class="num">${wk.n ? wk.over + "–" + wk.under : "—"}</td>` +
+      `<td class="num">${wk.ppg_proj != null ? wk.ppg_proj.toFixed(1) + " / " + wk.ppg_act.toFixed(1) : "—"}</td></tr>`;
+  });
+  if (!rows) return '<div class="empty">No data for this player in this scoring format.</div>';
+  let notes = [];
+  if (nBoth) {
+    const bias = sumDelta / nBoth;
+    const dir = bias > 0.5 ? "finished better than drafted"
+              : bias < -0.5 ? "finished worse than drafted" : "matched the pre-draft rank";
+    notes.push(`Mean pre-draft miss over ${nBoth} season${nBoth === 1 ? "" : "s"}: ` +
+      `${bias >= 0 ? "+" : ""}${bias.toFixed(1)} positional ranks (${dir} on average).`);
+  }
+  if (nWk) {
+    notes.push(`Finished above the weekly consensus rank in ${over} of ${nWk} ranked ` +
+      `player-weeks (${Math.round(over / nWk * 100)}%), below it in ${under} (${Math.round(under / nWk * 100)}%).`);
+  }
+  if (ppgN) {
+    const d = ppgDiffSum / ppgN;
+    notes.push(`Mean scoring relative to rank-implied points: ${d >= 0 ? "+" : ""}${d.toFixed(1)} points per game.`);
+  }
+  return `<div class="phist">` +
+    `<div class="phist-head">${esc(p.name)} — season-by-season record, ${FMT_LABEL[FMT]}</div>` +
+    `<div class="phist-sub">Ranks are positional (${esc(p.pos)}). Δ = pre-draft − finish; positive = finished better than drafted. ` +
+    `Wk proj / Wk finish = mean weekly consensus rank vs. mean weekly finish. O–U = weeks finished above vs. below his consensus rank. ` +
+    `PPG = rank-implied vs. actual points per game.</div>` +
+    `<div class="scroll-x"><table><thead><tr><th>Season</th><th class="num">Pre-draft</th><th class="num">Finish</th>` +
+    `<th class="num">Δ</th><th class="num">Pts</th><th class="num">GP</th><th class="num">Wk proj</th>` +
+    `<th class="num">Wk finish</th><th class="num">O–U</th><th class="num">PPG</th></tr></thead>` +
+    `<tbody>${rows}</tbody></table></div>` +
+    (notes.length ? `<p class="phist-note">${notes.join(" ")}</p>` : "");
+}
+
+function toggleDetail(tr) {
+  const next = tr.nextElementSibling;
+  const open = next && next.classList.contains("detail-row");
+  document.querySelectorAll("#board .detail-row").forEach(r => r.remove());
+  document.querySelectorAll('#board tr[aria-expanded="true"]')
+    .forEach(r => r.setAttribute("aria-expanded", "false"));
+  if (open) return;
+  const cols = tr.children.length;
+  tr.setAttribute("aria-expanded", "true");
+  tr.insertAdjacentHTML("afterend",
+    `<tr class="detail-row"><td class="detail-td" colspan="${cols}">` +
+    `<div class="empty">Loading player history…</div></td></tr>`);
+  fetchPlayers().then(() => {
+    const cell = tr.nextElementSibling && tr.nextElementSibling.querySelector(".detail-td");
+    if (cell) cell.innerHTML = PLAYERS
+      ? playerDetailHtml(tr.dataset.pid)
+      : '<div class="empty">Player history unavailable.</div>';
+  });
+}
+
+document.addEventListener("click", e => {
+  if (e.target.closest("#board th")) return;
+  const tr = e.target.closest('#board tbody tr[data-pid]');
+  if (tr && tr.dataset.pid) toggleDetail(tr);
+});
+document.addEventListener("keydown", e => {
+  if (e.key !== "Enter" && e.key !== " ") return;
+  const tr = e.target.closest && e.target.closest('#board tbody tr[data-pid]');
+  if (tr && tr.dataset.pid) { e.preventDefault(); toggleDetail(tr); }
 });
 
 function renderAll() {
