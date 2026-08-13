@@ -61,9 +61,24 @@ def load_curve():
     return CURVE
 
 
+NAME_OF = {}
+
+
 def load_positions(players_db):
     POS_OF.clear()
     POS_OF.update({pid: p["pos"] for pid, p in players_db.items() if p.get("pos")})
+    NAME_OF.clear()
+    NAME_OF.update({pid: p.get("name") for pid, p in players_db.items() if p.get("name")})
+
+
+def short_name(name):
+    """'Jahmyr Gibbs' -> 'J. Gibbs'; single-word and team names pass through."""
+    if not name:
+        return None
+    parts = name.split()
+    if len(parts) < 2:
+        return name
+    return f"{parts[0][0]}. {' '.join(parts[1:])}"
 
 
 MIN_POOL = 8   # a Spearman over fewer players than this is mostly noise
@@ -189,13 +204,16 @@ def evaluate(players, points_by_pid, top_n, hit_n=HIT_N, pos=None, kind=None, fm
     ranked_by_id = {p["sleeper_id"]: i + 1 for i, p in enumerate(ranked)}
     imputed_rank = len(ranked) + 1
 
-    entries = [(i + 1, points_by_pid.get(p.get("sleeper_id"), 0.0)) for i, p in enumerate(pool)]
+    entries = [(i + 1, points_by_pid.get(p.get("sleeper_id"), 0.0),
+                short_name(p.get("name") or NAME_OF.get(p.get("sleeper_id"))))
+               for i, p in enumerate(pool)]
     added = 0
     for pid, pts in top_actual:
         if pid in in_pool:
             continue
         # in the pool on merit; use the source's own rank if it has one
-        entries.append((ranked_by_id.get(pid, imputed_rank), pts))
+        entries.append((ranked_by_id.get(pid, imputed_rank), pts,
+                        short_name(NAME_OF.get(pid))))
         added += 1
 
     unmatched = dropped
@@ -226,7 +244,7 @@ def evaluate(players, points_by_pid, top_n, hit_n=HIT_N, pos=None, kind=None, fm
     gap = None
     if kind and fmt and pos:
         gaps = []
-        for pr, pts in entries:
+        for pr, pts, _name in entries:
             proj = rankvalue.points_for_rank(CURVE, kind, fmt, pos, int(round(pr)))
             if proj is not None:
                 gaps.append(abs(proj - pts))
@@ -236,7 +254,7 @@ def evaluate(players, points_by_pid, top_n, hit_n=HIT_N, pos=None, kind=None, fm
     # ---- calibration: predicted rank vs where the player actually finished,
     # for the scatter on the site. Capped so summary.json stays small.
     actual_rank_of = _avg_rank([e[1] for e in entries])
-    calib = [[int(round(e[0])), round(actual_rank_of[i], 1)]
+    calib = [[int(round(e[0])), round(actual_rank_of[i], 1), e[2] or ""]
              for i, e in enumerate(entries)][:80]
     # Headline Spearman stays on the players the source actually ranked — that
     # is what rank correlation means, and it keeps the number comparable across
@@ -569,6 +587,13 @@ def main(season=None, is_current=True):
         # lazily because player_history itself imports this module
         import player_history
         player_history.main()
+        # expectation model (reads players.json written above). Needs nflverse
+        # downloads on a cold cache; a network failure must not fail the run.
+        try:
+            import model
+            model.main()
+        except Exception as e:
+            log.warning("expectation model failed: %s", e)
     return summary
 
 

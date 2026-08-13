@@ -15,6 +15,8 @@ fantasy points every week, and publishes a running leaderboard for the season.
 | `scripts/capture.py` | CLI: `predraft` / `weekly` / `actuals` snapshots → `data/` |
 | `scripts/compute.py` | Scores every ranking vs. actual points; writes `docs/data/*.json` for the site |
 | `scripts/player_history.py` | Cross-season per-player record (`docs/data/players.json`): pre-draft consensus rank vs. season finish, weekly consensus rank vs. weekly finish, over/under rates, rank-implied vs. actual points. Feeds the board's click-to-drill panel; refreshed by `compute.py` on current-season runs |
+| `scripts/nflverse.py` | Free historical context from [nflverse-data](https://github.com/nflverse/nflverse-data) releases, cached in `data/nflverse/`: per-season rosters (ages, experience, teams, `sleeper_id` for exact joins) and weekly injury reports (2013+) |
+| `scripts/model.py` | Expectation model (`docs/data/model.json`): ridge logistic regression on player-seasons 2014+, estimating P(finish ≥ pre-draft consensus positional rank) from pre-season features — consensus rank, age, experience, team change, team skill-roster turnover, prior-season games/scoring/consensus miss/injury-report weeks. Fitted on PPR boards (the only format with multi-source consensus in every season), validated out-of-time (train ≤2022, test 2023–25), rendered as the site's "Expectation model" section |
 | `scripts/runner.py` | Scheduled entry point: captures, computes, commits, pushes |
 | `docs/` | Static GitHub Pages site (leaderboard, weekly trend, pre-draft comparison) |
 

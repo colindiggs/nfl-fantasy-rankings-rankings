@@ -158,6 +158,7 @@ tbody tr:hover { background: var(--rowhover); }
 svg text { fill: var(--muted); font-size: 10.5px; font-family: var(--font-mono); }
 circle.wk-dot { cursor: pointer; }
 circle.wk-dot:hover { stroke: var(--ink); stroke-width: 3; }
+circle.cal-dot:hover { opacity: 1; stroke: var(--ink); stroke-width: 1.5; }
 .quad-note { font-size: 11px; font-weight: 600; font-family: var(--font-sans); }
 a { color: var(--accent); }
 
@@ -243,6 +244,31 @@ th.sortable:hover { color: var(--ink); }
 .range { display: inline-block; width: 78px; height: 6px; background: var(--chip); border-radius: var(--r-sm); position: relative; vertical-align: middle; flex: none; }
 .range i { position: absolute; top: 0; height: 6px; background: var(--accent); opacity: .85; border-radius: var(--r-sm); min-width: 3px; }
 .cov { color: var(--muted); font-size: .75rem; }
+
+/* expectation model */
+.model-grid { display: grid; grid-template-columns: minmax(300px, 5fr) minmax(320px, 7fr); gap: 28px; }
+@media (max-width: 900px) { .model-grid { grid-template-columns: 1fr; } }
+.model-h3 { font-size: .8125rem; font-weight: 700; margin: 0 0 10px; }
+.model-h3:not(:first-child) { margin-top: 22px; }
+.coef-row { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; font-size: .75rem; }
+.coef-label { width: 168px; flex: none; color: var(--ink-2); text-align: right; }
+.coef-track { flex: 1; position: relative; height: 13px; }
+.coef-track::before { content: ""; position: absolute; left: 50%; top: -2px; bottom: -2px; width: 1px; background: var(--baseline); }
+.coef-bar { position: absolute; top: 1.5px; height: 10px; border-radius: var(--r-sm); }
+.coef-val { width: 46px; flex: none; font-family: var(--font-mono); color: var(--ink-2); font-size: .72rem; }
+.model-tablewrap { max-height: 480px; overflow-y: auto; border: 1px solid var(--grid); }
+.model-tablewrap thead th { position: sticky; top: 0; background: var(--surface); z-index: 2; box-shadow: 0 2px 0 var(--ink); border-bottom: 0; }
+#model-reliability { width: auto; }
+#model-reliability td, #model-reliability th { padding: 3px 9px; font-size: .72rem; }
+.pbar { display: inline-block; width: 54px; height: 7px; background: var(--chip); border-radius: var(--r-sm); vertical-align: middle; margin-right: 7px; }
+.pbar i { display: block; height: 7px; background: var(--accent); border-radius: var(--r-sm); }
+.drivers { font-family: var(--font-mono); font-size: .68rem; color: var(--muted); }
+#model-meta { display: flex; gap: 8px; flex-wrap: wrap; margin: 0 0 18px; }
+#model-meta .chip {
+  font-family: var(--font-mono); font-size: .72rem; background: var(--chip);
+  border: 1px solid var(--border); border-radius: var(--r); padding: 3px 12px; color: var(--ink-2);
+}
+#model-meta .chip b { color: var(--ink); }
 
 /* player drill-in */
 .board-wrap tbody tr[data-pid] { cursor: pointer; }
@@ -357,8 +383,7 @@ td.na { text-align: right; color: var(--baseline); }
 
   <div class="card">
     <h2>Projected rank vs. actual finish</h2>
-    <p class="sub">One point per ranked player-week. The dashed diagonal is y&nbsp;=&nbsp;x: a player
-    finishing exactly at his projected rank.</p>
+    <p class="sub">One point per ranked player-week. Hover a point for the player, week, and ranks.</p>
     <div class="calib-controls" id="calib-controls"></div>
     <div class="chartbox"><div id="calib-chart"></div></div>
   </div>
@@ -370,6 +395,32 @@ td.na { text-align: right; color: var(--baseline); }
     weekly table. Overall = Spearman over the top-150 board order; blank for sources that publish
     positional ranks only.</p>
     <div id="predraft-board"></div>
+  </div>
+
+  <div class="card" id="model-card" hidden>
+    <h2>Expectation model</h2>
+    <p class="sub" id="model-sub"></p>
+    <div id="model-meta"></div>
+    <div class="model-grid">
+      <div>
+        <h3 class="model-h3">Standardized coefficients (log-odds per SD)</h3>
+        <div id="model-coefs"></div>
+        <h3 class="model-h3">Reliability, test seasons</h3>
+        <div class="scroll-x"><table id="model-reliability"></table></div>
+      </div>
+      <div>
+        <h3 class="model-h3" id="model-pred-head"></h3>
+        <div class="board-controls">
+          <div class="posfilter" id="model-posfilter">
+            <button data-mpos="ALL" class="active">All</button>
+            <button data-mpos="QB">QB</button><button data-mpos="RB">RB</button>
+            <button data-mpos="WR">WR</button><button data-mpos="TE">TE</button>
+          </div>
+        </div>
+        <div class="model-tablewrap scroll-x" id="model-table"></div>
+      </div>
+    </div>
+    <p class="takeaway" id="model-takeaway"></p>
   </div>
 
   <p class="meta" id="meta"></p>
@@ -826,7 +877,7 @@ function calibrationPairs(source, pos) {
   Object.entries(entry.weeks || {}).forEach(([wk, data]) => {
     if (CALIB_WEEK != null && Number(wk) !== CALIB_WEEK) return;
     const m = (data.positions || {})[pos];
-    if (m && m.calibration) m.calibration.forEach(c => pts.push(c));
+    if (m && m.calibration) m.calibration.forEach(c => pts.push([c[0], c[1], c[2] || "", Number(wk)]));
   });
   return pts;
 }
@@ -868,7 +919,7 @@ function renderCalibration() {
   }
   const W = 940, H = 420, L = 54, R = 22, T = 16, B = 46;
   const pw = W - L - R, ph = H - T - B;
-  const hi = Math.max(10, Math.ceil(Math.max(...pairs.flatMap(c => c)) / 10) * 10);
+  const hi = Math.max(10, Math.ceil(Math.max(...pairs.map(c => Math.max(c[0], c[1]))) / 10) * 10);
   const x = v => L + pw * (v / hi);
   const y = v => T + ph * (v / hi);
   const step = Math.max(5, Math.round(hi / 6 / 5) * 5);
@@ -879,12 +930,12 @@ function renderCalibration() {
          '<line x1="' + x(v) + '" y1="' + T + '" x2="' + x(v) + '" y2="' + (H - B) + '" stroke="var(--grid)" stroke-dasharray="2 4"/>' +
          '<text x="' + x(v) + '" y="' + (H - B + 16) + '" text-anchor="middle">' + v + "</text>";
   }
-  // the perfect-prediction diagonal
-  g += '<line x1="' + x(0) + '" y1="' + y(0) + '" x2="' + x(hi) + '" y2="' + y(hi) +
-       '" stroke="var(--baseline)" stroke-width="2" stroke-dasharray="5 4"/>';
   pairs.forEach(c => {
-    g += '<circle cx="' + x(c[0]).toFixed(1) + '" cy="' + y(c[1]).toFixed(1) +
-         '" r="3" fill="' + POS_COLOR[CALIB_POS] + '" opacity="0.4"/>';
+    const label = (c[2] ? c[2] + " · " : "") + "week " + c[3] +
+      " · projected " + CALIB_POS + c[0] + " → finished " + CALIB_POS + Math.round(c[1]);
+    g += '<circle class="cal-dot" cx="' + x(c[0]).toFixed(1) + '" cy="' + y(c[1]).toFixed(1) +
+         '" r="3" fill="' + POS_COLOR[CALIB_POS] + '" opacity="0.4">' +
+         '<title>' + esc(label) + '</title></circle>';
   });
   g += '<text x="' + (L + pw / 2) + '" y="' + (H - 6) +
        '" text-anchor="middle" style="fill:var(--ink-2)">Projected rank \u2192 (1 = ranked best)</text>';
@@ -899,10 +950,6 @@ function renderCalibration() {
        '" style="fill:var(--s8)">Underperformed projection</text>';
   g += '<text class="quad-note" x="' + (L + 14) + '" y="' + (H - B - 10) +
        '" style="fill:var(--muted)">actual finish worse than projected rank</text>';
-  // label the diagonal itself
-  g += '<text class="quad-note" x="' + x(hi * 0.62) + '" y="' + (y(hi * 0.62) - 8) +
-       '" text-anchor="middle" style="fill:var(--baseline)" transform="rotate(45 ' +
-       x(hi * 0.62) + ' ' + y(hi * 0.62) + ')">y = x</text>';
 
   const mean = a => a.reduce((s, v) => s + v, 0) / a.length;
   const mx = mean(pairs.map(c => c[0])), my = mean(pairs.map(c => c[1]));
@@ -1028,6 +1075,97 @@ document.addEventListener("keydown", e => {
   const tr = e.target.closest && e.target.closest('#board tbody tr[data-pid]');
   if (tr && tr.dataset.pid) { e.preventDefault(); toggleDetail(tr); }
 });
+
+/* ---------- expectation model ---------- */
+let MODEL = null, MODEL_POS = "ALL";
+const COEF_LABEL = {
+  pre: "Draft slot (deeper = higher)", age: "Age", rookie: "Rookie",
+  years_exp: "Years of experience", team_change: "Changed team",
+  turnover: "Team skill-roster turnover", prior_delta: "Prior-season consensus miss",
+  prior_board: "Ranked last season", prior_gp: "Games played last season",
+  prior_ppg: "Points per game last season", inj_listed: "Injury-report weeks last season",
+  inj_out: "Weeks Out last season", pos_RB: "RB", pos_WR: "WR", pos_TE: "TE",
+};
+const DRIVER_LABEL = {
+  pre: "draft slot", age: "age", rookie: "rookie", years_exp: "experience",
+  team_change: "team change", turnover: "roster turnover", prior_delta: "prior miss",
+  prior_board: "ranked last yr", prior_gp: "games last yr", prior_ppg: "ppg last yr",
+  inj_listed: "injury weeks", inj_out: "weeks out", pos_RB: "RB", pos_WR: "WR", pos_TE: "TE",
+};
+
+function renderModel() {
+  if (!MODEL) return;
+  const m = MODEL.metrics;
+  $("#model-card").hidden = false;
+  $("#model-sub").innerHTML =
+    `Logistic regression estimating, for each player on the ${MODEL.season} consensus board, the probability ` +
+    `of finishing the season at or better than his pre-draft consensus positional rank (QB/RB/WR/TE). ` +
+    `Fitted on PPR consensus boards — the only format with a multi-source consensus in every captured season. ` +
+    `Inputs are known before kickoff: consensus rank, age, experience, team change, team skill-roster turnover, ` +
+    `and the player's prior season (games, scoring, consensus miss, injury-report weeks). ` +
+    `Roster and injury data: <a href="https://github.com/nflverse/nflverse-data">nflverse</a>.`;
+  const baseBrier = (m.base_rate_test * (1 - m.base_rate_test)).toFixed(3);
+  $("#model-meta").innerHTML =
+    `<span class="chip">train <b>${m.train_seasons[0]}–${m.train_seasons[1]}</b> · n=${m.n_train}</span>` +
+    `<span class="chip">test <b>${m.test_seasons[0]}–${m.test_seasons[1]}</b> · n=${m.n_test}</span>` +
+    `<span class="chip">test AUC <b>${m.auc_test.toFixed(3)}</b> (0.5 = chance)</span>` +
+    `<span class="chip">Brier <b>${m.brier_test.toFixed(3)}</b> vs ${baseBrier} base-rate</span>` +
+    `<span class="chip">base rate <b>${(m.base_rate_test * 100).toFixed(1)}%</b></span>`;
+
+  const coefs = [...MODEL.coefficients].sort((a, b) => Math.abs(b.beta) - Math.abs(a.beta));
+  const maxB = Math.max(...coefs.map(c => Math.abs(c.beta)));
+  $("#model-coefs").innerHTML = coefs.map(c => {
+    const w = Math.abs(c.beta) / maxB * 50;
+    const side = c.beta >= 0 ? `left:50%;width:${w}%` : `left:${50 - w}%;width:${w}%`;
+    const col = c.beta >= 0 ? "var(--s6)" : "var(--s8)";
+    return `<div class="coef-row"><span class="coef-label" title="${esc(c.desc)}">${esc(COEF_LABEL[c.f] || c.f)}</span>` +
+      `<span class="coef-track"><span class="coef-bar" style="${side};background:${col}"></span></span>` +
+      `<span class="coef-val">${c.beta >= 0 ? "+" : ""}${c.beta.toFixed(2)}</span></div>`;
+  }).join("");
+
+  $("#model-reliability").innerHTML =
+    '<thead><tr><th class="num">Predicted</th><th class="num">Observed</th><th class="num">n</th></tr></thead><tbody>' +
+    MODEL.reliability_test.map(r =>
+      `<tr><td class="num">${(r.p_mean * 100).toFixed(0)}%</td>` +
+      `<td class="num">${(r.obs_rate * 100).toFixed(0)}%</td><td class="num">${r.n}</td></tr>`).join("") +
+    "</tbody>";
+
+  $("#model-pred-head").textContent =
+    `${MODEL.season} board: estimated P(meets or beats consensus rank)`;
+  let rows = MODEL.predictions;
+  if (MODEL_POS !== "ALL") rows = rows.filter(r => r.pos === MODEL_POS);
+  $("#model-table").innerHTML = '<table><thead><tr><th class="num">#</th><th>Player</th>' +
+    '<th class="num" title="Pre-draft consensus positional rank (PPR)">Pre</th>' +
+    '<th class="num">P(beat)</th><th>Largest inputs (signed contribution)</th></tr></thead><tbody>' +
+    rows.map((r, i) => {
+      const drivers = (r.drivers || []).map(d =>
+        `${esc(DRIVER_LABEL[d.f] || d.f)} ${d.c >= 0 ? "+" : "−"}${Math.abs(d.c).toFixed(2)}`).join(" · ");
+      return `<tr><td class="num">${i + 1}</td>` +
+        `<td><span class="posbadge pos-${r.pos}">${r.pos}</span>${esc(r.name)}` +
+        `<span class="pmeta"> ${esc(r.team || "")}</span></td>` +
+        `<td class="num">${r.pos}${r.pre}</td>` +
+        `<td class="num"><span class="pbar"><i style="width:${Math.round(r.p * 100)}%"></i></span>${(r.p * 100).toFixed(0)}%</td>` +
+        `<td class="drivers">${drivers}</td></tr>`;
+    }).join("") + "</tbody></table>";
+
+  $("#model-takeaway").innerHTML =
+    `The strongest inputs are last season's games played (+), age (−), draft slot (+), and injury-report ` +
+    `weeks (−). The positive draft-slot coefficient means the target is easier deep in the board — a late ` +
+    `pick clears its bar more often than an early one — so probabilities are most comparable between ` +
+    `players drafted near each other. Test AUC of ${m.auc_test.toFixed(2)} is modestly better than chance: ` +
+    `most of a season's outcome is not predictable from pre-season information.`;
+}
+
+document.getElementById("model-posfilter").addEventListener("click", e => {
+  const b = e.target.closest("button"); if (!b) return;
+  MODEL_POS = b.dataset.mpos;
+  document.querySelectorAll("#model-posfilter button").forEach(x => x.classList.toggle("active", x === b));
+  renderModel();
+});
+
+fetch("data/model.json").then(r => r.json())
+  .then(d => { MODEL = d; renderModel(); })
+  .catch(() => {});
 
 function renderAll() {
   // isolate each panel: one failing render shouldn't blank the whole page
