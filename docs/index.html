@@ -256,13 +256,39 @@ th.sortable:hover { color: var(--ink); }
 .coef-track::before { content: ""; position: absolute; left: 50%; top: -2px; bottom: -2px; width: 1px; background: var(--baseline); }
 .coef-bar { position: absolute; top: 1.5px; height: 10px; border-radius: var(--r-sm); }
 .coef-val { width: 46px; flex: none; font-family: var(--font-mono); color: var(--ink-2); font-size: .72rem; }
-.model-tablewrap { max-height: 480px; overflow-y: auto; border: 1px solid var(--grid); }
+.model-tablewrap { max-height: 560px; overflow: auto; border: 1px solid var(--grid); }
 .model-tablewrap thead th { position: sticky; top: 0; background: var(--surface); z-index: 2; box-shadow: 0 2px 0 var(--ink); border-bottom: 0; }
-#model-reliability { width: auto; }
-#model-reliability td, #model-reliability th { padding: 3px 9px; font-size: .72rem; }
-.pbar { display: inline-block; width: 54px; height: 7px; background: var(--chip); border-radius: var(--r-sm); vertical-align: middle; margin-right: 7px; }
+.model-tablewrap td { white-space: nowrap; }
+.minitables { display: flex; gap: 24px; flex-wrap: wrap; }
+.minitables table { width: auto; }
+.minitables td, .minitables th { padding: 3px 9px; font-size: .72rem; }
+.mini-cap { font-size: .72rem; color: var(--muted); margin: 0 0 6px; font-family: var(--font-mono); text-transform: uppercase; letter-spacing: .06em; cursor: help; }
+.pbar { display: inline-block; width: 44px; height: 7px; background: var(--chip); border-radius: var(--r-sm); vertical-align: middle; margin-right: 6px; }
 .pbar i { display: block; height: 7px; background: var(--accent); border-radius: var(--r-sm); }
-.drivers { font-family: var(--font-mono); font-size: .68rem; color: var(--muted); }
+.ebar { display: inline-block; width: 56px; height: 7px; background: var(--chip); border-radius: var(--r-sm); vertical-align: middle; margin-right: 6px; position: relative; }
+.ebar::before { content: ""; position: absolute; left: 50%; top: -1px; bottom: -1px; width: 1px; background: var(--baseline); }
+.ebar i { position: absolute; top: 0; height: 7px; border-radius: var(--r-sm); }
+td.epos { color: var(--s6); font-weight: 700; }
+td.eneg { color: var(--s8); font-weight: 700; }
+.dpill {
+  display: inline-block; font-family: var(--font-mono); font-size: .66rem;
+  border: 1px solid var(--grid); border-radius: var(--r-sm); padding: 0 5px;
+  margin-right: 4px; color: var(--ink-2); background: var(--chip);
+}
+.dpill b { font-weight: 700; }
+.dpill b.pos { color: var(--s6); } .dpill b.neg { color: var(--s8); }
+#model-search {
+  background: var(--surface); color: var(--ink); border: 1px solid var(--border);
+  border-radius: var(--r); padding: 5px 12px; font: inherit; font-size: .875rem; width: 180px;
+}
+#model-search::placeholder { color: var(--muted); }
+#calib-tip {
+  position: absolute; pointer-events: none; display: none;
+  background: var(--surface); border: 1px solid var(--ink); border-radius: var(--r);
+  padding: 7px 10px; font-size: .8125rem; z-index: 5; white-space: nowrap;
+}
+#calib-tip .tt-week { font-family: var(--font-mono); color: var(--muted); font-size: .72rem; text-transform: uppercase; letter-spacing: .08em; margin-bottom: 2px; }
+#calib-tip b { font-family: var(--font-mono); }
 #model-meta { display: flex; gap: 8px; flex-wrap: wrap; margin: 0 0 18px; }
 #model-meta .chip {
   font-family: var(--font-mono); font-size: .72rem; background: var(--chip);
@@ -383,9 +409,9 @@ td.na { text-align: right; color: var(--baseline); }
 
   <div class="card">
     <h2>Projected rank vs. actual finish</h2>
-    <p class="sub">One point per ranked player-week. Hover a point for the player, week, and ranks.</p>
+    <p class="sub">One point per ranked player-week. Hover a point for the player, week, ranks, and points scored.</p>
     <div class="calib-controls" id="calib-controls"></div>
-    <div class="chartbox"><div id="calib-chart"></div></div>
+    <div class="chartbox" id="calib-box"><div id="calib-chart"></div><div id="calib-tip"></div></div>
   </div>
 
   <div class="card">
@@ -403,10 +429,19 @@ td.na { text-align: right; color: var(--baseline); }
     <div id="model-meta"></div>
     <div class="model-grid">
       <div>
-        <h3 class="model-h3">Standardized coefficients (log-odds per SD)</h3>
+        <h3 class="model-h3">Coefficients — points of POE per SD of input</h3>
         <div id="model-coefs"></div>
-        <h3 class="model-h3">Reliability, test seasons</h3>
-        <div class="scroll-x"><table id="model-reliability"></table></div>
+        <h3 class="model-h3">Validation, test seasons</h3>
+        <div class="minitables">
+          <div>
+            <p class="mini-cap" title="Test player-seasons grouped into fifths by predicted POE; a working model shows observed means rising with predicted means.">Points over expectation, by predicted quintile</p>
+            <table id="model-quintiles"></table>
+          </div>
+          <div>
+            <p class="mini-cap" title="Test player-seasons grouped into tenths by predicted probability.">P(beat slot): predicted vs. observed</p>
+            <table id="model-reliability"></table>
+          </div>
+        </div>
       </div>
       <div>
         <h3 class="model-h3" id="model-pred-head"></h3>
@@ -416,8 +451,9 @@ td.na { text-align: right; color: var(--baseline); }
             <button data-mpos="QB">QB</button><button data-mpos="RB">RB</button>
             <button data-mpos="WR">WR</button><button data-mpos="TE">TE</button>
           </div>
+          <input id="model-search" type="search" placeholder="Search players…">
         </div>
-        <div class="model-tablewrap scroll-x" id="model-table"></div>
+        <div class="model-tablewrap" id="model-table"></div>
       </div>
     </div>
     <p class="takeaway" id="model-takeaway"></p>
@@ -877,7 +913,8 @@ function calibrationPairs(source, pos) {
   Object.entries(entry.weeks || {}).forEach(([wk, data]) => {
     if (CALIB_WEEK != null && Number(wk) !== CALIB_WEEK) return;
     const m = (data.positions || {})[pos];
-    if (m && m.calibration) m.calibration.forEach(c => pts.push([c[0], c[1], c[2] || "", Number(wk)]));
+    if (m && m.calibration) m.calibration.forEach(c =>
+      pts.push([c[0], c[1], c[2] || "", Number(wk), c[3] != null ? c[3] : null]));
   });
   return pts;
 }
@@ -931,11 +968,11 @@ function renderCalibration() {
          '<text x="' + x(v) + '" y="' + (H - B + 16) + '" text-anchor="middle">' + v + "</text>";
   }
   pairs.forEach(c => {
-    const label = (c[2] ? c[2] + " · " : "") + "week " + c[3] +
-      " · projected " + CALIB_POS + c[0] + " → finished " + CALIB_POS + Math.round(c[1]);
     g += '<circle class="cal-dot" cx="' + x(c[0]).toFixed(1) + '" cy="' + y(c[1]).toFixed(1) +
-         '" r="3" fill="' + POS_COLOR[CALIB_POS] + '" opacity="0.4">' +
-         '<title>' + esc(label) + '</title></circle>';
+         '" r="3.5" fill="' + POS_COLOR[CALIB_POS] + '" opacity="0.4"' +
+         ' data-n="' + esc(c[2]) + '" data-w="' + c[3] + '" data-pr="' + c[0] +
+         '" data-ar="' + Math.round(c[1]) + '"' +
+         (c[4] != null ? ' data-pts="' + c[4] + '"' : "") + '></circle>';
   });
   g += '<text x="' + (L + pw / 2) + '" y="' + (H - 6) +
        '" text-anchor="middle" style="fill:var(--ink-2)">Projected rank \u2192 (1 = ranked best)</text>';
@@ -973,13 +1010,33 @@ document.addEventListener("click", e => {
   renderCalibration();
 });
 
+/* instant tooltip for scatter points — native SVG titles are slow and
+   invisible on touch, so position a real element next to the dot */
+document.addEventListener("mouseover", e => {
+  const dot = e.target.closest && e.target.closest("#calib-chart circle.cal-dot");
+  const tip = document.getElementById("calib-tip");
+  if (!dot) { if (tip) tip.style.display = "none"; return; }
+  const d = dot.dataset;
+  tip.innerHTML = `<div class="tt-week">Week ${esc(d.w)}</div>` +
+    (d.n ? `<b>${esc(d.n)}</b><br>` : "") +
+    `projected ${CALIB_POS}${esc(d.pr)} · finished ${CALIB_POS}${esc(d.ar)}` +
+    (d.pts != null ? ` · ${esc(d.pts)} pts` : "");
+  const box = document.getElementById("calib-box").getBoundingClientRect();
+  const r = dot.getBoundingClientRect();
+  tip.style.display = "block";
+  let px = r.left - box.left + 12, py = r.top - box.top - 10;
+  if (px + tip.offsetWidth > box.width - 8) px -= tip.offsetWidth + 20;
+  tip.style.left = px + "px";
+  tip.style.top = Math.max(0, py) + "px";
+});
+
 /* ---------- player drill-in: multi-season record ---------- */
 const FMT_LABEL = {ppr: "PPR", standard: "Standard", half_ppr: "Half PPR"};
 let PLAYERS = null, PLAYERS_REQ = null;
 
 function fetchPlayers() {
   if (PLAYERS) return Promise.resolve(PLAYERS);
-  PLAYERS_REQ = PLAYERS_REQ || fetch("data/players.json").then(r => r.json())
+  PLAYERS_REQ = PLAYERS_REQ || fetch("data/players.json", {cache: "no-cache"}).then(r => r.json())
     .then(d => { PLAYERS = d; return d; }).catch(() => null);
   return PLAYERS_REQ;
 }
@@ -1077,20 +1134,25 @@ document.addEventListener("keydown", e => {
 });
 
 /* ---------- expectation model ---------- */
-let MODEL = null, MODEL_POS = "ALL";
+let MODEL = null, MODEL_POS = "ALL", MODEL_SORT = "edge", MODEL_Q = "";
 const COEF_LABEL = {
-  pre: "Draft slot (deeper = higher)", age: "Age", rookie: "Rookie",
-  years_exp: "Years of experience", team_change: "Changed team",
-  turnover: "Team skill-roster turnover", prior_delta: "Prior-season consensus miss",
+  pre: "Draft slot", implied_pts: "Slot's historical points", age: "Age",
+  age_c2: "Aging curve (age − 26)²", age_rb: "RB-specific aging", rookie: "Rookie",
+  years_exp: "Years of experience", draft_round: "NFL draft round",
+  log_pick: "log(draft pick)", team_change: "Changed team",
+  turnover: "Team skill-roster turnover", prior_poe: "Prior season ± vs slot",
   prior_board: "Ranked last season", prior_gp: "Games played last season",
-  prior_ppg: "Points per game last season", inj_listed: "Injury-report weeks last season",
-  inj_out: "Weeks Out last season", pos_RB: "RB", pos_WR: "WR", pos_TE: "TE",
+  prior_ppg: "Points per game last season", prior2_gp: "Games two seasons ago",
+  inj_listed: "Injury-report weeks last season", inj_out: "Weeks Out last season",
+  pos_RB: "RB", pos_WR: "WR", pos_TE: "TE",
 };
 const DRIVER_LABEL = {
-  pre: "draft slot", age: "age", rookie: "rookie", years_exp: "experience",
-  team_change: "team change", turnover: "roster turnover", prior_delta: "prior miss",
-  prior_board: "ranked last yr", prior_gp: "games last yr", prior_ppg: "ppg last yr",
-  inj_listed: "injury weeks", inj_out: "weeks out", pos_RB: "RB", pos_WR: "WR", pos_TE: "TE",
+  age: "age", age_c2: "age curve", age_rb: "RB aging", rookie: "rookie",
+  years_exp: "experience", draft_round: "draft capital", log_pick: "draft pick",
+  team_change: "team change", turnover: "roster turnover",
+  prior_poe: "prior ±", prior_board: "unranked last yr", prior_gp: "durability",
+  prior_ppg: "prior ppg", prior2_gp: "durability (2 yr)",
+  inj_listed: "injury weeks", inj_out: "weeks out",
 };
 
 function renderModel() {
@@ -1098,31 +1160,40 @@ function renderModel() {
   const m = MODEL.metrics;
   $("#model-card").hidden = false;
   $("#model-sub").innerHTML =
-    `Logistic regression estimating, for each player on the ${MODEL.season} consensus board, the probability ` +
-    `of finishing the season at or better than his pre-draft consensus positional rank (QB/RB/WR/TE). ` +
-    `Fitted on PPR consensus boards — the only format with a multi-source consensus in every captured season. ` +
-    `Inputs are known before kickoff: consensus rank, age, experience, team change, team skill-roster turnover, ` +
-    `and the player's prior season (games, scoring, consensus miss, injury-report weeks). ` +
-    `Roster and injury data: <a href="https://github.com/nflverse/nflverse-data">nflverse</a>.`;
-  const baseBrier = (m.base_rate_test * (1 - m.base_rate_test)).toFixed(3);
+    `Two ridge regressions estimate how each QB/RB/WR/TE on the ${MODEL.season} consensus board will ` +
+    `compare with the historical value of his draft slot. The <b>value model</b> predicts points over ` +
+    `expectation (POE): season fantasy points minus the points the slot has historically produced — a ` +
+    `magnitude target, so a 120-point blowout season counts for far more than clearing a rank by half a ` +
+    `point. The <b>rank model</b> estimates the probability of finishing at or better than the slot. ` +
+    `Inputs are strictly pre-season: slot value, age and aging curve, experience, NFL draft capital, team ` +
+    `change, team skill-roster turnover, and the prior seasons' games, scoring, injury-report weeks, and ` +
+    `POE. Fitted on PPR boards (multi-source consensus in every captured season since 2013); roster, ` +
+    `injury, and draft data from <a href="https://github.com/nflverse/nflverse-data">nflverse</a>.`;
   $("#model-meta").innerHTML =
     `<span class="chip">train <b>${m.train_seasons[0]}–${m.train_seasons[1]}</b> · n=${m.n_train}</span>` +
     `<span class="chip">test <b>${m.test_seasons[0]}–${m.test_seasons[1]}</b> · n=${m.n_test}</span>` +
-    `<span class="chip">test AUC <b>${m.auc_test.toFixed(3)}</b> (0.5 = chance)</span>` +
-    `<span class="chip">Brier <b>${m.brier_test.toFixed(3)}</b> vs ${baseBrier} base-rate</span>` +
-    `<span class="chip">base rate <b>${(m.base_rate_test * 100).toFixed(1)}%</b></span>`;
+    `<span class="chip" title="Rank correlation between predicted and actual POE on held-out seasons">value: Spearman <b>${m.reg.spearman.toFixed(2)}</b></span>` +
+    `<span class="chip" title="Mean absolute error of predicted POE; actual POE has a standard deviation of ${m.reg.sd_actual} points">value: MAE <b>${m.reg.mae}</b> pts (SD ${m.reg.sd_actual})</span>` +
+    `<span class="chip" title="Probability that a random beater outranks a random non-beater; 0.5 = chance">rank: AUC <b>${m.cls.auc.toFixed(2)}</b></span>` +
+    `<span class="chip" title="Mean squared probability error vs ${(m.cls.base_rate * (1 - m.cls.base_rate)).toFixed(3)} for a constant base-rate forecast">rank: Brier <b>${m.cls.brier.toFixed(3)}</b></span>`;
 
-  const coefs = [...MODEL.coefficients].sort((a, b) => Math.abs(b.beta) - Math.abs(a.beta));
-  const maxB = Math.max(...coefs.map(c => Math.abs(c.beta)));
+  const coefs = [...MODEL.coefficients].sort((a, b) => Math.abs(b.beta_reg) - Math.abs(a.beta_reg));
+  const maxB = Math.max(...coefs.map(c => Math.abs(c.beta_reg)));
   $("#model-coefs").innerHTML = coefs.map(c => {
-    const w = Math.abs(c.beta) / maxB * 50;
-    const side = c.beta >= 0 ? `left:50%;width:${w}%` : `left:${50 - w}%;width:${w}%`;
-    const col = c.beta >= 0 ? "var(--s6)" : "var(--s8)";
+    const w = Math.abs(c.beta_reg) / maxB * 50;
+    const side = c.beta_reg >= 0 ? `left:50%;width:${w}%` : `left:${50 - w}%;width:${w}%`;
+    const col = c.beta_reg >= 0 ? "var(--s6)" : "var(--s8)";
     return `<div class="coef-row"><span class="coef-label" title="${esc(c.desc)}">${esc(COEF_LABEL[c.f] || c.f)}</span>` +
       `<span class="coef-track"><span class="coef-bar" style="${side};background:${col}"></span></span>` +
-      `<span class="coef-val">${c.beta >= 0 ? "+" : ""}${c.beta.toFixed(2)}</span></div>`;
+      `<span class="coef-val">${c.beta_reg >= 0 ? "+" : ""}${c.beta_reg.toFixed(1)}</span></div>`;
   }).join("");
 
+  $("#model-quintiles").innerHTML =
+    '<thead><tr><th>Q</th><th class="num">Predicted</th><th class="num">Observed</th><th class="num">n</th></tr></thead><tbody>' +
+    (MODEL.quintiles_test || []).map(q =>
+      `<tr><td>${q.q}</td><td class="num">${q.pred_mean > 0 ? "+" : ""}${q.pred_mean}</td>` +
+      `<td class="num">${q.obs_mean > 0 ? "+" : ""}${q.obs_mean}</td><td class="num">${q.n}</td></tr>`).join("") +
+    "</tbody>";
   $("#model-reliability").innerHTML =
     '<thead><tr><th class="num">Predicted</th><th class="num">Observed</th><th class="num">n</th></tr></thead><tbody>' +
     MODEL.reliability_test.map(r =>
@@ -1130,30 +1201,50 @@ function renderModel() {
       `<td class="num">${(r.obs_rate * 100).toFixed(0)}%</td><td class="num">${r.n}</td></tr>`).join("") +
     "</tbody>";
 
-  $("#model-pred-head").textContent =
-    `${MODEL.season} board: estimated P(meets or beats consensus rank)`;
-  let rows = MODEL.predictions;
+  $("#model-pred-head").textContent = `${MODEL.season} board, ${MODEL.predictions.length} players`;
+  let rows = [...MODEL.predictions];
   if (MODEL_POS !== "ALL") rows = rows.filter(r => r.pos === MODEL_POS);
-  $("#model-table").innerHTML = '<table><thead><tr><th class="num">#</th><th>Player</th>' +
-    '<th class="num" title="Pre-draft consensus positional rank (PPR)">Pre</th>' +
-    '<th class="num">P(beat)</th><th>Largest inputs (signed contribution)</th></tr></thead><tbody>' +
-    rows.map((r, i) => {
-      const drivers = (r.drivers || []).map(d =>
-        `${esc(DRIVER_LABEL[d.f] || d.f)} ${d.c >= 0 ? "+" : "−"}${Math.abs(d.c).toFixed(2)}`).join(" · ");
-      return `<tr><td class="num">${i + 1}</td>` +
-        `<td><span class="posbadge pos-${r.pos}">${r.pos}</span>${esc(r.name)}` +
-        `<span class="pmeta"> ${esc(r.team || "")}</span></td>` +
-        `<td class="num">${r.pos}${r.pre}</td>` +
+  if (MODEL_Q) rows = rows.filter(r => r.name.toLowerCase().includes(MODEL_Q));
+  const dir = MODEL_SORT === "pre" ? 1 : -1;
+  rows.sort((a, b) => (a[MODEL_SORT] - b[MODEL_SORT]) * dir);
+  const caret = k => MODEL_SORT === k ? " ▼" : "";
+  const maxE = Math.max(10, ...MODEL.predictions.map(r => Math.abs(r.edge)));
+  $("#model-table").innerHTML = '<table><thead><tr>' +
+    '<th>Player</th>' +
+    `<th class="num sortable" data-msort="pre" title="Pre-draft consensus positional rank (PPR) and the season points that slot has historically produced">Slot${caret("pre")}</th>` +
+    `<th class="num sortable" data-msort="edge" title="Player-specific signal only: the sum of contributions from age, durability, draft capital, injuries, and prior delivery — slot and position terms removed. Compares players against peers drafted near them.">Edge${caret("edge")}</th>` +
+    `<th class="num sortable" data-msort="poe" title="Predicted points over slot expectation, including the slot's own mean reversion. Early slots are negative on average — slot-1 players usually fail to repay slot-1 points.">E[± pts]${caret("poe")}</th>` +
+    `<th class="num sortable" data-msort="p" title="Rank model: probability of finishing at or better than the slot">P(beat)${caret("p")}</th>` +
+    '<th title="Largest player-specific inputs, in points of POE">Drivers</th></tr></thead><tbody>' +
+    rows.map(r => {
+      const w = Math.abs(r.edge) / maxE * 50;
+      const side = r.edge >= 0 ? `left:50%;width:${w}%` : `left:${50 - w}%;width:${w}%`;
+      const ecol = r.edge >= 0 ? "var(--s6)" : "var(--s8)";
+      const drivers = (r.drivers || []).map(d => {
+        const beta = (MODEL.coefficients.find(c => c.f === d.f) || {}).beta_reg || 0;
+        const above = beta !== 0 && (d.c / beta) > 0;
+        const tip = `${above ? "above" : "below"}-average ${COEF_LABEL[d.f] || d.f} contributes ` +
+          `${d.c >= 0 ? "+" : "−"}${Math.abs(d.c).toFixed(0)} points of expected POE`;
+        return `<span class="dpill" title="${esc(tip)}">${esc(DRIVER_LABEL[d.f] || d.f)} ` +
+          `<b class="${d.c >= 0 ? "pos" : "neg"}">${d.c >= 0 ? "+" : "−"}${Math.abs(d.c).toFixed(0)}</b></span>`;
+      }).join("");
+      return `<tr><td><span class="pcell">${faceHtml(r)}<span><span class="pname">${esc(r.name)}</span><br>` +
+        `<span class="pmeta"><span class="posbadge pos-${r.pos}">${r.pos}</span>${esc(r.team || "")}</span></span></span></td>` +
+        `<td class="num" title="slot has historically produced ${r.implied != null ? r.implied : "?"} pts">${r.pos}${r.pre}</td>` +
+        `<td class="num ${r.edge >= 0 ? "epos" : "eneg"}"><span class="ebar"><i style="${side};background:${ecol}"></i></span>${r.edge >= 0 ? "+" : "−"}${Math.abs(r.edge).toFixed(0)}</td>` +
+        `<td class="num">${r.poe >= 0 ? "+" : "−"}${Math.abs(r.poe).toFixed(0)}</td>` +
         `<td class="num"><span class="pbar"><i style="width:${Math.round(r.p * 100)}%"></i></span>${(r.p * 100).toFixed(0)}%</td>` +
-        `<td class="drivers">${drivers}</td></tr>`;
+        `<td>${drivers}</td></tr>`;
     }).join("") + "</tbody></table>";
 
   $("#model-takeaway").innerHTML =
-    `The strongest inputs are last season's games played (+), age (−), draft slot (+), and injury-report ` +
-    `weeks (−). The positive draft-slot coefficient means the target is easier deep in the board — a late ` +
-    `pick clears its bar more often than an early one — so probabilities are most comparable between ` +
-    `players drafted near each other. Test AUC of ${m.auc_test.toFixed(2)} is modestly better than chance: ` +
-    `most of a season's outcome is not predictable from pre-season information.`;
+    `E[± pts] is dominated by the slot itself: early slots carry the largest historical expectations and ` +
+    `mean-revert hardest, so every top pick shows a negative expected POE — the statement that slot-1 ` +
+    `players usually fail to repay slot-1 points, not a fade of any individual. <b>Edge</b> removes the ` +
+    `slot terms and keeps only player-specific signal — durability, age, draft capital, injury history, ` +
+    `prior delivery — and is the column to compare between players drafted near each other. Out-of-time ` +
+    `Spearman of ${m.reg.spearman.toFixed(2)} on POE is real but modest signal: most of a season is not ` +
+    `predictable before kickoff.`;
 }
 
 document.getElementById("model-posfilter").addEventListener("click", e => {
@@ -1162,8 +1253,18 @@ document.getElementById("model-posfilter").addEventListener("click", e => {
   document.querySelectorAll("#model-posfilter button").forEach(x => x.classList.toggle("active", x === b));
   renderModel();
 });
+document.getElementById("model-search").addEventListener("input", e => {
+  MODEL_Q = e.target.value.trim().toLowerCase();
+  renderModel();
+});
+document.addEventListener("click", e => {
+  const th = e.target.closest("#model-table th.sortable");
+  if (!th) return;
+  MODEL_SORT = th.dataset.msort;
+  renderModel();
+});
 
-fetch("data/model.json").then(r => r.json())
+fetch("data/model.json", {cache: "no-cache"}).then(r => r.json())
   .then(d => { MODEL = d; renderModel(); })
   .catch(() => {});
 
@@ -1223,9 +1324,11 @@ function fail(msg) {
 function loadSeason(year) {
   SEASON = year;
   const base = `data/${year}/`;
+  // no-cache = revalidate against the server (cheap 304s), so a fresh deploy
+  // is never hidden behind a stale cached copy
   return Promise.all([
-    fetch(base + "summary.json").then(r => r.json()),
-    fetch(base + "predraft.json").then(r => r.json()).catch(() => null),
+    fetch(base + "summary.json", {cache: "no-cache"}).then(r => r.json()),
+    fetch(base + "predraft.json", {cache: "no-cache"}).then(r => r.json()).catch(() => null),
   ]).then(([s, p]) => { SUMMARY = s; PREDRAFT = p; });
 }
 
@@ -1242,7 +1345,7 @@ function renderSeasonSelect() {
   }).join("");
 }
 
-fetch("data/seasons.json").then(r => r.json())
+fetch("data/seasons.json", {cache: "no-cache"}).then(r => r.json())
   .catch(() => null)
   .then(idx => {
     SEASONS = idx;
@@ -1254,8 +1357,8 @@ fetch("data/seasons.json").then(r => r.json())
     }
     // no season index (older build) — fall back to the flat files
     return Promise.all([
-      fetch("data/summary.json").then(r => r.json()),
-      fetch("data/predraft.json").then(r => r.json()).catch(() => null),
+      fetch("data/summary.json", {cache: "no-cache"}).then(r => r.json()),
+      fetch("data/predraft.json", {cache: "no-cache"}).then(r => r.json()).catch(() => null),
     ]).then(([s, p]) => { SUMMARY = s; PREDRAFT = p; });
   })
   .then(renderAll)

@@ -254,7 +254,9 @@ def evaluate(players, points_by_pid, top_n, hit_n=HIT_N, pos=None, kind=None, fm
     # ---- calibration: predicted rank vs where the player actually finished,
     # for the scatter on the site. Capped so summary.json stays small.
     actual_rank_of = _avg_rank([e[1] for e in entries])
-    calib = [[int(round(e[0])), round(actual_rank_of[i], 1), e[2] or ""]
+    # [predicted rank, actual finish, short name, actual fantasy points]
+    calib = [[int(round(e[0])), round(actual_rank_of[i], 1), e[2] or "",
+              round(e[1], 1)]
              for i, e in enumerate(entries)][:80]
     # Headline Spearman stays on the players the source actually ranked — that
     # is what rank correlation means, and it keeps the number comparable across

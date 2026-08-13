@@ -25,6 +25,8 @@ BASE = "https://github.com/nflverse/nflverse-data/releases/download"
 URLS = {
     "roster": BASE + "/rosters/roster_{season}.csv",
     "injuries": BASE + "/injuries/injuries_{season}.csv",
+    # one file covering every draft class, not per-season
+    "draft_picks": BASE + "/draft_picks/draft_picks.csv",
 }
 
 
@@ -33,10 +35,10 @@ def _load_csv(path):
         return list(csv.DictReader(f))
 
 
-def get(kind, season):
-    """Rows for one dataset-season, downloading on first use. [] if unavailable."""
+def get(kind, season=None):
+    """Rows for one dataset(-season), downloading on first use. [] if unavailable."""
     CACHE.mkdir(parents=True, exist_ok=True)
-    path = CACHE / f"{kind}_{season}.csv"
+    path = CACHE / (f"{kind}_{season}.csv" if season else f"{kind}.csv")
     if path.exists():
         return _load_csv(path)
     url = URLS[kind].format(season=season)
@@ -95,6 +97,24 @@ def injury_weeks(season, gsis_to_sleeper):
             out_wk.setdefault(sid, set()).add(wk)
     return {sid: {"listed": len(wks), "out": len(out_wk.get(sid, ()))}
             for sid, wks in listed.items()}
+
+
+def draft_index(gsis_to_sleeper):
+    """-> {sleeper_id: {"round": int, "pick": int}} NFL draft capital.
+
+    gsis_to_sleeper should be merged over every season of interest so late-career
+    players still resolve. Undrafted players are simply absent.
+    """
+    out = {}
+    for row in get("draft_picks"):
+        sid = gsis_to_sleeper.get(row.get("gsis_id") or "")
+        if not sid:
+            continue
+        try:
+            out[sid] = {"round": int(row["round"]), "pick": int(row["pick"])}
+        except (KeyError, TypeError, ValueError):
+            continue
+    return out
 
 
 def team_turnover(season):
