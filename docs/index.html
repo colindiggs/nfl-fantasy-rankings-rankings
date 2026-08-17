@@ -803,11 +803,26 @@ function valueCell(p, maxVal) {
     `<span class="${p.value >= 0 ? "epos" : "eneg"}">${p.value >= 0 ? "+" : "−"}${Math.abs(p.value).toFixed(0)}</span>`;
 }
 
+/* The toggle only means anything next to an actual table. Every early return
+   below used to skip the code that labels it, leaving a full-width blank
+   button on screen whenever the board was empty — visible on any format with
+   no captured boards, and in the IDP lens. */
+function setSrcToggle(nSources) {
+  const btn = document.getElementById("src-toggle");
+  if (!btn) return;
+  if (!nSources) { btn.hidden = true; return; }
+  btn.hidden = false;
+  btn.textContent = (SHOW_SRC ? "Hide " : "Show ") + nSources + " source column" +
+    (nSources === 1 ? "" : "s");
+  btn.setAttribute("aria-pressed", String(SHOW_SRC));
+}
+
 function renderBoard() {
   // Always resolve the column default against the live viewport. Relying on
   // the value captured when the script first parsed left the board collapsed
   // on a wide screen whenever the two disagreed.
   syncShowSrc();
+  setSrcToggle(0);   // re-shown below only when a table is actually drawn
   // the consensus is built from 1QB offense boards only; in the IDP lens there
   // is no consensus to show, so say so instead of showing contradictory data
   if (ROSTER !== "offense") {
@@ -846,6 +861,7 @@ function renderBoard() {
     const what = [QUERY && `\u201c${esc(QUERY)}\u201d`, POS !== "ALL" && POS]
       .filter(Boolean).join(" at ");
     $("#board").innerHTML = `<div class="empty" style="padding:14px">No players match ${what || "these filters"} \u2014 clear the search or position filter.</div>`;
+    setSrcToggle(sources.length);   // the board exists, this filter just found nothing
     return;
   }
   const caret = k => SORT.key === k ? (SORT.dir === 1 ? " \u25b2" : " \u25bc") : "";
@@ -887,12 +903,7 @@ function renderBoard() {
     html += "</tr>";
   });
   $("#board").innerHTML = html + "</tbody></table>";
-  const btn = document.getElementById("src-toggle");
-  if (btn) {
-    btn.textContent = SHOW_SRC
-      ? `Hide ${sources.length} source columns` : `Show ${sources.length} source columns`;
-    btn.setAttribute("aria-pressed", String(SHOW_SRC));
-  }
+  setSrcToggle(sources.length);
 }
 
 /* ---------- across all seasons ----------
