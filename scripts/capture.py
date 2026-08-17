@@ -26,7 +26,7 @@ from pathlib import Path
 from common import DATA, FORMATS, get_logger, session, tags, write_json
 import sleeper
 import spec_engine
-from sources import (cbs, draftsharks, espn, fantasypros, fftoday, mfl,
+from sources import (cbs, draftsharks, espn, fantasypros, footballguys, fftoday, mfl, nffc,
                      nfl_com, pff, ringer, sharks, sleeper_proj, walter, yahoo)
 
 log = get_logger("capture")
@@ -51,6 +51,10 @@ DRAFT_SOURCES = {
     "ringer": (["standard", "half_ppr", "ppr"], lambda f, y, s: ringer.fetch_draft(f, s)),
     # labelled superflex control — same analysts and week as the 1QB boards
     "ringer-superflex": (["half_ppr"], lambda f, y, s: ringer.fetch_draft(f, s, board="superflex")),
+    # High-stakes money-league ADP — the sharpest market board captured
+    "nffc": (["ppr"], lambda f, y, s: nffc.fetch_draft(f, s)),
+    # Only their default (PPR) board is reachable; see sources/footballguys.py
+    "footballguys": (["ppr"], lambda f, y, s: footballguys.fetch_draft(f, s)),
 }
 
 # source -> (formats, fetch(fmt, season, week, sess))
@@ -133,7 +137,22 @@ def import_inbox(season):
 # sites in Aug 2026 — see README "Source audit".
 SOURCE_TAGS = {
     "ffcalc": tags(basis="adp"),
-    "mfl": tags(basis="adp"),
+    "nffc": tags(basis="adp"),
+    # MyFantasyLeague pools every league type its hosts run into one ADP
+    # export, and the IS_KEEPER / FRANCHISES filters are accepted and silently
+    # ignored (same trap as RotoBaller's `season`). Measured against the
+    # consensus of the other PPR boards for 2026:
+    #
+    #   rookies          drafted 192 ranks EARLIER on average (n=49)
+    #   5+ year veterans drafted  41 ranks later              (n=88)
+    #   agreement with peers 0.50, against 0.87-0.95 for every other board
+    #
+    # and the reaches are obscure rookie tight ends going 300+ picks early.
+    # That is dynasty and devy drafts in the pool, not a redraft opinion.
+    # Scoring it against one season of redraft results punishes it for doing
+    # its own job, the same reasoning that keeps Underdog's best ball out — so
+    # it is captured and scored, but not inside the redraft consensus.
+    "mfl": tags(basis="adp", scope="dynasty-mixed"),
     "sharks": tags(basis="adp"),           # switched off their projection table
     "underdog": tags(basis="adp", scope="bestball"),
     "walter": tags(order="positional"),

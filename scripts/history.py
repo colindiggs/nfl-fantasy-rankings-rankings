@@ -14,7 +14,8 @@ between two independent means.
 from datetime import datetime, timezone
 from math import sqrt
 
-from common import DOCS, FORMATS, get_logger, read_json, write_json
+from common import (DEFAULT_TAGS, DOCS, FORMATS, get_logger, matches_baseline,
+                    read_json, write_json)
 
 log = get_logger("history")
 
@@ -142,8 +143,16 @@ def collect(kind, fmt, scope, summaries):
     return out
 
 
-def build_block(kind, fmt, scope, summaries):
+def build_block(kind, fmt, scope, summaries, src_tags=None):
     raw = collect(kind, fmt, scope, summaries)
+    # The card answers the benchmark's default question — 1QB redraft offence —
+    # so a superflex, IDP, best-ball or dynasty-mixed board does not belong in
+    # it. Leaving them in also breaks the comparison mechanically: the site
+    # hides them, and a reference source the reader cannot see makes every
+    # interval in the table meaningless.
+    if src_tags:
+        raw = {s: v for s, v in raw.items()
+               if matches_baseline({**DEFAULT_TAGS, **(src_tags.get(s) or {})})}
     if not raw:
         return None
 
@@ -274,7 +283,7 @@ def main():
         for fmt in FORMATS:
             out["kinds"][kind][fmt] = {}
             for scope in SCOPES:
-                block = build_block(kind, fmt, scope, summaries)
+                block = build_block(kind, fmt, scope, summaries, src_tags)
                 if block:
                     out["kinds"][kind][fmt][scope] = block
 

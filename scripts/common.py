@@ -64,12 +64,14 @@ def session():
     return s
 
 
-def fetch(url, sess=None, retries=3, timeout=30, **kwargs):
+def fetch(url, sess=None, retries=3, timeout=30, method="GET", **kwargs):
+    """Fetch a URL with retries. `method` covers the few sources whose table
+    body is only reachable through a POST (NFFC's ADP endpoint)."""
     sess = sess or session()
     last = None
     for attempt in range(retries):
         try:
-            r = sess.get(url, timeout=timeout, **kwargs)
+            r = sess.request(method, url, timeout=timeout, **kwargs)
             if r.status_code == 200:
                 return r
             last = f"HTTP {r.status_code}"

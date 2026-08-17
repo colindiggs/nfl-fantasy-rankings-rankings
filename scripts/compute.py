@@ -315,7 +315,16 @@ def pos_lists(players):
 # expert-vs-market comparison. Identity settles these four; ESPN and Sleeper
 # are deliberately absent because their basis genuinely differs between the
 # pre-draft board and the weekly projections.
-KNOWN_BASIS = {"ffcalc": "adp", "mfl": "adp", "sharks": "adp", "underdog": "adp"}
+KNOWN_BASIS = {"ffcalc": "adp", "mfl": "adp", "sharks": "adp", "underdog": "adp",
+               "nffc": "adp"}
+
+# Scope that follows from what a source's feed *is*, not from one snapshot.
+# MyFantasyLeague pools dynasty and keeper drafts into its ADP export and
+# ignores the filters that claim to separate them (see capture.SOURCE_TAGS),
+# so every season it has ever supplied carries the same contamination —
+# applying this only to newly captured boards would leave 13 seasons of
+# history scoring it as something it is not.
+KNOWN_SCOPE = {"mfl": "dynasty-mixed"}
 
 
 def tags_of(payload, source=None):
@@ -324,6 +333,9 @@ def tags_of(payload, source=None):
     if source in KNOWN_BASIS:
         t["basis"] = KNOWN_BASIS[source]
     t.update(payload.get("tags") or {})
+    # source-level truth wins over a snapshot that predates the finding
+    if source in KNOWN_SCOPE:
+        t["scope"] = KNOWN_SCOPE[source]
     return t
 
 
@@ -402,7 +414,7 @@ def annotate_tiers(rows, fmt):
             r["tier"] = tier
 
 
-def is_baseline(payload):
+def is_baseline(payload, source=None):
     """Can this board be compared directly against the default league?
 
     The default league is 1QB / half-PPR / K+DST / single flex redraft. A
@@ -410,7 +422,7 @@ def is_baseline(payload):
     question, so none of them belong in the default consensus — but all stay
     captured, tagged, and available behind a toggle.
     """
-    return matches_baseline(tags_of(payload))
+    return matches_baseline(tags_of(payload, source))
 
 
 def load_rankings(season, scope):
@@ -473,7 +485,7 @@ def main(season=None, is_current=True):
     baseline_sources = {}
     for scope_name in ["predraft"] + [f"week{w:02d}" for w in weeks]:
         for (source, _f), payload in load_rankings(season, scope_name).items():
-            baseline_sources.setdefault(source, is_baseline(payload))
+            baseline_sources.setdefault(source, is_baseline(payload, source))
 
     # ---- weekly rankings vs weekly points
     for fmt in FORMATS:
@@ -575,7 +587,7 @@ def main(season=None, is_current=True):
                         board.append({
                             "scope": scope,
                             "source": source,
-                            "baseline": is_baseline(payload),
+                            "baseline": is_baseline(payload, source),
                             "accuracy_gap": sc.get("accuracy_gap"),
                             "score": sc["avg_spearman"],
                             "overall": overall["spearman"] if overall else None,
@@ -630,7 +642,7 @@ def main(season=None, is_current=True):
         for (source, f2), payload in predraft.items():
             if f2 != fmt:
                 continue
-            if not is_baseline(payload):
+            if not is_baseline(payload, source):
                 continue  # superflex / IDP / best-ball — different question
             if sum(1 for p in payload["players"] if p["rank"] == 1) > 1:
                 continue  # positional-only board — no overall order

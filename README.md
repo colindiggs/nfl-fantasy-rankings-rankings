@@ -17,6 +17,7 @@ fantasy points every week, and publishes a running leaderboard for the season.
 | `scripts/player_history.py` | Cross-season per-player record (`docs/data/players.json`): pre-draft consensus rank vs. season finish, weekly consensus rank vs. weekly finish, over/under rates, rank-implied vs. actual points. Feeds the board's click-to-drill panel; refreshed by `compute.py` on current-season runs |
 | `scripts/nflverse.py` | Free historical context from [nflverse-data](https://github.com/nflverse/nflverse-data) releases, cached in `data/nflverse/`: per-season rosters (ages, experience, teams, `sleeper_id` for exact joins), weekly injury reports (2013+), and NFL draft picks |
 | `scripts/model.py` | Expectation models (`docs/data/model.json`), fitted on PPR boards 2014+ and validated out-of-time (train ≤2022, test 2023–25). **Value model** (headline): ridge regression on points over expectation — season points minus the historical value of the pre-draft slot — so magnitude matters, not just rank order. **Rank model**: ridge logistic P(finish ≥ slot). Features: slot value, age + aging curve (incl. RB-specific), experience, NFL draft capital, team change, team skill-roster turnover, prior-season games/scoring/injury-report weeks/POE, two-season durability. The site shows predicted POE, a slot-free player-specific **Edge**, P(beat), and per-player signed drivers |
+| `scripts/validate.py` | Quality gate over captured boards: row counts, id match rate, duplicate names, position coverage, snapshot age, the QB4 slot, and each board's agreement with its peers. `python validate.py [season] [scope] [--strict]` |
 | `scripts/history.py` | Cross-season record (`docs/data/history.json`): every source's score in every scored season, plus a **paired** comparison against a reference source computed only on the weeks/seasons the two actually share, with 95% confidence intervals. See "Which differences are real" below |
 | `scripts/runner.py` | Scheduled entry point: captures, computes, commits, pushes |
 | `docs/` | Static GitHub Pages site (leaderboard, weekly trend, pre-draft comparison) |
@@ -26,6 +27,8 @@ fantasy points every week, and publishes a running leaderboard for the season.
 | Source | Std | Half | PPR | Weekly | How |
 |---|---|---|---|---|---|
 | FantasyPros | ✓ | ✓ | ✓ | ✓ | embedded ecrData JSON, archive back to 2013 |
+| Footballguys | | | ✓ | | staff consensus, ~530 players; only their default (PPR) board is reachable — the scoring presets are session-based, not URL-based |
+| NFFC (ADP) | | | ✓ | | high-stakes money-league ADP via `adp.data.php`; the sharpest market board captured |
 | Sleeper (projections) | ✓ | ✓ | ✓ | ✓ | `/projections/nfl/{season}/{week}`, 2018+ |
 | ESPN | ✓ | ✓* | ✓ | ✓ | fantasy API; draft board 2023+, **weekly projections 2021+** (*half-PPR derived) |
 | CBS Sports | ✓ | | ✓ | ✓ | HTML top-200 / positional pages |
@@ -320,8 +323,27 @@ Every source was re-inspected against its live site:
   had it at 28 with TE1 at 8. A kicker in the top 12 is the tell — it is a
   legitimate board for the league it targets and misleading in any other, so it
   is tagged `roster=idp` and kept out of the default consensus.
-- **MyFantasyLeague** — QB-heavier than peers (QB4 at pick 23) but a genuine 1QB
-  board, not superflex.
+- **MyFantasyLeague** — *reclassified Aug 2026.* Previously vouched for here as
+  "QB-heavier than peers but a genuine 1QB board". It isn't a redraft board at
+  all. MFL pools every league type its hosts run into one ADP export, and the
+  `IS_KEEPER` and `FRANCHISES` filters are accepted and silently ignored (the
+  same trap as RotoBaller's `season`). Measured against the consensus of the
+  other 2026 PPR boards:
+
+  | | |
+  |---|---|
+  | rookies | drafted **192 ranks earlier** on average (n=49) |
+  | 5+ year veterans | drafted 41 ranks later (n=88) |
+  | agreement with peers | **0.50**, against 0.87–0.95 for every other board |
+
+  The disagreement is not a quarterback effect — excluding QBs it is 0.50,
+  and QBs alone are 0.70. The biggest reaches are obscure rookie tight ends
+  going 300+ picks early. That is dynasty and devy drafts in the pool. It is
+  still captured and scored, but tagged `scope=dynasty-mixed` and kept out of
+  the redraft consensus, the cross-season card and the leaderboards — the same
+  reasoning that keeps Underdog's best ball out. The tag is applied by source
+  rather than by snapshot, so all 13 seasons are reclassified, not just new
+  captures.
 - **Underdog** — best-ball ADP: no K or DST at all, and QB4 goes at pick 67
   against 49 on the redraft consensus. Tagged `bestball` and kept out of the
   redraft leaderboard, since scoring it against redraft outcomes would penalise

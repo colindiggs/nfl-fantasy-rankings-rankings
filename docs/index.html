@@ -743,6 +743,8 @@ function tagPills(s, scope) {
   if (t.basis === "projection") out.push(["PROJECTION",
     "Ranked by projected points rather than by expert opinion — it answers who scores most, not who you should start"]);
   if (t.scope === "bestball") out.push(["BEST BALL", "Best-ball ADP — no waivers, streaming or start/sit, and no K/DST"]);
+  if (t.scope === "dynasty-mixed") out.push(["DYNASTY MIX",
+    "ADP pooled across redraft, keeper and dynasty leagues — rookies are drafted about 190 ranks earlier than the redraft consensus, so it is not comparable to a redraft board"]);
   if (t.qb === "superflex") out.push(["SUPERFLEX", "Two-QB format — not comparable to a 1QB board"]);
   if (t.roster === "idp") out.push(["IDP", "Individual defensive players ranked alongside offense"]);
   if (t.order === "positional") out.push(["BY POSITION", "Ranks restart at 1 per position — no overall board"]);
