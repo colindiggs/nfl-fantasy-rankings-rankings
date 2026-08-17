@@ -804,6 +804,10 @@ function valueCell(p, maxVal) {
 }
 
 function renderBoard() {
+  // Always resolve the column default against the live viewport. Relying on
+  // the value captured when the script first parsed left the board collapsed
+  // on a wide screen whenever the two disagreed.
+  syncShowSrc();
   // the consensus is built from 1QB offense boards only; in the IDP lens there
   // is no consensus to show, so say so instead of showing contradictory data
   if (ROSTER !== "offense") {
@@ -1206,11 +1210,18 @@ const isNarrow = () => window.matchMedia("(max-width: 640px)").matches;
    settled and redraw anything measured against the wrong width. */
 function recheckWidths() {
   if (!SUMMARY) return;
-  const stale = ["chartbox", "calib-box"].some(id => {
+  const staleChart = ["chartbox", "calib-box"].some(id => {
     const el = document.getElementById(id);
     return el && el.clientWidth && Math.abs(el.clientWidth - (DRAWN[id] || 0)) > 8;
   });
-  if (stale) redrawForWidth();
+  // The board's column state can be stale even when every chart measured
+  // correctly, so it needs its own test rather than riding along on the
+  // charts': matchMedia at script-parse time does not always agree with the
+  // settled layout, and without this the board stays collapsed on a wide
+  // screen with nothing to trigger a correction.
+  const staleCols = !SRC_TOGGLED &&
+    SHOW_SRC === window.matchMedia("(max-width: 820px)").matches;
+  if (staleChart || staleCols) redrawForWidth();
 }
 
 /* Width-bound rendering has to survive rotation, window resizing, and the
