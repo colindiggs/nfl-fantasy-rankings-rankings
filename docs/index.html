@@ -145,8 +145,11 @@ tbody tr:hover { background: var(--rowhover); }
 .meta { color: var(--muted); font-size: .8125rem; margin-top: 8px; line-height: 1.7; border-top: 2px solid var(--ink); padding-top: 14px; }
 
 /* chart */
-.chartbox { position: relative; overflow-x: auto; }
-.chartbox svg { min-width: 640px; }
+.chartbox { position: relative; }
+/* Charts are drawn at the container's own pixel width (see chartWidth), so the
+   viewBox maps 1:1 to CSS pixels and label text stays at its intended size
+   instead of being scaled down to 4px on a phone. No horizontal scroll. */
+.chartbox svg { width: 100%; height: auto; display: block; }
 #tooltip {
   position: absolute; pointer-events: none; display: none;
   background: var(--surface); border: 1px solid var(--ink); border-radius: var(--r);
@@ -301,6 +304,10 @@ th.sortable:hover { color: var(--ink); }
 
 /* expectation model */
 .model-grid { display: grid; grid-template-columns: minmax(300px, 5fr) minmax(320px, 7fr); gap: 28px; }
+/* Grid items default to min-width:auto, so the wide predictions table refused
+   to shrink and pushed the whole page into horizontal scroll on a phone. The
+   table still scrolls — inside its own box, which is the point. */
+.model-grid > * { min-width: 0; }
 @media (max-width: 900px) { .model-grid { grid-template-columns: 1fr; } }
 .model-h3 { font-size: .8125rem; font-weight: 700; margin: 0 0 10px; }
 .model-h3:not(:first-child) { margin-top: 22px; }
@@ -373,9 +380,64 @@ td.na { text-align: right; color: var(--baseline); }
 @media (max-width: 640px) {
   .wrap { padding: 20px 12px 48px; }
   .hero h1 { font-size: 1.4rem; }
+  .hero .tag { font-size: .875rem; }
   .controls { gap: 14px; padding: 10px 12px; }
   .bar-val { width: 58px; }
   #search { width: 100%; }
+
+  /* Tap targets. Everything interactive was 30-35px tall; thumbs want ~44.
+     The filter rows are the worst offenders because they are also narrow. */
+  .tabs button, .posfilter button, .calib-controls button,
+  #season-select, .srctoggle, #search, #model-search {
+    min-height: 40px; padding-top: 8px; padding-bottom: 8px;
+  }
+  .posfilter button, .calib-controls button { min-width: 42px; }
+  .posfilter, .calib-controls, .tabs { gap: 6px; }
+  .board-controls { gap: 8px; }
+  #season-select { width: 100%; }
+  .ctl { flex: 1 1 100%; }
+
+  /* Section rhythm: hairline-ruled sections need more air when the content
+     above them is a dense scrolling table. */
+  .card { margin-bottom: 30px; }
+  h2 { font-size: 1.0625rem; }
+  .sub, .takeaway, .verdict { font-size: .8125rem; }
+  .verdict { padding: 9px 11px; }
+
+  /* Wide analysis tables: drop the columns that are context, keep the ones
+     that carry the conclusion. Both remain available on a wider screen. */
+  .col-desc { display: none; }
+  /* The source cell was the widest column in every analysis table: a mark
+     chip, a full label and its tags all on one nowrap line came to 285px of a
+     351px container. Letting it wrap costs two lines and buys the rest of the
+     table. */
+  .srccol { white-space: normal; max-width: 124px; }
+  .srccell { display: inline; }
+  .tag-pill { margin-left: 0; }
+  #history-board th, #history-board td,
+  #weekly-board th, #weekly-board td,
+  #predraft-board th, #predraft-board td { padding: 5px 6px; }
+  .fp { width: 62px; margin-right: 4px; }
+  .matrix table { font-size: .72rem; }
+  .matrix td.yr, .matrix th.yr { padding: 4px 6px; }
+
+  /* Coefficient labels were taking half the width of the model panel */
+  .coef-label { width: 104px; font-size: .7rem; }
+  .coef-val { width: 38px; }
+  .model-tablewrap td, .model-tablewrap th { padding: 5px 7px; }
+  .model-tablewrap td:first-child { max-width: 122px; white-space: normal; }
+  .pbar { width: 26px; margin-right: 4px; }
+  .minitables { gap: 14px; }
+
+  /* Drill-in stats table: ten columns will always scroll on a phone, but it
+     should scroll a little rather than a lot. */
+  .phist td, .phist th { padding: 3px 6px; font-size: .7rem; }
+  .detail-td { padding: 12px 10px 14px; }
+  .phist-note { font-size: .75rem; }
+
+  /* Tooltips are positioned panels; keep them inside a 375px screen */
+  #tooltip, #calib-tip { max-width: 88vw; }
+  #calib-tip { white-space: normal; }
   /* Draft day is a phone. The sticky player column was eating 212px of a
      349px board, leaving room for about one number; a smaller headshot and a
      tighter name column fit the whole decision — tier, rank, value — on
@@ -388,8 +450,13 @@ td.na { text-align: right; color: var(--baseline); }
   .face, .face-fallback { width: 30px; height: 30px; }
   .pcell { gap: 7px; }
   .pname { font-size: .8125rem; }
-  .board-wrap th, .board-wrap td { padding: 5px 7px; }
-  .ebar { width: 34px; }
+  /* PPR carries more sources, so the coverage cell reads "10/10" instead of
+     "7/7" and the board tipped back over the edge; these few pixels are what
+     keep every format fitting without sideways scroll. */
+  .board-wrap th, .board-wrap td { padding: 5px 5px; }
+  .ebar { width: 28px; margin-right: 4px; }
+  .tierbadge { padding: 0 3px; }
+  .cov { font-size: .7rem; }
   .srctoggle { margin-left: 0; width: 100%; }
 }
 </style>
@@ -583,8 +650,15 @@ let ROSTER = "offense";   // "offense" = team DST (default), "idp" = IDP leagues
 let SORT = {key: "avg", dir: 1};
 /* Per-source rank columns are the widest part of the board and the least
    useful mid-draft. On a phone they pushed everything but the name off screen,
-   so they start collapsed on narrow viewports and stay available on a toggle. */
+   so they start collapsed on narrow viewports and stay available on a toggle.
+   The default tracks the viewport until the reader overrides it — otherwise a
+   page that first loaded narrow would stay collapsed after rotating. */
 let SHOW_SRC = !window.matchMedia("(max-width: 820px)").matches;
+let SRC_TOGGLED = false;
+function syncShowSrc() {
+  if (SRC_TOGGLED) return;
+  SHOW_SRC = !window.matchMedia("(max-width: 820px)").matches;
+}
 
 // History spans seasons whose sources may not appear in the season currently
 // loaded, so tags and labels fall back to the cross-season union.
@@ -929,12 +1003,14 @@ function renderHistory() {
   // are what the reader should act on, and the career averages are context.
   let html = '<table><thead><tr><th class="num" title="Ordered by the paired comparison, not by career average">#</th>' +
     '<th>Source</th>' +
-    '<th title="Paired difference in Spearman against the reference, 95% confidence interval. Crossing zero = not established. The table is ordered by this column.">vs. reference ▼</th>' +
+    `<th title="Paired difference in Spearman against the reference, 95% confidence interval. Crossing zero = not established. The table is ordered by this column.">${isNarrow() ? "vs. ref" : "vs. reference"} ▼</th>` +
     '<th class="num">&nbsp;</th><th>Verdict</th>' +
-    '<th class="num" title="Seasons in which this source was scored for this format">Seasons</th>' +
-    `<th class="num" title="${HKIND === "weekly" ? "Scored weeks" : "Scored seasons"} behind the average">${HKIND === "weekly" ? "Weeks" : "Yrs"}</th>` +
-    '<th class="num" title="Career mean Spearman over whatever seasons this source covered. Because coverage differs, a higher average here does not mean a better source — the paired column is what settles that.">Avg rho *</th>' +
-    '<th class="num" title="Career mean accuracy gap in fantasy points. Lower is better.">Gap *</th>' +
+    // the verdict chip already flags a thin sample, so the raw season count is
+    // context rather than conclusion on a narrow screen
+    '<th class="num col-desc" title="Seasons in which this source was scored for this format">Seasons</th>' +
+    `<th class="num col-desc" title="${HKIND === "weekly" ? "Scored weeks" : "Scored seasons"} behind the average">${HKIND === "weekly" ? "Weeks" : "Yrs"}</th>` +
+    '<th class="num col-desc" title="Career mean Spearman over whatever seasons this source covered. Because coverage differs, a higher average here does not mean a better source — the paired column is what settles that.">Avg rho *</th>' +
+    '<th class="num col-desc" title="Career mean accuracy gap in fantasy points. Lower is better.">Gap *</th>' +
     "</tr></thead><tbody>";
 
   ordered.forEach((r, i) => {
@@ -958,12 +1034,12 @@ function renderHistory() {
     }
     if (r.thin) chip += ' <span class="vchip thin">thin sample</span>';
     html += `<tr><td class="num">${i + 1}</td>` +
-      `<td>${srcMark(r.source, true)}${tagPills(r.source, HKIND === "weekly" ? "weekly" : "predraft")}</td>` +
+      `<td class="srccol">${srcMark(r.source, true)}${tagPills(r.source, HKIND === "weekly" ? "weekly" : "predraft")}</td>` +
       `<td>${plot}</td><td class="num">${num}</td><td>${chip}</td>` +
-      `<td class="num">${r.n_seasons}</td>` +
-      `<td class="num">${r.n_obs}</td>` +
-      `<td class="num" title="95% CI ${r.score_lo != null ? r.score_lo.toFixed(3) + " to " + r.score_hi.toFixed(3) : "n/a"}">${r.score.toFixed(3)}</td>` +
-      `<td class="num">${r.gap != null ? r.gap.toFixed(1) : "—"}</td></tr>`;
+      `<td class="num col-desc">${r.n_seasons}</td>` +
+      `<td class="num col-desc">${r.n_obs}</td>` +
+      `<td class="num col-desc" title="95% CI ${r.score_lo != null ? r.score_lo.toFixed(3) + " to " + r.score_hi.toFixed(3) : "n/a"}">${r.score.toFixed(3)}</td>` +
+      `<td class="num col-desc">${r.gap != null ? r.gap.toFixed(1) : "—"}</td></tr>`;
   });
   $("#history-board").innerHTML = html + "</tbody></table>" +
     '<p class="chart-note" style="margin-top:10px">* Starred columns average over different ' +
@@ -1033,11 +1109,15 @@ function sortBoard(rows, kind) {
   });
 }
 
-function lbHead(kind, key, label, title) {
+/* Column headings are the widest text in these tables and the least
+   informative per pixel, so narrow screens get the abbreviation and keep the
+   full wording in the tooltip. */
+function lbHead(kind, key, label, title, short) {
   const s = LB_SORT[kind];
   const caret = s.key === key ? (s.dir === 1 ? " ▲" : " ▼") : "";
+  const text = (isNarrow() && short) ? short : label;
   return `<th class="num sortable" data-lbkind="${kind}" data-lbsort="${key}" ` +
-         `title="${esc(title)} Click to sort.">${esc(label)}${caret}</th>`;
+         `title="${esc(label)} — ${esc(title)} Click to sort.">${esc(text)}${caret}</th>`;
 }
 
 document.addEventListener("click", e => {
@@ -1059,13 +1139,13 @@ function renderWeeklyBoard() {
   }
   let html = '<div class="scroll-x"><table><thead><tr><th class="num">#</th><th>Source</th>' +
     lbHead("weekly", "accuracy_gap", "Accuracy gap",
-      "Mean |points implied by the predicted rank − points actually scored|. Lower is better.") +
+      "Mean |points implied by the predicted rank − points actually scored|. Lower is better.", "Gap") +
     lbHead("weekly", "score", "Spearman",
-      "Rank correlation with actual finish. 1.0 = perfect ordering.") +
-    lbHead("weekly", "weeks", "Weeks", "Scored weeks behind the averages.") +
+      "Rank correlation with actual finish. 1.0 = perfect ordering.", "Rho") +
+    lbHead("weekly", "weeks", "Weeks", "Scored weeks behind the averages.", "Wks") +
     "</tr></thead><tbody>";
   sortBoard(board, "weekly").forEach((r, i) => {
-    html += `<tr><td class="num">${i + 1}</td><td>${srcMark(r.source, true)}${tagPills(r.source, "weekly")}</td>` +
+    html += `<tr><td class="num">${i + 1}</td><td class="srccol">${srcMark(r.source, true)}${tagPills(r.source, "weekly")}</td>` +
             `<td class="num">${r.accuracy_gap != null ? r.accuracy_gap.toFixed(1) : "—"}</td>` +
             `<td class="num">${r.score.toFixed(3)}</td><td class="num">${r.weeks}</td></tr>`;
   });
@@ -1090,15 +1170,15 @@ function renderPredraftBoard() {
   }
   let html = '<div class="scroll-x"><table><thead><tr><th class="num">#</th><th>Source</th>' +
     lbHead("predraft", "accuracy_gap", "Accuracy gap",
-      "Mean |points implied by the predicted rank − points actually scored| over full-season totals. Lower is better.") +
+      "Mean |points implied by the predicted rank − points actually scored| over full-season totals. Lower is better.", "Gap") +
     lbHead("predraft", "score", "Avg pos Spearman",
-      "Mean positional rank correlation against cumulative season points.") +
+      "Mean positional rank correlation against cumulative season points.", "Pos rho") +
     lbHead("predraft", "overall", "Overall",
-      "Spearman over the top-150 board order; blank for positional-only boards.") +
-    lbHead("predraft", "through_week", "Through week", "Weeks of results scored against.") +
+      "Spearman over the top-150 board order; blank for positional-only boards.", "Ovr") +
+    lbHead("predraft", "through_week", "Through week", "Weeks of results scored against.", "Thru") +
     "</tr></thead><tbody>";
   sortBoard(board, "predraft").forEach((r, i) => {
-    html += `<tr><td class="num">${i + 1}</td><td>${srcMark(r.source, true)}${tagPills(r.source)}</td>` +
+    html += `<tr><td class="num">${i + 1}</td><td class="srccol">${srcMark(r.source, true)}${tagPills(r.source)}</td>` +
             `<td class="num">${r.accuracy_gap != null ? r.accuracy_gap.toFixed(1) : "—"}</td>` +
             `<td class="num">${r.score.toFixed(3)}</td>` +
             `<td class="num">${r.overall != null ? r.overall.toFixed(3) : "—"}</td>` +
@@ -1107,7 +1187,65 @@ function renderPredraftBoard() {
   $("#predraft-board").innerHTML = html + "</tbody></table></div>" + lbFootnote(board.length);
 }
 
-/* ---------- trend chart ---------- */
+/* ---------- charts ----------
+   Drawn at the container's measured width so one viewBox unit is one CSS
+   pixel: text keeps its real size on a phone instead of shrinking with the
+   drawing, and nothing has to scroll sideways. */
+let DRAWN = {};   // container id -> width the chart was last drawn at
+function chartWidth(el, fallback) {
+  const w = el && el.clientWidth ? el.clientWidth : 0;
+  if (el && el.id) DRAWN[el.id] = w;   // 0 records "measured before layout"
+  return Math.max(300, Math.round(w || fallback));
+}
+const isNarrow = () => window.matchMedia("(max-width: 640px)").matches;
+
+/* A chart drawn before its container has been laid out measures 0 and falls
+   back to a fixed width, which would then stay wrong for the life of the
+   page. Resize events don't fire for it and a ResizeObserver only delivers
+   while the document is rendering, so verify explicitly once things have
+   settled and redraw anything measured against the wrong width. */
+function recheckWidths() {
+  if (!SUMMARY) return;
+  const stale = ["chartbox", "calib-box"].some(id => {
+    const el = document.getElementById(id);
+    return el && el.clientWidth && Math.abs(el.clientWidth - (DRAWN[id] || 0)) > 8;
+  });
+  if (stale) redrawForWidth();
+}
+
+/* Width-bound rendering has to survive rotation, window resizing, and the
+   case where a chart is drawn before its container has been laid out (a
+   clientWidth of 0 falls back to the desktop size and would otherwise stay
+   wrong forever). A ResizeObserver catches all three; a plain resize listener
+   catches none of the last one. */
+let RESIZE_T = null, LAST_W = 0;
+function redrawForWidth() {
+  if (!SUMMARY) return;
+  syncShowSrc();
+  [renderTrend, renderCalibration, renderWeeklyBoard, renderPredraftBoard,
+   renderHistory, renderBoard].forEach(fn => {
+    try { fn(); } catch (e) { console.error(fn.name, e); }
+  });
+}
+function onWidthChange() {
+  const w = document.documentElement.clientWidth;
+  // ignore the reflow our own redraw causes; only real width changes matter
+  if (Math.abs(w - LAST_W) < 8) return;
+  LAST_W = w;
+  clearTimeout(RESIZE_T);
+  RESIZE_T = setTimeout(redrawForWidth, 150);
+}
+window.addEventListener("resize", onWidthChange);
+window.addEventListener("orientationchange", onWidthChange);
+// fonts and images can settle after first paint and change the layout width
+window.addEventListener("load", () => setTimeout(recheckWidths, 0));
+if (window.ResizeObserver) {
+  // observe the content column itself: it is a real layout box, so its first
+  // callback also covers the case where a chart was measured before layout
+  const wrap = document.querySelector(".wrap");
+  if (wrap) new ResizeObserver(onWidthChange).observe(wrap);
+}
+
 function renderTrend() {
   const weekly = SUMMARY.weekly[FMT] || {};
   const sources = orderSources(Object.keys(weekly)
@@ -1120,7 +1258,12 @@ function renderTrend() {
     $("#trend-chart").innerHTML = emptyWithHistory("No weekly scores for this season yet.");
     return;
   }
-  const W = 940, H = 300, L = 44, R = 70, T = 14, B = 30;
+  const narrow = isNarrow();
+  const W = chartWidth(document.getElementById("chartbox"), 940);
+  // End-of-line source labels need a right gutter; on a phone there isn't one
+  // to spare, so the legend above the chart carries the key instead.
+  const H = narrow ? 240 : 300, L = narrow ? 30 : 44,
+        R = narrow ? 8 : 70, T = 14, B = 30;
   const pw = W - L - R, ph = H - T - B;
   const vals = [];
   sources.forEach(s => weeks.forEach(w => {
@@ -1138,8 +1281,12 @@ function renderTrend() {
     g += `<line x1="${L}" y1="${yy}" x2="${W - R}" y2="${yy}" stroke="var(--grid)" stroke-width="1" stroke-dasharray="2 4"/>` +
          `<text x="${L - 8}" y="${yy + 4}" text-anchor="end">${v.toFixed(1)}</text>`;
   }
-  weeks.forEach(w => {
-    g += `<text x="${x(w)}" y="${H - 8}" text-anchor="middle">W${w}</text>`;
+  // 18 week labels collide well before a phone's width; thin them out and let
+  // the tooltip carry the exact week.
+  const everyN = Math.max(1, Math.ceil(weeks.length / (narrow ? 6 : 18)));
+  weeks.forEach((w, i) => {
+    if (i % everyN && i !== weeks.length - 1) return;
+    g += `<text x="${x(w)}" y="${H - 8}" text-anchor="middle">${narrow ? "" : "W"}${w}</text>`;
   });
   sources.forEach(s => {
     const pts = weeks.map(w => [w, weekScore(weekly[s], w)]).filter(p => p[1] != null);
@@ -1157,21 +1304,27 @@ function renderTrend() {
     endLabels.push({s, ly: y(last[1]) + 4});
   });
   // direct end-of-line labels: short names, nudged apart when lines finish close
-  endLabels.sort((a, b) => a.ly - b.ly);
-  for (let i = 1; i < endLabels.length; i++) {
-    if (endLabels[i].ly - endLabels[i - 1].ly < 13) endLabels[i].ly = endLabels[i - 1].ly + 13;
+  if (!narrow) {
+    endLabels.sort((a, b) => a.ly - b.ly);
+    for (let i = 1; i < endLabels.length; i++) {
+      if (endLabels[i].ly - endLabels[i - 1].ly < 13) endLabels[i].ly = endLabels[i - 1].ly + 13;
+    }
+    endLabels.forEach(({s, ly}) => {
+      g += `<text x="${W - R + 8}" y="${Math.min(ly, H - B - 2)}" style="fill:${SRC_COLOR[s]};font-weight:600">${esc(srcShort(s))}</text>`;
+    });
   }
-  endLabels.forEach(({s, ly}) => {
-    g += `<text x="${W - R + 8}" y="${Math.min(ly, H - B - 2)}" style="fill:${SRC_COLOR[s]};font-weight:600">${esc(srcShort(s))}</text>`;
-  });
-  $("#trend-chart").innerHTML =
-    `<svg viewBox="0 0 ${W} ${H}" style="width:100%;height:auto;display:block" id="trend-svg">${g}</svg>`;
+  $("#trend-chart").innerHTML = `<svg viewBox="0 0 ${W} ${H}" id="trend-svg">${g}</svg>`;
   attachHover(weeks, sources, weekly, x, W);
 }
 
+/* Pointer events rather than mouse events: a phone has no hover, so the
+   week-by-week tooltip was simply unreachable on touch. Tapping now opens it
+   and dragging scrubs across weeks, while the mouse behaviour is unchanged. */
 function attachHover(weeks, sources, weekly, x, W) {
   const svg = $("#trend-svg"), tip = $("#tooltip"), box = $("#chartbox");
-  svg.addEventListener("mousemove", e => {
+  let pressed = false;
+
+  function show(e) {
     const r = svg.getBoundingClientRect();
     const mx = (e.clientX - r.left) * (W / r.width);
     let best = null, bd = 1e9;
@@ -1184,13 +1337,32 @@ function attachHover(weeks, sources, weekly, x, W) {
     });
     tip.innerHTML = `<div class="tt-week">Week ${best}</div>${rows}`;
     tip.style.display = "block";
+    // measure after filling, and keep the panel inside the chart box on a
+    // narrow screen instead of trusting a hardcoded width
     const bx = box.getBoundingClientRect();
+    const tw = tip.offsetWidth, th = tip.offsetHeight;
     let px = e.clientX - bx.left + 14;
-    if (px + 170 > bx.width) px -= 190;
-    tip.style.left = px + "px";
-    tip.style.top = (e.clientY - bx.top + 10) + "px";
+    if (px + tw > bx.width - 4) px = e.clientX - bx.left - tw - 14;
+    let py = e.clientY - bx.top + 10;
+    if (py + th > bx.height - 4) py = Math.max(0, e.clientY - bx.top - th - 10);
+    tip.style.left = Math.max(2, Math.min(px, bx.width - tw - 2)) + "px";
+    tip.style.top = Math.max(0, py) + "px";
+  }
+
+  svg.addEventListener("pointerdown", e => { pressed = true; show(e); });
+  svg.addEventListener("pointermove", e => {
+    if (e.pointerType === "mouse" || pressed) show(e);
   });
-  svg.addEventListener("mouseleave", () => { tip.style.display = "none"; });
+  svg.addEventListener("pointerup", () => { pressed = false; });
+  svg.addEventListener("pointercancel", () => { pressed = false; });
+  svg.addEventListener("pointerleave", () => {
+    pressed = false;
+    if (matchMedia("(hover: hover)").matches) tip.style.display = "none";
+  });
+  // on touch there is no "leave", so dismiss by tapping anywhere else
+  document.addEventListener("pointerdown", e => {
+    if (!svg.contains(e.target)) tip.style.display = "none";
+  });
 }
 
 /* An empty panel during the preseason should route somewhere useful rather
@@ -1343,7 +1515,12 @@ function renderCalibration() {
     $("#calib-chart").innerHTML = '<div class="empty">Not enough data for this combination.</div>';
     return;
   }
-  const W = 940, H = 420, L = 54, R = 22, T = 16, B = 46;
+  const narrow = isNarrow();
+  const W = chartWidth(document.getElementById("calib-box"), 940);
+  // the scatter reads as a square — a wide short box hides the diagonal, which
+  // is the whole point of the plot
+  const H = narrow ? Math.round(W * 0.95) : 420;
+  const L = narrow ? 34 : 54, R = narrow ? 10 : 22, T = 16, B = narrow ? 40 : 46;
   const pw = W - L - R, ph = H - T - B;
   const hi = Math.max(10, Math.ceil(Math.max(...pairs.map(c => Math.max(c[0], c[1]))) / 10) * 10);
   const x = v => L + pw * (v / hi);
@@ -1356,9 +1533,13 @@ function renderCalibration() {
          '<line x1="' + x(v) + '" y1="' + T + '" x2="' + x(v) + '" y2="' + (H - B) + '" stroke="var(--grid)" stroke-dasharray="2 4"/>' +
          '<text x="' + x(v) + '" y="' + (H - B + 16) + '" text-anchor="middle">' + v + "</text>";
   }
+  // Bigger dots help a finger find one, but 800 points in a 350px box at r=6
+  // is a solid mass — and the shape of the cloud is what this chart is for.
+  // r=4 keeps the distribution readable and stays findable by tap.
+  const dotR = narrow ? 4 : 3.5;
   pairs.forEach(c => {
     g += '<circle class="cal-dot" cx="' + x(c[0]).toFixed(1) + '" cy="' + y(c[1]).toFixed(1) +
-         '" r="3.5" fill="' + POS_COLOR[CALIB_POS] + '" opacity="0.4"' +
+         '" r="' + dotR + '" fill="' + POS_COLOR[CALIB_POS] + '" opacity="0.4"' +
          ' data-n="' + esc(c[2]) + '" data-w="' + c[3] + '" data-pr="' + c[0] +
          '" data-ar="' + Math.round(c[1]) + '"' +
          (c[4] != null ? ' data-pts="' + c[4] + '"' : "") + '></circle>';
@@ -1368,14 +1549,21 @@ function renderCalibration() {
   g += '<text x="15" y="' + (T + ph / 2) + '" text-anchor="middle" transform="rotate(-90 15 ' +
        (T + ph / 2) + ')" style="fill:var(--ink-2)">\u2190 Actual finish (1 = scored most)</text>';
   // quadrant annotations. Above the diagonal = finished better than ranked.
+  // The second line of each annotation restates the first; on a small plot it
+  // is 196px of text sitting on top of the data, so narrow layouts keep only
+  // the headline and leave the restatement to the caption below.
   g += '<text class="quad-note" x="' + (W - R - 14) + '" y="' + (T + 22) +
-       '" text-anchor="end" style="fill:var(--s3)">Outperformed projection</text>';
-  g += '<text class="quad-note" x="' + (W - R - 14) + '" y="' + (T + 38) +
-       '" text-anchor="end" style="fill:var(--muted)">actual finish better than projected rank</text>';
-  g += '<text class="quad-note" x="' + (L + 14) + '" y="' + (H - B - 26) +
-       '" style="fill:var(--s8)">Underperformed projection</text>';
-  g += '<text class="quad-note" x="' + (L + 14) + '" y="' + (H - B - 10) +
-       '" style="fill:var(--muted)">actual finish worse than projected rank</text>';
+       '" text-anchor="end" style="fill:var(--s3)">Outperformed' + (narrow ? "" : " projection") + '</text>';
+  if (!narrow) {
+    g += '<text class="quad-note" x="' + (W - R - 14) + '" y="' + (T + 38) +
+         '" text-anchor="end" style="fill:var(--muted)">actual finish better than projected rank</text>';
+  }
+  g += '<text class="quad-note" x="' + (L + 14) + '" y="' + (H - B - (narrow ? 10 : 26)) +
+       '" style="fill:var(--s8)">Underperformed' + (narrow ? "" : " projection") + '</text>';
+  if (!narrow) {
+    g += '<text class="quad-note" x="' + (L + 14) + '" y="' + (H - B - 10) +
+         '" style="fill:var(--muted)">actual finish worse than projected rank</text>';
+  }
 
   const mean = a => a.reduce((s, v) => s + v, 0) / a.length;
   const mx = mean(pairs.map(c => c[0])), my = mean(pairs.map(c => c[1]));
@@ -1401,7 +1589,7 @@ document.addEventListener("click", e => {
 
 /* instant tooltip for scatter points — native SVG titles are slow and
    invisible on touch, so position a real element next to the dot */
-document.addEventListener("mouseover", e => {
+function showCalibTip(e) {
   const dot = e.target.closest && e.target.closest("#calib-chart circle.cal-dot");
   const tip = document.getElementById("calib-tip");
   if (!dot) { if (tip) tip.style.display = "none"; return; }
@@ -1415,8 +1603,17 @@ document.addEventListener("mouseover", e => {
   tip.style.display = "block";
   let px = r.left - box.left + 12, py = r.top - box.top - 10;
   if (px + tip.offsetWidth > box.width - 8) px -= tip.offsetWidth + 20;
+  // the panel is wider than a phone in landscape-heavy cases; clamp both axes
+  px = Math.max(2, Math.min(px, box.width - tip.offsetWidth - 2));
+  py = Math.min(py, box.height - tip.offsetHeight - 2);
   tip.style.left = px + "px";
   tip.style.top = Math.max(0, py) + "px";
+}
+
+document.addEventListener("mouseover", showCalibTip);
+// touch has no hover: tap a point to read it, tap elsewhere to dismiss
+document.addEventListener("pointerdown", e => {
+  if (e.pointerType !== "mouse") showCalibTip(e);
 });
 
 /* ---------- player drill-in: multi-season record ---------- */
@@ -1602,9 +1799,12 @@ function renderModel() {
     '<th>Player</th>' +
     `<th class="num sortable" data-msort="pre" title="Pre-draft consensus positional rank (PPR) and the season points that slot has historically produced">Slot${caret("pre")}</th>` +
     `<th class="num sortable" data-msort="edge" title="Player-specific signal only: the sum of contributions from age, durability, draft capital, injuries, and prior delivery — slot and position terms removed. Compares players against peers drafted near them.">Edge${caret("edge")}</th>` +
-    `<th class="num sortable" data-msort="poe" title="Predicted points over slot expectation, including the slot's own mean reversion. Early slots are negative on average — slot-1 players usually fail to repay slot-1 points.">E[± pts]${caret("poe")}</th>` +
+    // E[± pts] is dominated by the slot and negative for every early pick by
+    // construction; Edge is the column to actually compare players on, so the
+    // narrow layout keeps Edge and drops this one
+    `<th class="num sortable col-desc" data-msort="poe" title="Predicted points over slot expectation, including the slot's own mean reversion. Early slots are negative on average — slot-1 players usually fail to repay slot-1 points.">E[± pts]${caret("poe")}</th>` +
     `<th class="num sortable" data-msort="p" title="Rank model: probability of finishing at or better than the slot">P(beat)${caret("p")}</th>` +
-    '<th title="Largest player-specific inputs, in points of POE">Drivers</th></tr></thead><tbody>' +
+    '<th class="col-desc" title="Largest player-specific inputs, in points of POE">Drivers</th></tr></thead><tbody>' +
     rows.map(r => {
       const w = Math.abs(r.edge) / maxE * 50;
       const side = r.edge >= 0 ? `left:50%;width:${w}%` : `left:${50 - w}%;width:${w}%`;
@@ -1621,9 +1821,9 @@ function renderModel() {
         `<span class="pmeta"><span class="posbadge pos-${r.pos}">${r.pos}</span>${esc(r.team || "")}</span></span></span></td>` +
         `<td class="num" title="slot has historically produced ${r.implied != null ? r.implied : "?"} pts">${r.pos}${r.pre}</td>` +
         `<td class="num ${r.edge >= 0 ? "epos" : "eneg"}"><span class="ebar"><i style="${side};background:${ecol}"></i></span>${r.edge >= 0 ? "+" : "−"}${Math.abs(r.edge).toFixed(0)}</td>` +
-        `<td class="num">${r.poe >= 0 ? "+" : "−"}${Math.abs(r.poe).toFixed(0)}</td>` +
+        `<td class="num col-desc">${r.poe >= 0 ? "+" : "−"}${Math.abs(r.poe).toFixed(0)}</td>` +
         `<td class="num"><span class="pbar"><i style="width:${Math.round(r.p * 100)}%"></i></span>${(r.p * 100).toFixed(0)}%</td>` +
-        `<td>${drivers}</td></tr>`;
+        `<td class="col-desc">${drivers}</td></tr>`;
     }).join("") + "</tbody></table>";
 
   $("#model-takeaway").innerHTML =
@@ -1669,6 +1869,8 @@ function renderAll() {
    renderTrend, renderPosBreakdown, renderCalibration, renderPredraftBoard].forEach(fn => {
     try { fn(); } catch (err) { console.error(fn.name, err); }
   });
+  // charts may have been measured before layout settled; check once after
+  requestAnimationFrame(() => setTimeout(recheckWidths, 0));
   $("#meta").innerHTML =
     `Sources: FantasyPros, ESPN, CBS, NFL.com, Yahoo, The Ringer, PFF, RotoBaller, Draft Sharks, FantasySharks, ` +
     `FFToday, WalterFootball, plus market ADP from FF Calculator, MyFantasyLeague, and Underdog. ` +
@@ -1702,6 +1904,7 @@ document.getElementById("search").addEventListener("input", e => {
 });
 document.getElementById("src-toggle").addEventListener("click", () => {
   SHOW_SRC = !SHOW_SRC;
+  SRC_TOGGLED = true;   // an explicit choice outranks the breakpoint default
   // sorting by a now-hidden source column would leave an unexplained order
   if (!SHOW_SRC && !["avg", "tier", "value", "cov"].includes(SORT.key)) {
     SORT = {key: "avg", dir: 1};
