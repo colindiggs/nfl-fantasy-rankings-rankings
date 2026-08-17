@@ -1239,6 +1239,9 @@ window.addEventListener("resize", onWidthChange);
 window.addEventListener("orientationchange", onWidthChange);
 // fonts and images can settle after first paint and change the layout width
 window.addEventListener("load", () => setTimeout(recheckWidths, 0));
+if (document.fonts && document.fonts.ready) {
+  document.fonts.ready.then(() => setTimeout(recheckWidths, 0));
+}
 if (window.ResizeObserver) {
   // observe the content column itself: it is a real layout box, so its first
   // callback also covers the case where a chart was measured before layout
@@ -1869,8 +1872,13 @@ function renderAll() {
    renderTrend, renderPosBreakdown, renderCalibration, renderPredraftBoard].forEach(fn => {
     try { fn(); } catch (err) { console.error(fn.name, err); }
   });
-  // charts may have been measured before layout settled; check once after
-  requestAnimationFrame(() => setTimeout(recheckWidths, 0));
+  // Charts may have been measured before layout settled. One immediate check
+  // is not enough: the window "load" listener usually fires before the data
+  // fetches resolve (so it bails with no SUMMARY), and web fonts can reflow
+  // the page after first paint. Stagger a few cheap checks instead — each is
+  // a width comparison that redraws only when it finds a real mismatch.
+  [0, 150, 600].forEach(d => setTimeout(recheckWidths, d));
+  requestAnimationFrame(recheckWidths);
   $("#meta").innerHTML =
     `Sources: FantasyPros, ESPN, CBS, NFL.com, Yahoo, The Ringer, PFF, RotoBaller, Draft Sharks, FantasySharks, ` +
     `FFToday, WalterFootball, plus market ADP from FF Calculator, MyFantasyLeague, and Underdog. ` +
