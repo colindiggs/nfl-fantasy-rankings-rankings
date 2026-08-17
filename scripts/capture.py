@@ -26,7 +26,8 @@ from pathlib import Path
 from common import DATA, FORMATS, get_logger, session, tags, write_json
 import sleeper
 import spec_engine
-from sources import (cbs, draftsharks, espn, fantasypros, footballguys, fftoday, mfl, nffc,
+from sources import (cbs, cbs_adp, draftsharks, espn, espn_adp, fantasypros,
+                     footballguys, fftoday, mfl, nffc, yahoo_adp,
                      nfl_com, pff, ringer, sharks, sleeper_proj, walter, yahoo)
 
 log = get_logger("capture")
@@ -55,6 +56,12 @@ DRAFT_SOURCES = {
     "nffc": (["ppr"], lambda f, y, s: nffc.fetch_draft(f, s)),
     # Only their default (PPR) board is reachable; see sources/footballguys.py
     "footballguys": (["ppr"], lambda f, y, s: footballguys.fetch_draft(f, s)),
+    # Platform ADP — what drafters on each host actually did, as opposed to
+    # what that host's analysts published. Each is one pooled figure rather
+    # than one per scoring format, so each is captured once (see the modules).
+    "yahoo-adp": (["half_ppr"], lambda f, y, s: yahoo_adp.fetch_draft(f, s)),
+    "espn-adp": (["ppr"], lambda f, y, s: espn_adp.fetch_draft(f, y, s)),
+    "cbs-adp": (["ppr"], lambda f, y, s: cbs_adp.fetch_draft(f, s)),
 }
 
 # source -> (formats, fetch(fmt, season, week, sess))
@@ -138,6 +145,9 @@ def import_inbox(season):
 SOURCE_TAGS = {
     "ffcalc": tags(basis="adp"),
     "nffc": tags(basis="adp"),
+    "yahoo-adp": tags(basis="adp"),
+    "espn-adp": tags(basis="adp"),
+    "cbs-adp": tags(basis="adp"),
     # MyFantasyLeague pools every league type its hosts run into one ADP
     # export, and the IS_KEEPER / FRANCHISES filters are accepted and silently
     # ignored (same trap as RotoBaller's `season`). Measured against the

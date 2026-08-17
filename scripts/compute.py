@@ -27,6 +27,8 @@ CODE_LABELS = {
     "ringer-superflex": "The Ringer (Superflex)",
     "ffcalc": "FF Calculator (ADP)", "underdog": "Underdog (Best Ball ADP)",
     "rotoballer": "RotoBaller", "sleeper": "Sleeper (projections)",
+    "nffc": "NFFC (ADP)", "footballguys": "Footballguys",
+    "yahoo-adp": "Yahoo (ADP)", "espn-adp": "ESPN (ADP)", "cbs-adp": "CBS (ADP)",
 }
 
 
@@ -316,7 +318,8 @@ def pos_lists(players):
 # are deliberately absent because their basis genuinely differs between the
 # pre-draft board and the weekly projections.
 KNOWN_BASIS = {"ffcalc": "adp", "mfl": "adp", "sharks": "adp", "underdog": "adp",
-               "nffc": "adp"}
+               "nffc": "adp", "yahoo-adp": "adp", "espn-adp": "adp",
+               "cbs-adp": "adp"}
 
 # Scope that follows from what a source's feed *is*, not from one snapshot.
 # MyFantasyLeague pools dynasty and keeper drafts into its ADP export and

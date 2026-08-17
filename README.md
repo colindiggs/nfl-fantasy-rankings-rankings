@@ -29,6 +29,14 @@ fantasy points every week, and publishes a running leaderboard for the season.
 | FantasyPros | ✓ | ✓ | ✓ | ✓ | embedded ecrData JSON, archive back to 2013 |
 | Footballguys | | | ✓ | | staff consensus, ~530 players; only their default (PPR) board is reachable — the scoring presets are session-based, not URL-based |
 | NFFC (ADP) | | | ✓ | | high-stakes money-league ADP via `adp.data.php`; the sharpest market board captured |
+| Yahoo (ADP) | | ✓ | | | `draft_analysis.average_pick` — what Yahoo's drafters did, not what Yahoo's analysts said |
+| ESPN (ADP) | | | ✓ | | `ownership.averageDraftPosition` |
+| CBS (ADP) | | | ✓ | | the draft-averages table |
+
+The three platform ADPs are each published as a **single pooled figure**, not
+one per scoring format — ESPN returns byte-identical numbers through its
+standard and PPR endpoints — so each is captured once rather than relabelled
+three times to look like three sources.
 | Sleeper (projections) | ✓ | ✓ | ✓ | ✓ | `/projections/nfl/{season}/{week}`, 2018+ |
 | ESPN | ✓ | ✓* | ✓ | ✓ | fantasy API; draft board 2023+, **weekly projections 2021+** (*half-PPR derived) |
 | CBS Sports | ✓ | | ✓ | ✓ | HTML top-200 / positional pages |
