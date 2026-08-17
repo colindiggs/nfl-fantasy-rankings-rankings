@@ -307,11 +307,99 @@ def pos_lists(players):
     return out
 
 
-def tags_of(payload):
+# Sources whose basis is a property of the source itself, not of a given
+# snapshot. Boards captured before tagging existed (2024 and 2025 pre-draft)
+# carry no tags at all, and the generic default is "expert" — which silently
+# turned FF Calculator's mock-draft ADP into an expert opinion, dropping its
+# ADP badge and, worse, putting the market on the expert side of the
+# expert-vs-market comparison. Identity settles these four; ESPN and Sleeper
+# are deliberately absent because their basis genuinely differs between the
+# pre-draft board and the weekly projections.
+KNOWN_BASIS = {"ffcalc": "adp", "mfl": "adp", "sharks": "adp", "underdog": "adp"}
+
+
+def tags_of(payload, source=None):
     """Tags for a snapshot, defaulted for boards captured before tagging."""
     t = dict(DEFAULT_TAGS)
+    if source in KNOWN_BASIS:
+        t["basis"] = KNOWN_BASIS[source]
     t.update(payload.get("tags") or {})
     return t
+
+
+def annotate_value(rows, basis_of):
+    """Expert opinion vs. the market, per player.
+
+    The draft-day question is not "who is good" but "where does he go relative
+    to where he should". Splitting the consensus into expert boards and ADP
+    boards gives both numbers, and their difference is the only cell on the
+    board that is directly actionable: a player the experts rank 24th who is
+    actually drafted 46th is a player you can wait on.
+
+    Both means are taken over the sources of that basis which rank him, so a
+    player nobody's market covers gets no value figure rather than a fake one.
+    """
+    experts = {s for s, b in basis_of.items() if b == "expert"}
+    market = {s for s, b in basis_of.items() if b == "adp"}
+    for r in rows:
+        exp = [v for s, v in r["ranks"].items() if s in experts]
+        adp = [v for s, v in r["ranks"].items() if s in market]
+        r["exp"] = round(sum(exp) / len(exp), 1) if exp else None
+        r["adp"] = round(sum(adp) / len(adp), 1) if adp else None
+        r["n_exp"] = len(exp)
+        r["n_adp"] = len(adp)
+        # positive = the market lets him fall past where experts value him
+        r["value"] = (round(r["adp"] - r["exp"], 1)
+                      if r["exp"] is not None and r["adp"] is not None else None)
+
+
+TIER_WIDTH = 0.07   # a tier spans ~7% of the position's top-slot value
+
+
+def annotate_tiers(rows, fmt):
+    """Positional tiers: "if I miss this player, is the next one equivalent?"
+
+    That question is about value, not rank order, so the primary cut is a
+    points cliff — a tier ends once the slot value has fallen a fixed share of
+    the position's top slot below where the tier started. Cutting on gaps in
+    consensus rank alone put Gibbs and Kenneth Walker in one RB tier, 138
+    points apart, because the top of an overall board is dense in rank terms
+    however far apart the players are in production.
+
+    A large gap in consensus rank still forces a break, so a cluster the
+    sources clearly separate isn't papered over by a smooth curve. Tiers
+    therefore move with the board rather than reproducing the curve's shape
+    every season.
+    """
+    by_pos = {}
+    for r in rows:
+        by_pos.setdefault(r["pos"], []).append(r)
+    for pos, plist in by_pos.items():
+        plist.sort(key=lambda r: r["avg"])
+        for i, r in enumerate(plist):
+            r["pos_rank"] = i + 1
+            r["implied"] = rankvalue.points_for_rank(
+                CURVE, "season", fmt, pos, i + 1)
+
+        gaps = [plist[i + 1]["avg"] - plist[i]["avg"] for i in range(len(plist) - 1)]
+        if gaps:
+            m = sum(gaps) / len(gaps)
+            sd = (sum((g - m) ** 2 for g in gaps) / len(gaps)) ** 0.5
+            rank_cut = max(3.0, m + 2 * sd)
+        else:
+            rank_cut = 3.0
+        top = next((r["implied"] for r in plist if r["implied"] is not None), None)
+        width = (top * TIER_WIDTH) if top else None
+
+        tier, anchor = 1, plist[0]["implied"] if plist else None
+        for i, r in enumerate(plist):
+            drop = (anchor is not None and r["implied"] is not None and width
+                    and (anchor - r["implied"]) > width)
+            split = i and (r["avg"] - plist[i - 1]["avg"]) > rank_cut
+            if i and (drop or split):
+                tier += 1
+                anchor = r["implied"]
+            r["tier"] = tier
 
 
 def is_baseline(payload):
@@ -512,10 +600,10 @@ def main(season=None, is_current=True):
     # projections — and one merged map would mislabel whichever came second.
     src_tags, weekly_tags = {}, {}
     for (source, _f), payload in load_rankings(season, "predraft").items():
-        src_tags.setdefault(source, tags_of(payload))
+        src_tags.setdefault(source, tags_of(payload, source))
     for w in weeks:
         for (source, _f), payload in load_rankings(season, f"week{w:02d}").items():
-            weekly_tags.setdefault(source, tags_of(payload))
+            weekly_tags.setdefault(source, tags_of(payload, source))
     for source, t in weekly_tags.items():
         src_tags.setdefault(source, t)
     summary["source_tags"] = src_tags
@@ -538,6 +626,7 @@ def main(season=None, is_current=True):
     comparison = {"season": season, "formats": {}}
     for fmt in FORMATS:
         boards = {}
+        basis_of = {}
         for (source, f2), payload in predraft.items():
             if f2 != fmt:
                 continue
@@ -545,6 +634,7 @@ def main(season=None, is_current=True):
                 continue  # superflex / IDP / best-ball — different question
             if sum(1 for p in payload["players"] if p["rank"] == 1) > 1:
                 continue  # positional-only board — no overall order
+            basis_of[source] = tags_of(payload, source)["basis"]
             board = {}
             for p in sorted(payload["players"], key=lambda x: x["rank"]):
                 pid = p.get("sleeper_id")
@@ -575,9 +665,14 @@ def main(season=None, is_current=True):
             rec["max"] = max(ranks)
             rows.append(rec)
         rows.sort(key=lambda r: (r["avg"], -r["n"]))
+        rows = rows[:200]
+        annotate_value(rows, basis_of)
+        annotate_tiers(rows, fmt)
         comparison["formats"][fmt] = {
             "sources": sorted(boards, key=lambda s: len(boards[s]), reverse=True),
-            "players": rows[:200],
+            "experts": sorted(s for s, b in basis_of.items() if b == "expert"),
+            "market": sorted(s for s, b in basis_of.items() if b == "adp"),
+            "players": rows,
         }
     write_json(DOCS / "data" / str(season) / "predraft.json", comparison)
     if is_current:

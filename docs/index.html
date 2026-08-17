@@ -241,6 +241,17 @@ th.sortable:hover { color: var(--ink); }
 .pos-QB { --pos: var(--s7); } .pos-RB { --pos: var(--s3); }
 .pos-WR { --pos: var(--s1); } .pos-TE { --pos: var(--s2); }
 .pos-K  { --pos: var(--s4); } .pos-DST{ --pos: var(--muted); }
+.tierbadge {
+  display: inline-block; min-width: 20px; text-align: center; padding: 0 5px;
+  border: 1px solid var(--border); background: var(--chip); border-radius: var(--r-sm);
+  font-family: var(--font-mono); font-size: .72rem; font-weight: 700; color: var(--ink-2);
+}
+.srctoggle {
+  background: var(--chip); color: var(--ink-2); border: 1px solid var(--border);
+  border-radius: var(--r); padding: 5px 12px; cursor: pointer; font: inherit;
+  font-size: .8125rem; margin-left: auto;
+}
+.srctoggle:hover { color: var(--ink); border-color: var(--ink-2); }
 .range { display: inline-block; width: 78px; height: 6px; background: var(--chip); border-radius: var(--r-sm); position: relative; vertical-align: middle; flex: none; }
 .range i { position: absolute; top: 0; height: 6px; background: var(--accent); opacity: .85; border-radius: var(--r-sm); min-width: 3px; }
 .cov { color: var(--muted); font-size: .75rem; }
@@ -365,6 +376,21 @@ td.na { text-align: right; color: var(--baseline); }
   .controls { gap: 14px; padding: 10px 12px; }
   .bar-val { width: 58px; }
   #search { width: 100%; }
+  /* Draft day is a phone. The sticky player column was eating 212px of a
+     349px board, leaving room for about one number; a smaller headshot and a
+     tighter name column fit the whole decision — tier, rank, value — on
+     screen without sideways scrolling. */
+  .board-wrap th.pcol, .board-wrap td.pcol { min-width: 146px; white-space: normal; }
+  /* the row number is redundant on a list you are already reading in order,
+     and dropping it is what brings the board inside the viewport.
+     The drill-in row is excluded — its single cell is a first-child too. */
+  .board-wrap tr:not(.detail-row) > :first-child { display: none; }
+  .face, .face-fallback { width: 30px; height: 30px; }
+  .pcell { gap: 7px; }
+  .pname { font-size: .8125rem; }
+  .board-wrap th, .board-wrap td { padding: 5px 7px; }
+  .ebar { width: 34px; }
+  .srctoggle { margin-left: 0; width: 100%; }
 }
 </style>
 </head>
@@ -405,9 +431,13 @@ td.na { text-align: right; color: var(--baseline); }
 
   <div class="card">
     <h2>Consensus draft board</h2>
-    <p class="sub">Top 200 by mean rank across the sources that rank each player. <b>Cov</b> = number of
-    sources ranking the player (minimum 2 to appear). Green marks a player's best rank across sources; red his
-    worst. Click a row for the player's multi-season record.</p>
+    <p class="sub">Top 200 by mean rank across the sources that rank each player.
+    <b>Tier</b> groups players close enough in expected value to be interchangeable — if you miss one,
+    the rest of his tier is an equivalent fallback. <b>Value</b> is expert consensus minus market ADP:
+    green means the market lets him fall past where the experts rank him, red means he goes earlier than
+    expert opinion justifies. <b>Cov</b> = number of sources ranking the player (minimum 2 to appear).
+    Green and red ranks mark a player's best and worst rank across sources. Click a row for his
+    multi-season record.</p>
     <div class="board-controls">
       <div class="posfilter" id="posfilter">
         <button data-pos="ALL" class="active">All</button>
@@ -416,6 +446,7 @@ td.na { text-align: right; color: var(--baseline); }
         <button data-pos="K">K</button><button data-pos="DST">DST</button>
       </div>
       <input id="search" type="search" placeholder="Search players…">
+      <button id="src-toggle" class="srctoggle"></button>
     </div>
     <div class="board-wrap" id="board"></div>
   </div>
@@ -548,8 +579,12 @@ let FMT = "half_ppr", POS = "ALL", QUERY = "", SEASON = null;
 // average.
 const SCOPE = "all";
 let ROSTER = "offense";   // "offense" = team DST (default), "idp" = IDP leagues
-// board sort: key is "avg", "cov", or a source slug; dir 1 = best first
+// board sort: "avg", "tier", "value", "cov", or a source slug; dir 1 = best first
 let SORT = {key: "avg", dir: 1};
+/* Per-source rank columns are the widest part of the board and the least
+   useful mid-draft. On a phone they pushed everything but the name off screen,
+   so they start collapsed on narrow viewports and stay available on a toggle. */
+let SHOW_SRC = !window.matchMedia("(max-width: 820px)").matches;
 
 // History spans seasons whose sources may not appear in the season currently
 // loaded, so tags and labels fall back to the cross-season union.
@@ -678,6 +713,22 @@ function renderHero() {
 }
 
 /* ---------- consensus board ---------- */
+/* The single actionable cell on a draft board: where expert opinion and the
+   market disagree, and by how much. */
+function valueCell(p, maxVal) {
+  if (p.value == null) {
+    return '<span class="na" title="No market ADP source ranks him, so there is nothing to compare expert opinion against">–</span>';
+  }
+  const w = Math.min(50, Math.abs(p.value) / maxVal * 50);
+  const side = p.value >= 0 ? `left:50%;width:${w}%` : `left:${50 - w}%;width:${w}%`;
+  const col = p.value >= 0 ? "var(--s6)" : "var(--s8)";
+  const tip = `experts ${p.exp} (${p.n_exp}) · market ${p.adp} (${p.n_adp}) · ` +
+    (p.value >= 0 ? `falls ${Math.abs(p.value)} picks past expert value`
+                  : `drafted ${Math.abs(p.value)} picks ahead of expert value`);
+  return `<span class="ebar" title="${esc(tip)}"><i style="${side};background:${col}"></i></span>` +
+    `<span class="${p.value >= 0 ? "epos" : "eneg"}">${p.value >= 0 ? "+" : "−"}${Math.abs(p.value).toFixed(0)}</span>`;
+}
+
 function renderBoard() {
   // the consensus is built from 1QB offense boards only; in the IDP lens there
   // is no consensus to show, so say so instead of showing contradictory data
@@ -702,6 +753,10 @@ function renderBoard() {
   rows = rows.slice().sort((a, b) => {
     const get = r => SORT.key === "avg" ? r.avg
                    : SORT.key === "cov" ? -r.n
+                   : SORT.key === "tier" ? (r.tier != null ? r.tier : Infinity)
+                   // value sorts best-first, and "no market coverage" is
+                   // missing data rather than a zero-value verdict
+                   : SORT.key === "value" ? (r.value != null ? -r.value : Infinity)
                    : (r.ranks[SORT.key] != null ? r.ranks[SORT.key] : Infinity);
     const va = get(a), vb = get(b);
     if (va === Infinity && vb === Infinity) return a.avg - b.avg;
@@ -717,11 +772,19 @@ function renderBoard() {
   }
   const caret = k => SORT.key === k ? (SORT.dir === 1 ? " \u25b2" : " \u25bc") : "";
   const maxRank = Math.max(10, ...rows.map(r => r.max));
+  // seasons computed before these columns existed simply omit them
+  const anyValue = rows.some(r => r.value != null);
+  const anyTier = rows.some(r => r.tier != null);
+  const maxVal = Math.max(5, ...rows.map(r => Math.abs(r.value || 0)));
+  const nExp = (data.experts || []).length, nMkt = (data.market || []).length;
   let html = '<table><thead><tr><th class="num">#</th><th class="pcol">Player</th>' +
+    (anyTier ? `<th class="num sortable" data-sort="tier" title="Positional tier: players inside a tier are close enough in expected value to be treated as interchangeable. Click to sort.">Tier${caret("tier")}</th>` : "") +
     `<th class="num sortable" data-sort="avg" title="Mean rank across the sources that rank him. Click to sort.">Avg${caret("avg")}</th>` +
-    '<th title="Best and worst rank any source gave him">Spread</th>' +
+    (anyValue ? `<th class="num sortable" data-sort="value" title="Expert consensus rank minus market ADP. Positive (green) = the market lets him fall past where the experts rank him, so you can wait. Negative = the market drafts him ahead of expert opinion. From ${nExp} expert board${nExp === 1 ? "" : "s"} and ${nMkt} ADP source${nMkt === 1 ? "" : "s"}. Click to sort.">Value${caret("value")}</th>` : "") +
+    // spread is the range across the per-source columns, so it travels with them
+    (SHOW_SRC ? '<th title="Best and worst rank any source gave him">Spread</th>' : "") +
     `<th class="num sortable" data-sort="cov" title="How many sources rank him. Click to sort.">Cov${caret("cov")}</th>` +
-    sources.map(s => `<th class="rk sortable" data-sort="${esc(s)}" title="${esc(srcName(s))} \u2014 click to sort by this source">${srcMark(s)}${caret(s)}</th>`).join("") +
+    (SHOW_SRC ? sources.map(s => `<th class="rk sortable" data-sort="${esc(s)}" title="${esc(srcName(s))} \u2014 click to sort by this source">${srcMark(s)}${caret(s)}</th>`).join("") : "") +
     "</tr></thead><tbody>";
   rows.forEach((p, i) => {
     const left = (p.min - 1) / maxRank * 100, width = Math.max(2, (p.max - p.min) / maxRank * 100);
@@ -732,10 +795,12 @@ function renderBoard() {
       ` title="Click for multi-season history"><td class="num">${rnk}</td>` +
       `<td class="pcol"><span class="pcell">${faceHtml(p)}<span><span class="pname">${esc(p.name)}</span><br>` +
       `<span class="pmeta"><span class="posbadge pos-${p.pos}">${p.pos}</span>${esc(p.team || "")}</span></span></span></td>` +
+      (anyTier ? `<td class="num"><span class="tierbadge" title="${esc(p.pos)} tier ${p.tier}${p.implied != null ? " · slot worth about " + Math.round(p.implied) + " pts" : ""}">${p.tier != null ? p.tier : "–"}</span></td>` : "") +
       `<td class="num"><b>${p.avg}</b></td>` +
-      `<td>${spread}</td>` +
+      (anyValue ? `<td class="num">${valueCell(p, maxVal)}</td>` : "") +
+      (SHOW_SRC ? `<td>${spread}</td>` : "") +
       `<td class="num"><span class="cov">${p.n}/${sources.length}</span></td>`;
-    sources.forEach(s => {
+    if (SHOW_SRC) sources.forEach(s => {
       const r = p.ranks[s];
       if (r == null) { html += '<td class="na">–</td>'; return; }
       const cls = (r === p.min && p.max !== p.min) ? "rk best" : (r === p.max && p.max !== p.min) ? "rk worst" : "rk";
@@ -744,6 +809,12 @@ function renderBoard() {
     html += "</tr>";
   });
   $("#board").innerHTML = html + "</tbody></table>";
+  const btn = document.getElementById("src-toggle");
+  if (btn) {
+    btn.textContent = SHOW_SRC
+      ? `Hide ${sources.length} source columns` : `Show ${sources.length} source columns`;
+    btn.setAttribute("aria-pressed", String(SHOW_SRC));
+  }
 }
 
 /* ---------- across all seasons ----------
@@ -1627,6 +1698,14 @@ document.addEventListener("click", e => {
 });
 document.getElementById("search").addEventListener("input", e => {
   QUERY = e.target.value.trim().toLowerCase();
+  renderBoard();
+});
+document.getElementById("src-toggle").addEventListener("click", () => {
+  SHOW_SRC = !SHOW_SRC;
+  // sorting by a now-hidden source column would leave an unexplained order
+  if (!SHOW_SRC && !["avg", "tier", "value", "cov"].includes(SORT.key)) {
+    SORT = {key: "avg", dir: 1};
+  }
   renderBoard();
 });
 document.getElementById("roster-tabs").addEventListener("click", e => {
