@@ -272,9 +272,12 @@ th.sortable:hover { color: var(--ink); }
   display: inline-block; position: relative; width: 120px; height: 14px;
   vertical-align: middle; margin-right: 8px; flex: none;
 }
+/* Zero is the whole point of this plot — an interval touching it is a
+   difference the data cannot establish — so the rule has to be clearly
+   visible, not a hairline the eye loses against the row. */
 .fp::before {
-  content: ""; position: absolute; left: 50%; top: 0; bottom: 0;
-  width: 1px; background: var(--baseline);
+  content: ""; position: absolute; left: 50%; top: -1px; bottom: -1px;
+  width: 1px; background: var(--muted);
 }
 .fp-ci { position: absolute; top: 6px; height: 2px; background: var(--ink-2); border-radius: 1px; }
 .fp-dot {
@@ -423,13 +426,17 @@ td.na { text-align: right; color: var(--baseline); }
      chip, a full label and its tags all on one nowrap line came to 285px of a
      351px container. Letting it wrap costs two lines and buys the rest of the
      table. */
-  .srccol { white-space: normal; max-width: 124px; }
+  /* The monogram chip and the full name say the same thing. Side by side in a
+     wrapped 124px cell they cost an extra line per row and squeeze the plot
+     next to them, so the name alone carries it on a phone. */
+  .srccol .mark { display: none; }
+  .srccol { white-space: normal; max-width: 118px; }
   .srccell { display: inline; }
   .tag-pill { margin-left: 0; }
   #history-board th, #history-board td,
   #weekly-board th, #weekly-board td,
   #predraft-board th, #predraft-board td { padding: 5px 6px; }
-  .fp { width: 62px; margin-right: 4px; }
+  .fp { width: 86px; margin-right: 4px; }
   .matrix table { font-size: .72rem; }
   .matrix td.yr, .matrix th.yr { padding: 4px 6px; }
 
@@ -1327,7 +1334,13 @@ function renderTrend() {
     const v = weekScore(weekly[s], w);
     if (v != null) vals.push(v);
   }));
-  let lo = Math.min(0, ...vals), hi = Math.max(0.8, ...vals);
+  // A fixed ceiling keeps seasons comparable, but 0.8 was well above anything
+  // ever recorded: across 13 seasons the highest weekly score is 0.574 and
+  // most sit under 0.45, so a quarter of the plot was permanently empty and
+  // the differences between sources were squashed into the lower half. 0.6
+  // still covers every season on record. Zero stays pinned because it is a
+  // meaningful floor for a rank correlation — it is "no signal".
+  let lo = Math.min(0, ...vals), hi = Math.max(0.6, ...vals);
   lo = Math.floor(lo * 5) / 5; hi = Math.ceil(hi * 5) / 5;
   const x = w => weeks.length === 1 ? L + pw / 2 : L + pw * (weeks.indexOf(w) / (weeks.length - 1));
   const y = v => T + ph * (1 - (v - lo) / (hi - lo));
