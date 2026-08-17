@@ -215,7 +215,10 @@ th .mark { margin: 0 auto; }
 .bar-val { width: 72px; text-align: right; color: var(--ink-2); flex: none; font-size: .75rem; }
 .bar-group { margin-bottom: 20px; }
 .bar-group h4 { margin: 0 0 8px; font-size: .8125rem; font-weight: 700; color: var(--ink); display: flex; align-items: center; }
-.chart-note { color: var(--muted); font-size: .78rem; margin: 0 0 14px; display: flex; align-items: center; }
+/* Block, not flex. As a flex container every inline child became a flex item,
+   so a link inside the note was squeezed to its min-content width and broke
+   "Across all seasons" into a three-line column in the middle of a sentence. */
+.chart-note { color: var(--muted); font-size: .78rem; margin: 0 0 14px; line-height: 1.5; }
 .chart-note .arrow { color: var(--s3); margin-right: 6px; font-size: .7rem; }
 .note-sep { width: 1px; height: 12px; background: var(--grid); margin: 0 12px; display: inline-block; }
 th.sortable { cursor: pointer; user-select: none; }
@@ -389,6 +392,7 @@ td.na { text-align: right; color: var(--baseline); }
   /* search and the column toggle share a row rather than stacking; three
      stacked full-width controls pushed the first data row off the screen */
   #search { flex: 1 1 130px; width: auto; min-width: 0; }
+  #model-search { flex: 1 1 auto; width: auto; min-width: 0; }
   .srctoggle { flex: 0 0 auto; width: auto; margin-left: 0; white-space: nowrap; }
 
   /* Tap targets. Everything interactive was 30-35px tall; thumbs want ~44.
@@ -477,10 +481,13 @@ td.na { text-align: right; color: var(--baseline); }
      tighter name column fit the whole decision — tier, rank, value — on
      screen without sideways scrolling. */
   .board-wrap th.pcol, .board-wrap td.pcol { min-width: 146px; white-space: normal; }
-  /* the row number is redundant on a list you are already reading in order,
-     and dropping it is what brings the board inside the viewport.
-     The drill-in row is excluded — its single cell is a first-child too. */
-  .board-wrap tr:not(.detail-row) > :first-child { display: none; }
+  /* The row number is redundant on a list you are already reading in order,
+     and dropping it is what brings the board inside the viewport. Scope this
+     to the board's own rows: an unscoped version also matched the rows of the
+     per-player history table nested inside the drill-in, silently hiding its
+     Season column and leaving a table of ranks with no year against them. */
+  .board-wrap > table > thead > tr > th:first-child,
+  .board-wrap > table > tbody > tr:not(.detail-row) > td:first-child { display: none; }
   .face, .face-fallback { width: 30px; height: 30px; }
   .pcell { gap: 7px; }
   .pname { font-size: .8125rem; }
