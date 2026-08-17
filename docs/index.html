@@ -225,6 +225,13 @@ th.sortable { cursor: pointer; user-select: none; }
 th.sortable:hover { color: var(--ink); }
 .spread-cell { display: flex; align-items: center; gap: 8px; }
 .spread-num { color: var(--muted); font-size: .72rem; white-space: nowrap; }
+/* Stands in for the Cov column only where that column is hidden; alongside it
+   the two would just say the same thing twice. */
+.cov-thin {
+  display: none;
+  font-family: var(--font-mono); font-size: .58rem; color: var(--muted);
+  margin-left: 3px; font-weight: 600;
+}
 .tag-pill {
   display: inline-block; font-size: .62rem; font-weight: 600; border-radius: var(--r-sm);
   padding: 1px 6px; margin-left: 6px; background: none; color: var(--muted);
@@ -480,7 +487,7 @@ td.na { text-align: right; color: var(--baseline); }
      349px board, leaving room for about one number; a smaller headshot and a
      tighter name column fit the whole decision — tier, rank, value — on
      screen without sideways scrolling. */
-  .board-wrap th.pcol, .board-wrap td.pcol { min-width: 146px; white-space: normal; }
+  .board-wrap th.pcol, .board-wrap td.pcol { min-width: 126px; white-space: normal; }
   /* The row number is redundant on a list you are already reading in order,
      and dropping it is what brings the board inside the viewport. Scope this
      to the board's own rows: an unscoped version also matched the rows of the
@@ -494,10 +501,19 @@ td.na { text-align: right; color: var(--baseline); }
   /* PPR carries more sources, so the coverage cell reads "10/10" instead of
      "7/7" and the board tipped back over the edge; these few pixels are what
      keep every format fitting without sideways scroll. */
-  .board-wrap th, .board-wrap td { padding: 5px 5px; }
+  .board-wrap th, .board-wrap td { padding: 5px 4px; }
   .ebar { width: 28px; margin-right: 4px; }
   .tierbadge { padding: 0 3px; }
-  .cov { font-size: .7rem; }
+  /* Spread and Value are the two columns you actually draft off, so they keep
+     their place on a phone and coverage gives up its column instead. The
+     range bar goes too: at this width the min–max numbers carry the
+     disagreement and the bar is decoration. */
+  .col-cov { display: none; }
+  .spread-cell .range { display: none; }
+  .spread-num { font-size: .74rem; color: var(--ink-2); }
+  /* PPR carries ten sources, so both the rank range and the coverage flag run
+     wider than in half-PPR; these keep every format inside the same box. */
+  .cov-thin { display: inline; font-size: .54rem; margin-left: 2px; }
 }
 </style>
 </head>
@@ -919,14 +935,23 @@ function renderBoard() {
     (anyTier ? `<th class="num sortable" data-sort="tier" title="Positional tier: players inside a tier are close enough in expected value to be treated as interchangeable. Click to sort.">Tier${caret("tier")}</th>` : "") +
     `<th class="num sortable" data-sort="avg" title="Mean rank across the sources that rank him. Click to sort.">Avg${caret("avg")}</th>` +
     (anyValue ? `<th class="num sortable" data-sort="value" title="Expert consensus rank minus market ADP. Positive (green) = the market lets him fall past where the experts rank him, so you can wait. Negative = the market drafts him ahead of expert opinion. From ${nExp} expert board${nExp === 1 ? "" : "s"} and ${nMkt} ADP source${nMkt === 1 ? "" : "s"}. Click to sort.">Value${caret("value")}</th>` : "") +
-    // spread is the range across the per-source columns, so it travels with them
-    (SHOW_SRC ? '<th title="Best and worst rank any source gave him">Spread</th>' : "") +
-    `<th class="num sortable" data-sort="cov" title="How many sources rank him. Click to sort.">Cov${caret("cov")}</th>` +
+    '<th title="Best and worst rank any source gave him — how much the sources disagree">Spread</th>' +
+    // Coverage is a data-quality caveat rather than a draft decision, so it
+    // gives up its column on a phone. Partial coverage is still flagged on
+    // the spread number itself, where it actually changes the reading.
+    `<th class="num sortable col-cov" data-sort="cov" title="How many sources rank him. Click to sort.">Cov${caret("cov")}</th>` +
     (SHOW_SRC ? sources.map(s => `<th class="rk sortable" data-sort="${esc(s)}" title="${esc(srcName(s))} \u2014 click to sort by this source">${srcMark(s)}${caret(s)}</th>`).join("") : "") +
     "</tr></thead><tbody>";
   rows.forEach((p, i) => {
     const left = (p.min - 1) / maxRank * 100, width = Math.max(2, (p.max - p.min) / maxRank * 100);
-    const spread = `<span class="spread-cell"><span class="range" title="Best rank ${p.min}, worst ${p.max}"><i style="left:${left}%;width:${width}%"></i></span><span class="spread-num">${p.min}–${p.max}</span></span>`;
+    // A rank range built from 3 of 8 sources means something different from
+    // one built from all 8, so flag the thin ones right where the range is
+    // read rather than relying on a Cov column that may be hidden.
+    const thin = p.n < sources.length;
+    const covFlag = thin
+      ? `<sup class="cov-thin" title="Ranked by only ${p.n} of ${sources.length} sources">${p.n}/${sources.length}</sup>`
+      : "";
+    const spread = `<span class="spread-cell"><span class="range" title="Best rank ${p.min}, worst ${p.max}"><i style="left:${left}%;width:${width}%"></i></span><span class="spread-num">${p.min}–${p.max}${covFlag}</span></span>`;
     const rnk = i < 3 && SORT.key === "avg" && SORT.dir === 1
       ? `<span class="rnk-chip">${i + 1}</span>` : String(i + 1);
     html += `<tr data-pid="${esc(p.id || "")}" tabindex="0" role="button" aria-expanded="false"` +
@@ -936,8 +961,8 @@ function renderBoard() {
       (anyTier ? `<td class="num"><span class="tierbadge" title="${esc(p.pos)} tier ${p.tier}${p.implied != null ? " · slot worth about " + Math.round(p.implied) + " pts" : ""}">${p.tier != null ? p.tier : "–"}</span></td>` : "") +
       `<td class="num"><b>${p.avg}</b></td>` +
       (anyValue ? `<td class="num">${valueCell(p, maxVal)}</td>` : "") +
-      (SHOW_SRC ? `<td>${spread}</td>` : "") +
-      `<td class="num"><span class="cov">${p.n}/${sources.length}</span></td>`;
+      `<td>${spread}</td>` +
+      `<td class="num col-cov"><span class="cov">${p.n}/${sources.length}</span></td>`;
     if (SHOW_SRC) sources.forEach(s => {
       const r = p.ranks[s];
       if (r == null) { html += '<td class="na">–</td>'; return; }
