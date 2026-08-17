@@ -383,7 +383,10 @@ td.na { text-align: right; color: var(--baseline); }
   .hero .tag { font-size: .875rem; }
   .controls { gap: 14px; padding: 10px 12px; }
   .bar-val { width: 58px; }
-  #search { width: 100%; }
+  /* search and the column toggle share a row rather than stacking; three
+     stacked full-width controls pushed the first data row off the screen */
+  #search { flex: 1 1 130px; width: auto; min-width: 0; }
+  .srctoggle { flex: 0 0 auto; width: auto; margin-left: 0; white-space: nowrap; }
 
   /* Tap targets. Everything interactive was 30-35px tall; thumbs want ~44.
      The filter rows are the worst offenders because they are also narrow. */
@@ -394,8 +397,17 @@ td.na { text-align: right; color: var(--baseline); }
   .posfilter button, .calib-controls button { min-width: 42px; }
   .posfilter, .calib-controls, .tabs { gap: 6px; }
   .board-controls { gap: 8px; }
+  /* Scoring and Defense fit on one row together; forcing every control group
+     onto its own row made the block 236px tall and pushed the first row of
+     real data off a phone screen entirely. */
+  .controls { gap: 10px 12px; padding: 10px 12px; }
+  .ctl { flex: 0 1 auto; }
+  .ctl:last-child { flex: 1 1 100%; }
   #season-select { width: 100%; }
-  .ctl { flex: 1 1 100%; }
+  .ctl > label { font-size: .62rem; }
+  /* trimming the horizontal padding is what lets Scoring (3 tabs) and Defense
+     (2 tabs) share one row inside a 325px content box */
+  #fmt-tabs button, #roster-tabs button { padding-left: 10px; padding-right: 10px; }
 
   /* Section rhythm: hairline-ruled sections need more air when the content
      above them is a dense scrolling table. */
@@ -435,6 +447,21 @@ td.na { text-align: right; color: var(--baseline); }
   .detail-td { padding: 12px 10px 14px; }
   .phist-note { font-size: .75rem; }
 
+  /* Section explanations run to 10-14 lines. On a phone that is a wall of
+     text between the reader and the data, so clamp it and let them open it.
+     The prose is worth keeping — it just should not be the first thing
+     between you and the board. */
+  .sub.clamped {
+    display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+  .sub.clamped.open { display: block; -webkit-line-clamp: unset; overflow: visible; }
+  .submore {
+    background: none; border: 0; padding: 2px 0 6px; margin: 0 0 8px;
+    color: var(--accent); font: inherit; font-size: .78rem; font-weight: 600;
+    cursor: pointer; text-decoration: underline; min-height: 0;
+  }
+
   /* Tooltips are positioned panels; keep them inside a 375px screen */
   #tooltip, #calib-tip { max-width: 88vw; }
   #calib-tip { white-space: normal; }
@@ -457,7 +484,6 @@ td.na { text-align: right; color: var(--baseline); }
   .ebar { width: 28px; margin-right: 4px; }
   .tierbadge { padding: 0 3px; }
   .cov { font-size: .7rem; }
-  .srctoggle { margin-left: 0; width: 100%; }
 }
 </style>
 </head>
@@ -812,8 +838,12 @@ function setSrcToggle(nSources) {
   if (!btn) return;
   if (!nSources) { btn.hidden = true; return; }
   btn.hidden = false;
-  btn.textContent = (SHOW_SRC ? "Hide " : "Show ") + nSources + " source column" +
-    (nSources === 1 ? "" : "s");
+  // the short label shares a row with the search box on a phone
+  btn.textContent = isNarrow()
+    ? (SHOW_SRC ? "Hide " : "Show ") + nSources + " src"
+    : (SHOW_SRC ? "Hide " : "Show ") + nSources + " source column" +
+      (nSources === 1 ? "" : "s");
+  btn.title = (SHOW_SRC ? "Hide" : "Show") + " the per-source rank columns";
   btn.setAttribute("aria-pressed", String(SHOW_SRC));
 }
 
@@ -1094,6 +1124,7 @@ function renderHistory() {
     : `Differences that survive a paired test across ${nSeasons} seasons are the only ones worth acting ` +
       `on. A source topping a single season's table is usually the same field reshuffled by noise — ` +
       `compare the season-by-season row above against the interval to see how much a one-year lead moves around.`;
+  applyClamps();
 }
 
 document.getElementById("history-controls").addEventListener("click", e => {
@@ -1248,6 +1279,7 @@ function redrawForWidth() {
    renderHistory, renderBoard].forEach(fn => {
     try { fn(); } catch (e) { console.error(fn.name, e); }
   });
+  applyClamps();
 }
 function onWidthChange() {
   const w = document.documentElement.clientWidth;
@@ -1387,6 +1419,43 @@ function attachHover(weeks, sources, weekly, x, W) {
   // on touch there is no "leave", so dismiss by tapping anywhere else
   document.addEventListener("pointerdown", e => {
     if (!svg.contains(e.target)) tip.style.display = "none";
+  });
+}
+
+/* Collapse the long section explanations on a phone, with a control to open
+   each one. Re-run after any render that rewrites a .sub, and on width change,
+   since the clamp only applies on narrow screens. */
+function applyClamps() {
+  const narrow = isNarrow();
+  document.querySelectorAll(".sub").forEach(el => {
+    let btn = el.nextElementSibling;
+    if (!btn || !btn.classList.contains("submore")) btn = null;
+    if (!narrow) {
+      el.classList.remove("clamped", "open");
+      if (btn) btn.remove();
+      return;
+    }
+    el.classList.add("clamped");
+    // measure against the clamp: nothing to open if it already fits
+    const clipped = el.scrollHeight > el.clientHeight + 2;
+    if (!clipped && !el.classList.contains("open")) {
+      el.classList.remove("clamped");
+      if (btn) btn.remove();
+      return;
+    }
+    if (!btn) {
+      btn = document.createElement("button");
+      btn.className = "submore";
+      btn.addEventListener("click", () => {
+        const open = el.classList.toggle("open");
+        btn.textContent = open ? "Show less" : "What this shows";
+        btn.setAttribute("aria-expanded", String(open));
+      });
+      el.insertAdjacentElement("afterend", btn);
+    }
+    const open = el.classList.contains("open");
+    btn.textContent = open ? "Show less" : "What this shows";
+    btn.setAttribute("aria-expanded", String(open));
   });
 }
 
@@ -1859,6 +1928,7 @@ function renderModel() {
     `prior delivery — and is the column to compare between players drafted near each other. Out-of-time ` +
     `Spearman of ${m.reg.spearman.toFixed(2)} on POE is real but modest signal: most of a season is not ` +
     `predictable before kickoff.`;
+  applyClamps();
 }
 
 document.getElementById("model-posfilter").addEventListener("click", e => {
@@ -1894,6 +1964,7 @@ function renderAll() {
    renderTrend, renderPosBreakdown, renderCalibration, renderPredraftBoard].forEach(fn => {
     try { fn(); } catch (err) { console.error(fn.name, err); }
   });
+  applyClamps();
   // Charts may have been measured before layout settled. One immediate check
   // is not enough: the window "load" listener usually fires before the data
   // fetches resolve (so it bails with no SUMMARY), and web fonts can reflow
