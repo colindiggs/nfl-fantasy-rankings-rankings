@@ -245,6 +245,49 @@ th.sortable:hover { color: var(--ink); }
 .range i { position: absolute; top: 0; height: 6px; background: var(--accent); opacity: .85; border-radius: var(--r-sm); min-width: 3px; }
 .cov { color: var(--muted); font-size: .75rem; }
 
+/* across-seasons card */
+.verdict {
+  border: 1px solid var(--border); border-left: 3px solid var(--accent);
+  background: var(--surface); border-radius: var(--r);
+  padding: 10px 14px; margin: 0 0 16px; font-size: .875rem; max-width: 880px;
+}
+.verdict b { font-weight: 700; }
+/* Forest plot of the paired interval. The centre rule is zero — an interval
+   crossing it is a difference the data cannot establish. */
+.fp {
+  display: inline-block; position: relative; width: 120px; height: 14px;
+  vertical-align: middle; margin-right: 8px; flex: none;
+}
+.fp::before {
+  content: ""; position: absolute; left: 50%; top: 0; bottom: 0;
+  width: 1px; background: var(--baseline);
+}
+.fp-ci { position: absolute; top: 6px; height: 2px; background: var(--ink-2); border-radius: 1px; }
+.fp-dot {
+  position: absolute; top: 3.5px; width: 7px; height: 7px; margin-left: -3.5px;
+  border-radius: 50%; background: var(--ink);
+}
+.fp-ci.tied { background: var(--baseline); }
+.fp-dot.tied { background: var(--muted); }
+.fp-dot.sep { background: var(--s8); }
+.vchip {
+  display: inline-block; font-family: var(--font-mono); font-size: .62rem;
+  font-weight: 700; letter-spacing: .05em; text-transform: uppercase;
+  border-radius: var(--r-sm); padding: 1px 6px; border: 1px solid var(--baseline);
+  color: var(--muted);
+}
+.vchip.ref { border-color: var(--accent); color: var(--accent); }
+.vchip.tied { border-color: var(--baseline); color: var(--ink-2); }
+.vchip.behind { border-color: var(--s8); color: var(--s8); }
+.vchip.ahead { border-color: var(--s6); color: var(--s6); }
+.vchip.thin { border-style: dashed; }
+.matrix table { font-size: .78rem; }
+.matrix td.yr { text-align: right; font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+.matrix th.yr { text-align: right; }
+.matrix td.srccol { position: sticky; left: 0; background: var(--surface); z-index: 2; box-shadow: 1px 0 0 var(--grid); }
+.matrix th.srccol { position: sticky; left: 0; background: var(--surface); z-index: 4; }
+.history-h3 { font-size: .8125rem; font-weight: 700; margin: 26px 0 4px; }
+
 /* expectation model */
 .model-grid { display: grid; grid-template-columns: minmax(300px, 5fr) minmax(320px, 7fr); gap: 28px; }
 @media (max-width: 900px) { .model-grid { grid-template-columns: 1fr; } }
@@ -377,6 +420,21 @@ td.na { text-align: right; color: var(--baseline); }
     <div class="board-wrap" id="board"></div>
   </div>
 
+  <div class="card" id="history-card" hidden>
+    <h2>Across all seasons</h2>
+    <p class="sub" id="history-sub"></p>
+    <div class="calib-controls" id="history-controls">
+      <button data-hkind="weekly" class="active">Weekly rankings</button>
+      <button data-hkind="predraft">Pre-draft boards</button>
+    </div>
+    <p class="verdict" id="history-verdict"></p>
+    <div class="scroll-x" id="history-board"></div>
+    <h3 class="history-h3">Season by season</h3>
+    <p class="chart-note" id="history-matrix-note"></p>
+    <div class="scroll-x matrix" id="history-matrix"></div>
+    <p class="takeaway" id="history-takeaway"></p>
+  </div>
+
   <div class="card">
     <h2>In-season leaderboard</h2>
     <p class="sub">Positions QB/RB/WR/TE/K/DST, averaged over scored weeks.
@@ -482,7 +540,7 @@ const SRC_COLOR = {};
 SRC_ORDER.forEach((s, i) => { SRC_COLOR[s] = i < 8 ? `var(--s${i + 1})` : "var(--muted)"; });
 function dotStyle(s) { return `style="background:${SRC_COLOR[s] || "var(--muted)"}"`; }
 // Half PPR / 1QB / K+DST / single flex is the default league lens.
-let SUMMARY = null, PREDRAFT = null, SEASONS = null;
+let SUMMARY = null, PREDRAFT = null, SEASONS = null, HISTORY = null;
 let FMT = "half_ppr", POS = "ALL", QUERY = "", SEASON = null;
 // The league scores QB/RB/WR/TE/K/DST, so the leaderboard does too. Both scopes
 // are still computed and stored; per-position detail lives in the charts below,
@@ -493,7 +551,10 @@ let ROSTER = "offense";   // "offense" = team DST (default), "idp" = IDP leagues
 // board sort: key is "avg", "cov", or a source slug; dir 1 = best first
 let SORT = {key: "avg", dir: 1};
 
-const srcTags = s => (SUMMARY && SUMMARY.source_tags && SUMMARY.source_tags[s]) || {};
+// History spans seasons whose sources may not appear in the season currently
+// loaded, so tags and labels fall back to the cross-season union.
+const srcTags = s => (SUMMARY && SUMMARY.source_tags && SUMMARY.source_tags[s])
+                     || (HISTORY && HISTORY.source_tags && HISTORY.source_tags[s]) || {};
 // a source can be an expert board pre-draft and a projection weekly (ESPN is),
 // so weekly views badge from the weekly tags
 const weeklyTags = s => (SUMMARY && SUMMARY.weekly_tags && SUMMARY.weekly_tags[s])
@@ -538,7 +599,9 @@ function weekScore(entry, w) {
 }
 
 const $ = s => document.querySelector(s) || {};
-const srcName = s => (SUMMARY && SUMMARY.labels && SUMMARY.labels[s]) || SRC_LABEL[s] || s;
+const srcName = s => (SUMMARY && SUMMARY.labels && SUMMARY.labels[s])
+                     || (HISTORY && HISTORY.labels && HISTORY.labels[s])
+                     || SRC_LABEL[s] || s;
 const srcShort = s => SRC_SHORT[s] || srcName(s).slice(0, 6);
 const esc = t => String(t).replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
 
@@ -591,11 +654,18 @@ function srcMark(s, withName) {
 }
 
 function renderHero() {
-  // count what's actually being shown for this format and view, not every
-  // source label the project has ever seen
+  // Count the sources that actually reach a leaderboard, not every source with
+  // a captured board. A source can be captured and still be unscoreable this
+  // season, and a hero chip claiming more sources than the tables list reads
+  // as a bug.
   const inFmt = new Set();
-  Object.keys(SUMMARY.weekly[FMT] || {}).forEach(s => inView(s) && inFmt.add(s));
-  Object.keys(SUMMARY.predraft[FMT] || {}).forEach(s => inView(s) && inFmt.add(s));
+  boardFor("weekly").forEach(r => inFmt.add(r.source));
+  boardFor("predraft").forEach(r => inFmt.add(r.source));
+  // preseason: nothing is scored yet, so fall back to what has been captured
+  if (!inFmt.size) {
+    Object.keys(SUMMARY.weekly[FMT] || {}).forEach(s => inView(s) && inFmt.add(s));
+    Object.keys(SUMMARY.predraft[FMT] || {}).forEach(s => inView(s) && inFmt.add(s));
+  }
   const updated = (SUMMARY.generated_at || "").slice(0, 10);
   const wks = SUMMARY.weeks_evaluated.length;
   const nSeasons = (SEASONS && SEASONS.scored || []).length;
@@ -676,7 +746,239 @@ function renderBoard() {
   $("#board").innerHTML = html + "</tbody></table>";
 }
 
+/* ---------- across all seasons ----------
+   A single season routinely separates sources by less than the noise in the
+   measurement, so the durable question is only answerable across seasons —
+   and only on the weeks the sources actually share. */
+let HKIND = "weekly";
+const HKIND_LABEL = {weekly: "weekly rankings", predraft: "pre-draft boards"};
+
+function historyBlock() {
+  if (!HISTORY) return null;
+  const byFmt = (HISTORY.kinds && HISTORY.kinds[HKIND]) || {};
+  return (byFmt[FMT] || {})[SCOPE] || null;
+}
+
+function fmtDelta3(v) { return (v >= 0 ? "+" : "−") + Math.abs(v).toFixed(3); }
+
+function renderHistory() {
+  const card = document.getElementById("history-card");
+  if (!card) return;
+  const block = historyBlock();
+  const rows = block ? block.sources.filter(r => inView(r.source)) : [];
+  if (!block || rows.length < 2) {
+    card.hidden = !block;
+    if (block) {
+      $("#history-verdict").innerHTML = rows.length
+        ? `Only one source in this view has a multi-season record of ${esc(HKIND_LABEL[HKIND])} in ` +
+          `this format (${esc(srcName(rows[0].source))}, ${rows[0].n_seasons} ` +
+          `season${rows[0].n_seasons === 1 ? "" : "s"}) — there is nothing to compare it against.`
+        : `No source in this view has a multi-season record of ${esc(HKIND_LABEL[HKIND])} in this ` +
+          `format yet. Comparison needs at least two sources scored on overlapping ` +
+          `${HKIND === "weekly" ? "weeks" : "seasons"}.`;
+      $("#history-board").innerHTML = "";
+      $("#history-matrix").innerHTML = "";
+      $("#history-matrix-note").innerHTML = "";
+      $("#history-takeaway").innerHTML = "";
+    }
+    return;
+  }
+  card.hidden = false;
+
+  const ref = block.leader;
+  const refRow = rows.find(r => r.source === ref);
+  const nSeasons = (HISTORY.seasons || []).length;
+
+  // Order by the paired comparison, not the raw average: the averages are not
+  // taken over the same weeks, so they cannot settle an ordering.
+  const ordered = [...rows].sort((a, b) => {
+    const da = a.vs_leader ? a.vs_leader.delta : -99;
+    const db = b.vs_leader ? b.vs_leader.delta : -99;
+    return db - da;
+  });
+
+  $("#history-sub").innerHTML =
+    `Every source's ${esc(HKIND_LABEL[HKIND])} across all ${nSeasons} scored seasons. ` +
+    `Sources publish different seasons, so career averages are not taken over the same ` +
+    `games and cannot rank anyone on their own. The <b>vs. reference</b> column is the ` +
+    `comparison that holds: a paired difference computed only on the ` +
+    `${HKIND === "weekly" ? "weeks" : "seasons"} both sources actually covered, with a 95% ` +
+    `confidence interval. An interval crossing zero is a difference this data cannot establish.`;
+
+  const tiedNames = (block.tied_with_leader || [])
+    .filter(s => s !== ref && rows.some(r => r.source === s)).map(srcName);
+  const behindNames = (block.behind_leader || [])
+    .filter(s => rows.some(r => r.source === s)).map(srcName);
+  const aheadNames = (block.ahead_on_shared || [])
+    .filter(s => rows.some(r => r.source === s)).map(srcName);
+  const list = a => a.length === 1 ? a[0]
+    : a.slice(0, -1).join(", ") + " and " + a[a.length - 1];
+
+  let verdict = "";
+  if (!block.separable) {
+    verdict = `<b>No source in this view separates from any other.</b> Over ${nSeasons} seasons, ` +
+      `every board's paired interval against ${esc(srcName(ref))} contains zero. The ordering ` +
+      `below is real arithmetic on real results, but the gaps it shows are inside the margin of ` +
+      `error — treating them as a ranking would be reading noise.`;
+  } else {
+    verdict = `Measured against <b>${esc(srcName(ref))}</b> (the reference: most ` +
+      `${HKIND === "weekly" ? "weeks" : "seasons"} scored, so the tightest intervals)`;
+    const parts = [];
+    if (tiedNames.length) parts.push(`<b>${esc(list(tiedNames))}</b> ${tiedNames.length === 1 ? "is" : "are"} statistically tied with it`);
+    if (behindNames.length) parts.push(`<b>${esc(list(behindNames))}</b> ${behindNames.length === 1 ? "sits" : "sit"} measurably behind`);
+    if (aheadNames.length) parts.push(`<b>${esc(list(aheadNames))}</b> ${aheadNames.length === 1 ? "is" : "are"} measurably ahead on shared ${HKIND === "weekly" ? "weeks" : "seasons"}`);
+    verdict += parts.length ? ": " + list(parts) + "." : ", nothing separates.";
+  }
+  // Testing everyone against one reference hides separations between two
+  // sources that are both tied with it — which is exactly where this data's
+  // only weekly result lives, so state it rather than let it vanish.
+  const pairs = [];
+  ordered.forEach(r => (r.beaten_by || []).forEach(w => {
+    if (rows.some(x => x.source === w)) pairs.push([w, r.source]);
+  }));
+  const hidden = pairs.filter(([w, l]) => w !== ref && l !== ref);
+  if (hidden.length) {
+    verdict += ` Within that group one pair still separates: ` +
+      list(hidden.map(([w, l]) => `<b>${esc(srcName(w))}</b> beats ${esc(srcName(l))}`)) +
+      ` head-to-head on the ${HKIND === "weekly" ? "weeks" : "seasons"} they share.`;
+  }
+  if (block.pooled_disagrees) {
+    verdict += ` Note the average column and the paired column disagree on the order — that is ` +
+      `the coverage difference showing, not a contradiction.`;
+  }
+  $("#history-verdict").innerHTML = verdict;
+
+  // forest plot domain, symmetric about zero
+  const bounds = ordered.filter(r => r.vs_leader && !r.vs_leader.is_leader)
+    .flatMap(r => [Math.abs(r.vs_leader.lo), Math.abs(r.vs_leader.hi)]);
+  const dom = Math.max(0.02, ...bounds);
+  const pct = v => 50 + (v / dom) * 50;
+
+  // Conclusion first, description second: the paired interval and its verdict
+  // are what the reader should act on, and the career averages are context.
+  let html = '<table><thead><tr><th class="num" title="Ordered by the paired comparison, not by career average">#</th>' +
+    '<th>Source</th>' +
+    '<th title="Paired difference in Spearman against the reference, 95% confidence interval. Crossing zero = not established. The table is ordered by this column.">vs. reference ▼</th>' +
+    '<th class="num">&nbsp;</th><th>Verdict</th>' +
+    '<th class="num" title="Seasons in which this source was scored for this format">Seasons</th>' +
+    `<th class="num" title="${HKIND === "weekly" ? "Scored weeks" : "Scored seasons"} behind the average">${HKIND === "weekly" ? "Weeks" : "Yrs"}</th>` +
+    '<th class="num" title="Career mean Spearman over whatever seasons this source covered. Because coverage differs, a higher average here does not mean a better source — the paired column is what settles that.">Avg rho *</th>' +
+    '<th class="num" title="Career mean accuracy gap in fantasy points. Lower is better.">Gap *</th>' +
+    "</tr></thead><tbody>";
+
+  ordered.forEach((r, i) => {
+    const v = r.vs_leader;
+    let plot = '<span class="fp"></span>', num = "—", chip = '<span class="vchip">untested</span>';
+    if (v && v.is_leader) {
+      plot = '<span class="fp"><i class="fp-dot" style="left:50%"></i></span>';
+      num = "—";
+      chip = '<span class="vchip ref">reference</span>';
+    } else if (v) {
+      const lo = pct(v.lo), hi = pct(v.hi), p = pct(v.delta);
+      const tie = v.tied ? " tied" : "";
+      const dotCls = v.tied ? "tied" : (v.delta < 0 ? "sep" : "");
+      plot = `<span class="fp" title="95% CI ${fmtDelta3(v.lo)} to ${fmtDelta3(v.hi)} over ${v.n} shared ${HKIND === "weekly" ? "weeks" : "seasons"}">` +
+        `<i class="fp-ci${tie}" style="left:${Math.min(lo, hi)}%;width:${Math.max(1.5, Math.abs(hi - lo))}%"></i>` +
+        `<i class="fp-dot ${dotCls}" style="left:${p}%"></i></span>`;
+      num = fmtDelta3(v.delta);
+      chip = v.tied ? '<span class="vchip tied">tied</span>'
+           : v.delta < 0 ? '<span class="vchip behind">behind</span>'
+           : '<span class="vchip ahead">ahead</span>';
+    }
+    if (r.thin) chip += ' <span class="vchip thin">thin sample</span>';
+    html += `<tr><td class="num">${i + 1}</td>` +
+      `<td>${srcMark(r.source, true)}${tagPills(r.source, HKIND === "weekly" ? "weekly" : "predraft")}</td>` +
+      `<td>${plot}</td><td class="num">${num}</td><td>${chip}</td>` +
+      `<td class="num">${r.n_seasons}</td>` +
+      `<td class="num">${r.n_obs}</td>` +
+      `<td class="num" title="95% CI ${r.score_lo != null ? r.score_lo.toFixed(3) + " to " + r.score_hi.toFixed(3) : "n/a"}">${r.score.toFixed(3)}</td>` +
+      `<td class="num">${r.gap != null ? r.gap.toFixed(1) : "—"}</td></tr>`;
+  });
+  $("#history-board").innerHTML = html + "</tbody></table>" +
+    '<p class="chart-note" style="margin-top:10px">* Starred columns average over different ' +
+    'sets of games — a source scored on 3 seasons is not averaging the same weeks as one ' +
+    'scored on 13. They describe each source; they do not rank the field.</p>';
+
+  // ---- season-by-season matrix
+  const years = [...(HISTORY.seasons || [])].sort((a, b) => a - b);
+  const all = ordered.flatMap(r => years.map(y => (r.by_season[String(y)] || {}).score)
+    .filter(v => v != null));
+  const lo = Math.min(...all), hi = Math.max(...all);
+  $("#history-matrix-note").innerHTML =
+    `<span class="arrow">▶</span>Mean Spearman per season. Darker is stronger. ` +
+    `Blank means the source published nothing scoreable that season in this format.`;
+  let m = '<table><thead><tr><th class="srccol">Source</th>' +
+    years.map(y => `<th class="yr">${String(y).slice(2)}</th>`).join("") + "</tr></thead><tbody>";
+  ordered.forEach(r => {
+    m += `<tr><td class="srccol">${srcMark(r.source, true)}</td>`;
+    years.forEach(y => {
+      const cell = r.by_season[String(y)];
+      if (!cell || cell.score == null) { m += '<td class="yr na">–</td>'; return; }
+      const t = hi > lo ? (cell.score - lo) / (hi - lo) : 0.5;
+      const bg = `color-mix(in srgb, var(--accent) ${(8 + t * 34).toFixed(0)}%, transparent)`;
+      m += `<td class="yr" style="background:${bg}" title="${esc(srcName(r.source))} ${y}: rho ${cell.score.toFixed(3)}` +
+        (cell.gap != null ? `, gap ${cell.gap.toFixed(1)} pts` : "") +
+        (cell.n > 1 ? `, ${cell.n} weeks` : "") + `">${cell.score.toFixed(2)}</td>`;
+    });
+    m += "</tr>";
+  });
+  $("#history-matrix").innerHTML = m + "</tbody></table>";
+
+  $("#history-takeaway").innerHTML = !block.separable
+    ? `The useful conclusion from ${nSeasons} seasons is that picking a ranking site is not where ` +
+      `fantasy edges come from — in this view the field is one undifferentiated blob. Where the sources ` +
+      `<i>disagree</i> on a given player is far more informative than which source you follow, which is ` +
+      `what the spread column on the draft board is for.`
+    : `Differences that survive a paired test across ${nSeasons} seasons are the only ones worth acting ` +
+      `on. A source topping a single season's table is usually the same field reshuffled by noise — ` +
+      `compare the season-by-season row above against the interval to see how much a one-year lead moves around.`;
+}
+
+document.getElementById("history-controls").addEventListener("click", e => {
+  const b = e.target.closest("button"); if (!b) return;
+  HKIND = b.dataset.hkind;
+  document.querySelectorAll("#history-controls button")
+    .forEach(x => x.classList.toggle("active", x === b));
+  renderHistory();
+});
+
 /* ---------- leaderboards ---------- */
+/* Both season leaderboards are sortable, and the rank column follows whichever
+   metric is active. Previously rows were sorted by Spearman while accuracy gap
+   sat in the leftmost metric column, so the #1 row could hold the worse of the
+   two numbers a reader saw first. */
+const LB_SORT = {weekly: {key: "score", dir: -1}, predraft: {key: "score", dir: -1}};
+// -1 = larger is better (correlation), 1 = smaller is better (error in points)
+const LB_DEFAULT_DIR = {score: -1, accuracy_gap: 1, overall: -1, weeks: -1, through_week: -1};
+
+function sortBoard(rows, kind) {
+  const {key, dir} = LB_SORT[kind];
+  return [...rows].sort((a, b) => {
+    const va = a[key], vb = b[key];
+    if (va == null && vb == null) return 0;
+    if (va == null) return 1;          // missing metric sorts last either way
+    if (vb == null) return -1;
+    return (va - vb) * dir;
+  });
+}
+
+function lbHead(kind, key, label, title) {
+  const s = LB_SORT[kind];
+  const caret = s.key === key ? (s.dir === 1 ? " ▲" : " ▼") : "";
+  return `<th class="num sortable" data-lbkind="${kind}" data-lbsort="${key}" ` +
+         `title="${esc(title)} Click to sort.">${esc(label)}${caret}</th>`;
+}
+
+document.addEventListener("click", e => {
+  const th = e.target.closest("th[data-lbsort]");
+  if (!th) return;
+  const kind = th.dataset.lbkind, key = th.dataset.lbsort;
+  const s = LB_SORT[kind];
+  LB_SORT[kind] = (s.key === key) ? {key, dir: -s.dir}
+                                  : {key, dir: LB_DEFAULT_DIR[key] || -1};
+  if (kind === "weekly") renderWeeklyBoard(); else renderPredraftBoard();
+});
+
 function renderWeeklyBoard() {
   const board = boardFor("weekly");
   if (!board.length) {
@@ -684,17 +986,28 @@ function renderWeeklyBoard() {
       "No games played yet this season.");
     return;
   }
-  const anyGap = board.some(r => r.accuracy_gap != null);
-  let html = '<div class="scroll-x"><table><thead><tr><th>#</th><th>Source</th>' +
-    '<th class="num" title="Mean |points implied by the predicted rank - points actually scored|. Lower is better.">Accuracy gap</th>' +
-    '<th class="num" title="Rank correlation with actual finish. 1.0 = perfect ordering.">Spearman</th>' +
-    '<th class="num">Weeks</th></tr></thead><tbody>';
-  board.forEach((r, i) => {
-    html += `<tr><td>${i + 1}</td><td>${srcMark(r.source, true)}${tagPills(r.source, "weekly")}</td>` +
+  let html = '<div class="scroll-x"><table><thead><tr><th class="num">#</th><th>Source</th>' +
+    lbHead("weekly", "accuracy_gap", "Accuracy gap",
+      "Mean |points implied by the predicted rank − points actually scored|. Lower is better.") +
+    lbHead("weekly", "score", "Spearman",
+      "Rank correlation with actual finish. 1.0 = perfect ordering.") +
+    lbHead("weekly", "weeks", "Weeks", "Scored weeks behind the averages.") +
+    "</tr></thead><tbody>";
+  sortBoard(board, "weekly").forEach((r, i) => {
+    html += `<tr><td class="num">${i + 1}</td><td>${srcMark(r.source, true)}${tagPills(r.source, "weekly")}</td>` +
             `<td class="num">${r.accuracy_gap != null ? r.accuracy_gap.toFixed(1) : "—"}</td>` +
             `<td class="num">${r.score.toFixed(3)}</td><td class="num">${r.weeks}</td></tr>`;
   });
-  $("#weekly-board").innerHTML = html + "</tbody></table></div>";
+  $("#weekly-board").innerHTML = html + "</tbody></table></div>" + lbFootnote(board.length);
+}
+
+/* One season is a small sample and the sources sit close together; say so
+   where the ordering is read, not only in the cross-season card. */
+function lbFootnote(n) {
+  if (n < 2) return "";
+  return '<p class="chart-note" style="margin-top:10px"><span class="arrow">▶</span>' +
+    'One season separates these sources by less than the measurement noise. ' +
+    'See <a href="#history-card">Across all seasons</a> for which gaps survive a paired test.</p>';
 }
 
 function renderPredraftBoard() {
@@ -704,18 +1017,23 @@ function renderPredraftBoard() {
       "Pre-draft boards are scored after week 1 completes.");
     return;
   }
-  let html = '<div class="scroll-x"><table><thead><tr><th>#</th><th>Source</th>' +
-    '<th class="num" title="Mean |points implied by the predicted rank - points actually scored|. Lower is better.">Accuracy gap</th>' +
-    '<th class="num">Avg pos Spearman</th><th class="num">Overall</th>' +
-    '<th class="num">Through week</th></tr></thead><tbody>';
-  board.forEach((r, i) => {
-    html += `<tr><td>${i + 1}</td><td>${srcMark(r.source, true)}${tagPills(r.source)}</td>` +
+  let html = '<div class="scroll-x"><table><thead><tr><th class="num">#</th><th>Source</th>' +
+    lbHead("predraft", "accuracy_gap", "Accuracy gap",
+      "Mean |points implied by the predicted rank − points actually scored| over full-season totals. Lower is better.") +
+    lbHead("predraft", "score", "Avg pos Spearman",
+      "Mean positional rank correlation against cumulative season points.") +
+    lbHead("predraft", "overall", "Overall",
+      "Spearman over the top-150 board order; blank for positional-only boards.") +
+    lbHead("predraft", "through_week", "Through week", "Weeks of results scored against.") +
+    "</tr></thead><tbody>";
+  sortBoard(board, "predraft").forEach((r, i) => {
+    html += `<tr><td class="num">${i + 1}</td><td>${srcMark(r.source, true)}${tagPills(r.source)}</td>` +
             `<td class="num">${r.accuracy_gap != null ? r.accuracy_gap.toFixed(1) : "—"}</td>` +
             `<td class="num">${r.score.toFixed(3)}</td>` +
             `<td class="num">${r.overall != null ? r.overall.toFixed(3) : "—"}</td>` +
             `<td class="num">${r.through_week}</td></tr>`;
   });
-  $("#predraft-board").innerHTML = html + "</tbody></table></div>";
+  $("#predraft-board").innerHTML = html + "</tbody></table></div>" + lbFootnote(board.length);
 }
 
 /* ---------- trend chart ---------- */
@@ -1268,10 +1586,16 @@ fetch("data/model.json", {cache: "no-cache"}).then(r => r.json())
   .then(d => { MODEL = d; renderModel(); })
   .catch(() => {});
 
+// the cross-season record is independent of the selected season, so it loads
+// once and re-renders whenever the format or roster lens changes
+fetch("data/history.json", {cache: "no-cache"}).then(r => r.json())
+  .then(d => { HISTORY = d; try { renderHistory(); } catch (e) { console.error("renderHistory", e); } })
+  .catch(() => {});
+
 function renderAll() {
   // isolate each panel: one failing render shouldn't blank the whole page
-  [renderHero, renderBaselineNote, renderBoard, renderWeeklyBoard, renderTrend,
-   renderPosBreakdown, renderCalibration, renderPredraftBoard].forEach(fn => {
+  [renderHero, renderBaselineNote, renderBoard, renderHistory, renderWeeklyBoard,
+   renderTrend, renderPosBreakdown, renderCalibration, renderPredraftBoard].forEach(fn => {
     try { fn(); } catch (err) { console.error(fn.name, err); }
   });
   $("#meta").innerHTML =

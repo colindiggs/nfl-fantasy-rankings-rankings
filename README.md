@@ -17,6 +17,7 @@ fantasy points every week, and publishes a running leaderboard for the season.
 | `scripts/player_history.py` | Cross-season per-player record (`docs/data/players.json`): pre-draft consensus rank vs. season finish, weekly consensus rank vs. weekly finish, over/under rates, rank-implied vs. actual points. Feeds the board's click-to-drill panel; refreshed by `compute.py` on current-season runs |
 | `scripts/nflverse.py` | Free historical context from [nflverse-data](https://github.com/nflverse/nflverse-data) releases, cached in `data/nflverse/`: per-season rosters (ages, experience, teams, `sleeper_id` for exact joins), weekly injury reports (2013+), and NFL draft picks |
 | `scripts/model.py` | Expectation models (`docs/data/model.json`), fitted on PPR boards 2014+ and validated out-of-time (train ≤2022, test 2023–25). **Value model** (headline): ridge regression on points over expectation — season points minus the historical value of the pre-draft slot — so magnitude matters, not just rank order. **Rank model**: ridge logistic P(finish ≥ slot). Features: slot value, age + aging curve (incl. RB-specific), experience, NFL draft capital, team change, team skill-roster turnover, prior-season games/scoring/injury-report weeks/POE, two-season durability. The site shows predicted POE, a slot-free player-specific **Edge**, P(beat), and per-player signed drivers |
+| `scripts/history.py` | Cross-season record (`docs/data/history.json`): every source's score in every scored season, plus a **paired** comparison against a reference source computed only on the weeks/seasons the two actually share, with 95% confidence intervals. See "Which differences are real" below |
 | `scripts/runner.py` | Scheduled entry point: captures, computes, commits, pushes |
 | `docs/` | Static GitHub Pages site (leaderboard, weekly trend, pre-draft comparison) |
 
@@ -71,6 +72,42 @@ The two metrics can disagree, which is usually the interesting case: kickers hav
 the *lowest* points-space error of any position despite near-random rank
 correlation, because they all score within a narrow band.
 
+### Which differences are real
+
+A single season orders the sources, but it does not separate them: in 2025
+half-PPR the top three weekly boards finished 0.263 / 0.263 / 0.251 Spearman
+and 6.0 / 6.1 / 6.1 points of accuracy gap. Reporting that as a ranking would
+be reporting noise.
+
+So the durable comparison is made across all scored seasons, and it is
+**paired**. Sources publish different seasons — FantasyPros covers 2013–25,
+Sleeper 2018–25, ESPN 2023–25 — so their career averages are not taken over
+the same games and cannot be ranked against each other directly. Instead each
+source is compared with a reference source using only the weeks (or, for
+pre-draft, the seasons) both actually covered, giving a mean difference and a
+95% confidence interval. An interval containing zero is a difference the data
+cannot establish.
+
+The reference is chosen by a paired round robin: a source is eligible if no
+other source beats it head-to-head, and among those the one with the most
+observations is used, so the intervals are as tight as the evidence allows.
+Picking the highest average instead would hand the yardstick to whichever
+source had the shortest, luckiest record.
+
+Two consequences are visible on the site and worth stating plainly:
+
+- **Weekly, nothing separates.** Over 13 seasons FantasyPros, ESPN and Sleeper
+  are all statistically tied. The one exception is ESPN over Sleeper on the 54
+  weeks they share (+0.022, CI +0.004 to +0.040) — a pair that a
+  compare-everyone-to-the-leader table would have hidden, since both are tied
+  with the reference.
+- **Pre-draft in standard, the experts do separate from the market.**
+  FantasyPros beats MyFantasyLeague (−0.036, CI −0.063 to −0.008) and FF
+  Calculator (−0.071, CI −0.106 to −0.035) across all 13 seasons.
+
+Career averages are still shown, marked with an asterisk, because they
+describe a source — they just cannot rank the field.
+
 The site also builds a **consensus draft board** (top 200 per format, with player
 headshots): each source's board is re-numbered over matched skill players, and a
 player's consensus rank is the mean of ranks from the sources that rank him.
@@ -103,7 +140,8 @@ cd scripts
 python capture.py predraft      # snapshot pre-draft boards
 python capture.py weekly [wk]   # snapshot weekly rankings
 python capture.py actuals [wk]  # pull actual points for a completed week
-python compute.py [season|all]  # rebuild docs/data/{season}/*.json
+python compute.py [season|all]  # rebuild docs/data/{season}/*.json (+ seasons.json, history.json)
+python history.py               # rebuild only the cross-season record
 python runner.py tuesday        # full scheduled run (capture + compute + push)
 ```
 

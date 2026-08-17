@@ -626,6 +626,19 @@ def write_index(current):
              len(seasons), len(scored), scored[0] if scored else current)
 
 
+def finalize(current):
+    """Season index plus the cross-season record, after any set of season runs.
+
+    Both depend on every season's summary.json, so they can only be built once
+    the per-season work is done. Scheduled runs must call this too: `scored`
+    changes the moment week 1 completes, and history.json is the site's whole
+    multi-season view.
+    """
+    write_index(current)
+    import history
+    history.main()
+
+
 if __name__ == "__main__":
     import sys
     args = [a for a in sys.argv[1:] if not a.startswith("--")]
@@ -638,7 +651,7 @@ if __name__ == "__main__":
         targets = [current]
     for s in targets:
         main(season=s, is_current=(s == current))
-    write_index(current)
+    finalize(current)
     if current not in targets:
         # backfill-only run: main() skipped the player-history refresh
         import player_history

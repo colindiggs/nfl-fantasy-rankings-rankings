@@ -60,6 +60,7 @@ def run_tuesday():
             except Exception as e:
                 log.warning("actuals week %d failed: %s", w, e)
     compute.main()
+    compute.finalize(season)
     commit_push(f"auto: tuesday update {date.today().isoformat()}")
 
 
@@ -78,6 +79,7 @@ def run_thursday():
         log.info("season over: nothing to capture")
         return
     compute.main()
+    compute.finalize(season)
     commit_push(f"auto: thursday rankings {date.today().isoformat()}")
 
 
