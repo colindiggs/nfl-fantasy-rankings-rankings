@@ -715,10 +715,12 @@ const SRC_SHORT = {
   ringer: "Ringer", pff: "PFF", ffcalc: "FFC", mfl: "MFL", sharks: "Sharks",
   sleeper: "Sleeper", "draftsharks-idp": "DShrk IDP", "ringer-superflex": "Ringer SF",
   fftoday: "FFT", walter: "Walter", rotoballer: "RBall", draftsharks: "DSharks",
-  underdog: "UDog",
+  underdog: "UDog", nffc: "NFFC", footballguys: "FBG",
+  "yahoo-adp": "Yahoo ADP", "espn-adp": "ESPN ADP", "cbs-adp": "CBS ADP",
 };
 const SRC_ORDER = ["fantasypros", "espn", "sleeper", "cbs", "nfl", "fftoday", "yahoo", "pff",
-                   "ringer", "rotoballer", "draftsharks", "sharks", "ffcalc", "mfl",
+                   "ringer", "rotoballer", "footballguys", "draftsharks", "sharks",
+                   "ffcalc", "nffc", "yahoo-adp", "espn-adp", "cbs-adp", "mfl",
                    "underdog", "walter"];
 const SRC_COLOR = {};
 SRC_ORDER.forEach((s, i) => { SRC_COLOR[s] = i < 8 ? `var(--s${i + 1})` : "var(--muted)"; });
@@ -796,9 +798,13 @@ function weekScore(entry, w) {
 }
 
 const $ = s => document.querySelector(s) || {};
+const FALLBACK_LABEL = {
+  nffc: "NFFC (ADP)", footballguys: "Footballguys", "yahoo-adp": "Yahoo (ADP)",
+  "espn-adp": "ESPN (ADP)", "cbs-adp": "CBS (ADP)", nfl: "NFL.com",
+};
 const srcName = s => (SUMMARY && SUMMARY.labels && SUMMARY.labels[s])
                      || (HISTORY && HISTORY.labels && HISTORY.labels[s])
-                     || SRC_LABEL[s] || s;
+                     || FALLBACK_LABEL[s] || SRC_LABEL[s] || s;
 const srcShort = s => SRC_SHORT[s] || srcName(s).slice(0, 6);
 const esc = t => String(t).replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
 
@@ -841,7 +847,8 @@ const SRC_MARK = {
   "draftsharks-idp": "DShrk IDP", sharks: "FShrk",
   fftoday: "FFToday", walter: "Walter",
   ffcalc: "FFCalc", mfl: "MFL", underdog: "Underdog",
-  sleeper: "Sleeper",
+  sleeper: "Sleeper", nffc: "NFFC", footballguys: "FBguys",
+  "yahoo-adp": "Yahoo ADP", "espn-adp": "ESPN ADP", "cbs-adp": "CBS ADP",
 };
 
 function srcMark(s, withName) {

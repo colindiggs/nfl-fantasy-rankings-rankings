@@ -139,6 +139,33 @@ def import_inbox(season):
     return done
 
 
+# Sources that have stopped publishing. Their captured history stays — it was
+# real when it was taken and it is still scored — but they are not attempted
+# again, so they do not sit in the health record as permanently broken and
+# drown out a source that has genuinely just broken.
+#
+# Retiring is a judgement call and deliberately not automated: a 404 for a week
+# is a site having a bad day, and only a human should decide that a publisher
+# is gone for good.
+RETIRED = {
+    "nfl": ("2026-08-17", "fantasy.nfl.com/research/rankings and /research/players "
+            "now 301 to nfl.com/news/series/fantasy, and the v1/v2 research APIs "
+            "return 404 — NFL.com has withdrawn its fantasy rankings product. "
+            "Snapshots through 2025 are kept and still scored."),
+}
+
+
+def drop_retired(registry):
+    for name, (when, why) in RETIRED.items():
+        if registry.pop(name, None) is not None:
+            log.debug("skipping retired source %s (%s): %s", name, when, why)
+    return registry
+
+
+drop_retired(DRAFT_SOURCES)
+drop_retired(WEEKLY_SOURCES)
+
+
 # What each source actually publishes. Anything absent gets DEFAULT_TAGS
 # (1QB / expert / offense / redraft / overall). Verified by inspecting the live
 # sites in Aug 2026 — see README "Source audit".
