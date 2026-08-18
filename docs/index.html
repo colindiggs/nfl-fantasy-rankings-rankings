@@ -269,6 +269,24 @@ th.sortable:hover { color: var(--ink); }
 .range i { position: absolute; top: 0; height: 6px; background: var(--accent); opacity: .85; border-radius: var(--r-sm); min-width: 3px; }
 .cov { color: var(--muted); font-size: .75rem; }
 
+/* pipeline health */
+.health-banner {
+  border: 1px solid var(--s8); border-left: 3px solid var(--s8);
+  background: var(--surface); border-radius: var(--r);
+  padding: 10px 14px; margin: 0 0 20px; font-size: .875rem;
+}
+.health-banner b { color: var(--s8); }
+.hstate {
+  display: inline-block; font-family: var(--font-mono); font-size: .62rem;
+  font-weight: 700; letter-spacing: .05em; text-transform: uppercase;
+  border-radius: var(--r-sm); padding: 1px 6px; border: 1px solid var(--baseline);
+  color: var(--muted);
+}
+.hstate.ok { border-color: var(--s6); color: var(--s6); }
+.hstate.flaky { border-color: var(--s2); color: var(--s2); }
+.hstate.broken { border-color: var(--s8); color: var(--s8); }
+.herr { color: var(--muted); font-size: .75rem; font-family: var(--font-mono); }
+
 /* across-seasons card */
 .verdict {
   border: 1px solid var(--border); border-left: 3px solid var(--accent);
@@ -519,6 +537,8 @@ td.na { text-align: right; color: var(--baseline); }
 </head>
 <body>
 <div class="wrap">
+  <div class="health-banner" id="health-banner" hidden></div>
+
   <div class="hero">
     <p class="eyebrow">Fantasy football &middot; accuracy benchmark</p>
     <h1>NFL Rankings of Rankings</h1>
@@ -669,6 +689,16 @@ td.na { text-align: right; color: var(--baseline); }
       </div>
     </div>
     <p class="takeaway" id="model-takeaway"></p>
+  </div>
+
+  <div class="card" id="health-card" hidden>
+    <h2>Pipeline health</h2>
+    <p class="sub">Every source this project captures, and whether the last automated run
+    actually got anything from it. A scraper that breaks does not announce itself — it just
+    stops contributing while the rest of the page carries on looking normal — so the state is
+    published here rather than left in a log file.</p>
+    <div class="scroll-x" id="health-board"></div>
+    <p class="chart-note" id="health-runs"></p>
   </div>
 
   <p class="meta" id="meta"></p>
@@ -1997,6 +2027,69 @@ document.addEventListener("click", e => {
 
 fetch("data/model.json", {cache: "no-cache"}).then(r => r.json())
   .then(d => { MODEL = d; renderModel(); })
+  .catch(() => {});
+
+/* ---------- pipeline health ----------
+   Operational state, not analysis: which sources the unattended run last got
+   anything from. The banner only appears when something is actually broken,
+   so a healthy pipeline stays quiet and a broken one cannot be missed. */
+let HEALTH = null;
+
+function ago(stamp) {
+  if (!stamp) return "never";
+  const then = new Date(stamp);
+  if (isNaN(then)) return "unknown";
+  const days = Math.floor((Date.now() - then.getTime()) / 86400000);
+  if (days <= 0) return "today";
+  return days === 1 ? "yesterday" : days + " days ago";
+}
+
+function renderHealth() {
+  const card = document.getElementById("health-card");
+  const banner = document.getElementById("health-banner");
+  if (!card || !HEALTH || !(HEALTH.sources || []).length) return;
+  card.hidden = false;
+
+  const broken = HEALTH.sources.filter(s => s.state === "broken");
+  if (broken.length) {
+    banner.hidden = false;
+    banner.innerHTML = `<b>${broken.length} source${broken.length === 1 ? " is" : "s are"} not reporting.</b> ` +
+      esc(broken.map(s => srcName(s.source)).join(", ")) +
+      ` — last produced data ${esc(ago(broken[0].last_ok))}. Scores below are computed from the ` +
+      `sources that did report; see <a href="#health-card">pipeline health</a>.`;
+  } else {
+    banner.hidden = true;
+  }
+
+  const order = {broken: 0, flaky: 1, ok: 2};
+  const rows = [...HEALTH.sources].sort(
+    (a, b) => (order[a.state] - order[b.state]) || a.source.localeCompare(b.source));
+
+  let html = '<table><thead><tr><th>Source</th><th>State</th>' +
+    '<th class="num col-desc" title="Weeks captured this season">Weeks</th>' +
+    '<th class="num col-desc">Last data</th>' +
+    '<th class="col-desc">Last error</th></tr></thead><tbody>';
+  rows.forEach(s => {
+    html += `<tr><td class="srccol">${srcMark(s.source, true)}</td>` +
+      `<td><span class="hstate ${s.state}">${s.state}</span>` +
+      (s.fails > 1 ? ` <span class="herr">${s.fails} runs</span>` : "") + `</td>` +
+      `<td class="num col-desc">${s.weeks != null ? s.weeks : "—"}</td>` +
+      `<td class="num col-desc">${esc(ago(s.last_ok))}</td>` +
+      `<td class="col-desc herr">${s.last_error ? esc(s.last_error.slice(0, 90)) : ""}</td></tr>`;
+  });
+  $("#health-board").innerHTML = html + "</tbody></table>";
+
+  const last = (HEALTH.runs || [])[0];
+  $("#health-runs").innerHTML = last
+    ? `<span class="arrow">▶</span>Last automated run ${esc(ago(last.at))}: ` +
+      `${last.ok} source-formats captured, ${last.failed} failed. ` +
+      `The run is idempotent and repeats daily, so a missed run repairs itself where the ` +
+      `source still serves that week.`
+    : "";
+}
+
+fetch("data/health.json", {cache: "no-cache"}).then(r => r.json())
+  .then(d => { HEALTH = d; try { renderHealth(); } catch (e) { console.error("renderHealth", e); } })
   .catch(() => {});
 
 // the cross-season record is independent of the selected season, so it loads
