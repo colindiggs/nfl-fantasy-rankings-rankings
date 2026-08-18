@@ -10,7 +10,7 @@ fantasy points every week, and publishes a running leaderboard for the season.
 
 | Piece | What it does |
 |---|---|
-| `scripts/sources/` | 15 source adapters — see coverage table below |
+| `scripts/sources/` | 20 source adapters — see coverage table below |
 | `scripts/sleeper.py` | Sleeper API: player DB (cross-site ID matching) and actual weekly fantasy points in standard / half-PPR / PPR |
 | `scripts/capture.py` | CLI: `predraft` / `weekly` / `actuals` snapshots → `data/` |
 | `scripts/compute.py` | Scores every ranking vs. actual points; writes `docs/data/*.json` for the site |
@@ -19,7 +19,8 @@ fantasy points every week, and publishes a running leaderboard for the season.
 | `scripts/model.py` | Expectation models (`docs/data/model.json`), fitted on PPR boards 2014+ and validated out-of-time (train ≤2022, test 2023–25). **Value model** (headline): ridge regression on points over expectation — season points minus the historical value of the pre-draft slot — so magnitude matters, not just rank order. **Rank model**: ridge logistic P(finish ≥ slot). Features: slot value, age + aging curve (incl. RB-specific), experience, NFL draft capital, team change, team skill-roster turnover, prior-season games/scoring/injury-report weeks/POE, two-season durability. The site shows predicted POE, a slot-free player-specific **Edge**, P(beat), and per-player signed drivers |
 | `scripts/validate.py` | Quality gate over captured boards: row counts, id match rate, duplicate names, position coverage, snapshot age, the QB4 slot, and each board's agreement with its peers. `python validate.py [season] [scope] [--strict]` |
 | `scripts/history.py` | Cross-season record (`docs/data/history.json`): every source's score in every scored season, plus a **paired** comparison against a reference source computed only on the weeks/seasons the two actually share, with 95% confidence intervals. See "Which differences are real" below |
-| `scripts/runner.py` | Scheduled entry point: captures, computes, commits, pushes |
+| `scripts/runner.py` | Scheduled entry point. `sync` works out what is missing, captures it, computes, publishes health, commits, pushes. Idempotent, so a missed run repairs itself — see "How it runs unattended" |
+| `scripts/health.py` | Operational record: which sources the unattended run actually got data from. Publishes `docs/data/health.json`, rendered as the site's Pipeline health panel |
 | `docs/` | Static GitHub Pages site (leaderboard, weekly trend, pre-draft comparison) |
 
 ### Sources & coverage
@@ -32,15 +33,10 @@ fantasy points every week, and publishes a running leaderboard for the season.
 | Yahoo (ADP) | | ✓ | | | `draft_analysis.average_pick` — what Yahoo's drafters did, not what Yahoo's analysts said |
 | ESPN (ADP) | | | ✓ | | `ownership.averageDraftPosition` |
 | CBS (ADP) | | | ✓ | | the draft-averages table |
-
-The three platform ADPs are each published as a **single pooled figure**, not
-one per scoring format — ESPN returns byte-identical numbers through its
-standard and PPR endpoints — so each is captured once rather than relabelled
-three times to look like three sources.
 | Sleeper (projections) | ✓ | ✓ | ✓ | ✓ | `/projections/nfl/{season}/{week}`, 2018+ |
 | ESPN | ✓ | ✓* | ✓ | ✓ | fantasy API; draft board 2023+, **weekly projections 2021+** (*half-PPR derived) |
 | CBS Sports | ✓ | | ✓ | ✓ | HTML top-200 / positional pages |
-| NFL.com | ✓ | | | ✓ | server-rendered research pages |
+| ~~NFL.com~~ | ✓ | | | ✓ | **retired Aug 2026** — research pages now 301 to a news feed and the research APIs 404; snapshots through 2025 are kept and still scored |
 | Yahoo | | ✓ | | | public `pub-api-ro` JSON (default = half-PPR) |
 | The Ringer | ✓ | ✓ | ✓ | | published Google Sheet CSV (4 boards incl. a labelled superflex control) |
 | PFF | | | ✓ | | consumer API (public client key — may rotate) |
@@ -55,6 +51,11 @@ three times to look like three sources.
 
 Standard, half-PPR, and PPR are evaluated separately; each format's leaderboard
 only includes sources that publish that format.
+
+The three platform ADPs (Yahoo, ESPN, CBS) are each published as a **single
+pooled figure**, not one per scoring format — ESPN returns byte-identical
+numbers through its standard and PPR endpoints — so each is captured once
+rather than relabelled three times to look like three sources.
 
 ### Metrics
 Per source, per format, per week, positions QB/RB/WR/TE/K/DST (top 24/36/48/24/24/24):
@@ -133,15 +134,76 @@ pre-draft score is average positional Spearman (comparable across all sources);
 overall top-150 Spearman is also shown for sources with a true overall board.
 ADP sources (FF Calculator, MFL, Underdog) measure "the market" against the experts.
 
-## Schedule (Windows Task Scheduler)
+## How it runs unattended
 
-- **Thursday 12:00** — snapshot the week's rankings before any games kick off
-- **Tuesday 07:00** — fetch completed-week actual points, re-score everything, push
+The pipeline exists to need nothing weekly. That requires being explicit about
+who does what, because the three parties involved fail in different ways.
 
-Register both: `powershell -ExecutionPolicy Bypass -File tasks\register_tasks.ps1`
+| | Responsible for | Fails by |
+|---|---|---|
+| **Windows Task Scheduler** | making sure Python runs at all | not running (asleep, on battery, missed window) |
+| **Python in this repo** | working out what is missing and getting it | a source changing shape |
+| **Colin** | nothing weekly | — |
+| **Claude** | fixing broken adapters, adding sources, retiring dead ones | not being there (summoned, not scheduled) |
 
-During the preseason both runs refresh the pre-draft snapshots instead; the last
-snapshot before Week 1 becomes the frozen pre-draft board.
+### The runner asks "what is missing", not "what day is it"
+
+`runner.py sync` is idempotent: every run works out what it does not have and
+gets it. That is what makes a missed run survivable, and it is why the task
+runs **daily** rather than on the two days the jobs used to be pinned to.
+
+The old design pinned the weekly capture to Thursday. Weekly rankings are
+perishable — CBS and FFToday publish the current week and nothing else — so a
+Thursday the machine happened to be asleep took that week off those sources
+permanently. It also had `StartWhenAvailable` off, meaning a missed run was
+never retried, and `DisallowStartIfOnBatteries` on.
+
+What can and cannot be repaired later is a property of the source:
+
+| Data | Perishable? | Repairable |
+|---|---|---|
+| Actual points | no | any past week, from Sleeper |
+| Pre-draft boards | frozen at week 1 | FantasyPros, FF Calculator, ESPN |
+| Weekly rankings | **yes** | only FantasyPros, Sleeper, ESPN — they serve past weeks |
+| Weekly rankings | **yes** | CBS, FFToday: current week only, gone if missed |
+
+### Rankings are only captured before kickoff
+
+A catch-up run must not quietly snapshot a board that has already watched the
+games it is about to be scored on — that is the one way this project could
+produce numbers that flatter every source. Weekly capture is therefore allowed
+only between Tuesday and Thursday 17:00 ET, comfortably before Thursday night
+kickoff. Outside that window the run holds off and logs why, and the week is
+repaired later only from the sources that genuinely serve past weeks.
+
+### Breakage is published, not logged
+
+Sources break regularly and quietly: FantasyPros has changed its weekly schema,
+ESPN its API shape, and NFL.com withdrew its rankings product entirely. A
+broken scraper does not announce itself — it stops contributing while the rest
+of the page carries on looking normal.
+
+`scripts/health.py` records every capture outcome and publishes
+`docs/data/health.json`, which the site renders as a **Pipeline health** panel.
+A source that fails twice in a row is marked broken and raises a banner at the
+top of the page. That record is the handover to Claude: dated, machine-written,
+and specific enough to fix from without anyone having to diagnose it first.
+
+Retiring a source is deliberately *not* automated — a 404 for a week is a site
+having a bad day. `capture.RETIRED` records the decision with a date and a
+reason, keeps the source's history, and stops attempting it.
+
+### Register the schedule
+
+```
+powershell -ExecutionPolicy Bypass -File tasks
+egister_tasks.ps1
+```
+
+Registers `NFL-Rankings-Sync` daily at 07:00 and 12:00 with the settings that
+actually matter for unattended running: `StartWhenAvailable` (run a missed task
+as soon as the machine is back), `WakeToRun`, retries on transient failure, and
+no battery restriction.
 
 ## Manual runs
 
