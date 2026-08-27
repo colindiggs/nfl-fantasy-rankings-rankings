@@ -12,6 +12,7 @@
   --grid: #e6e5df; --border: rgba(20,20,15,0.12);
   --accent: #2a6fd6; --chip: #efeee9; --rowhover: rgba(42,111,214,0.05);
   --good: 27,150,110; --bad: 205,66,66;
+  --pos-good: #12805e; --pos-bad: #b03b3b;
   --qb: #6b4fbb; --rb: #1a9e6f; --wr: #2a6fd6; --te: #d9722c; --k: #b8860b; --dst: #6c757d;
   --shadow: 0 1px 2px rgba(0,0,0,.05), 0 6px 20px rgba(0,0,0,.04);
 }
@@ -23,6 +24,7 @@
     --grid: #2b2b29; --border: rgba(255,255,255,0.12);
     --accent: #4b90ea; --chip: #232322; --rowhover: rgba(75,144,234,0.10);
     --good: 45,175,125; --bad: 226,88,88;
+    --pos-good: #35b98a; --pos-bad: #e46b6b;
     --qb: #9b85e8; --rb: #35b98a; --wr: #4b90ea; --te: #e8874a; --k: #d6a52b; --dst: #8d949b;
     --shadow: none;
   }
@@ -34,6 +36,7 @@
   --grid: #2b2b29; --border: rgba(255,255,255,0.12);
   --accent: #4b90ea; --chip: #232322; --rowhover: rgba(75,144,234,0.10);
   --good: 45,175,125; --bad: 226,88,88;
+  --pos-good: #35b98a; --pos-bad: #e46b6b;
   --qb: #9b85e8; --rb: #35b98a; --wr: #4b90ea; --te: #e8874a; --k: #d6a52b; --dst: #8d949b;
   --shadow: none;
 }
@@ -42,7 +45,7 @@ body {
   margin: 0; background: var(--page); color: var(--ink);
   font-family: system-ui, -apple-system, "Segoe UI", sans-serif; line-height: 1.45;
 }
-.wrap { max-width: 1500px; margin: 0 auto; padding: 22px 16px 60px; }
+.wrap { max-width: 1600px; margin: 0 auto; padding: 22px 16px 60px; }
 
 header.top { display: flex; align-items: baseline; gap: 14px; flex-wrap: wrap; margin-bottom: 4px; }
 h1 { font-size: 1.55rem; margin: 0; letter-spacing: -0.02em; }
@@ -55,7 +58,6 @@ h1 { font-size: 1.55rem; margin: 0; letter-spacing: -0.02em; }
 }
 .chip b { color: var(--ink); font-weight: 600; }
 
-/* controls */
 .bar { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-bottom: 12px; }
 .seg { display: inline-flex; background: var(--chip); border: 1px solid var(--border); border-radius: 9px; overflow: hidden; }
 .seg button {
@@ -71,9 +73,8 @@ select, input[type=search] {
 input[type=search] { width: 190px; }
 .spacer { flex: 1; }
 
-/* table */
 .tablewrap {
-  overflow: auto; max-height: 78vh; background: var(--surface);
+  overflow: auto; max-height: 80vh; background: var(--surface);
   border: 1px solid var(--border); border-radius: 12px; box-shadow: var(--shadow);
 }
 table { border-collapse: separate; border-spacing: 0; width: 100%; font-size: .87rem; }
@@ -87,13 +88,14 @@ thead th {
 thead th.left { text-align: left; }
 thead th:hover { color: var(--ink); }
 td.num { text-align: right; font-variant-numeric: tabular-nums; }
+tbody tr[data-pid] { cursor: pointer; }
 tbody tr:hover { background: var(--rowhover); }
 
-/* frozen left columns so you can scroll sideways and keep the player in view */
-th.c-rank, td.c-rank { position: sticky; left: 0; z-index: 2; background: var(--surface); width: 42px; text-align: right; }
-th.c-player, td.c-player { position: sticky; left: 42px; z-index: 2; background: var(--surface); min-width: 208px; box-shadow: 1px 0 0 var(--grid); }
+th.c-rank, td.c-rank { position: sticky; left: 0; z-index: 2; background: var(--surface); width: 52px; text-align: right; }
+th.c-player, td.c-player { position: sticky; left: 52px; z-index: 2; background: var(--surface); min-width: 208px; box-shadow: 1px 0 0 var(--grid); }
 thead th.c-rank, thead th.c-player { z-index: 4; }
 tbody tr:hover td.c-rank, tbody tr:hover td.c-player { background: color-mix(in srgb, var(--surface) 93%, var(--accent)); }
+td.c-rank b { font-size: .95rem; }
 
 .pcell { display: flex; align-items: center; gap: 8px; }
 .face { width: 28px; height: 28px; border-radius: 50%; object-fit: cover; object-position: top;
@@ -113,11 +115,33 @@ td.src { text-align: right; font-variant-numeric: tabular-nums; }
 td.na { color: var(--grid); text-align: right; }
 td.espn, th.espn { border-left: 2px solid var(--border); }
 td.espn { text-align: right; font-variant-numeric: tabular-nums; }
-.pick { color: var(--muted); font-size: .72rem; }
-.range { display: inline-block; width: 62px; height: 6px; background: var(--grid);
-         border-radius: 3px; position: relative; vertical-align: middle; }
-.range i { position: absolute; top: 0; height: 6px; background: var(--accent); opacity: .85; border-radius: 3px; min-width: 3px; }
-.rangetxt { color: var(--muted); font-size: .74rem; margin-left: 6px; font-variant-numeric: tabular-nums; }
+
+/* range: a window centred on the consensus rank, so the bar shows not just how
+   wide the disagreement is but which side of him it falls on */
+th.c-range, td.c-range { min-width: 168px; }
+.rng { display: flex; align-items: center; gap: 8px; }
+.rngtrack { position: relative; flex: 1; height: 16px; background: var(--chip);
+            border-radius: 4px; overflow: hidden; }
+.rngbar { position: absolute; top: 3px; height: 10px; background: var(--accent);
+          opacity: .5; border-radius: 3px; min-width: 3px; }
+.rngtick { position: absolute; top: 0; width: 2px; height: 16px; background: var(--ink-2); opacity: .55; }
+.rngtxt { color: var(--ink-2); font-size: .76rem; font-variant-numeric: tabular-nums;
+          min-width: 62px; text-align: right; }
+
+/* player drill-in */
+tr.detail-row:hover, tr.detail-row td { background: var(--page); }
+.detail-td { background: var(--page); padding: 14px 16px 16px; white-space: normal; }
+.phist { position: sticky; left: 16px; display: inline-block; max-width: min(980px, 88vw); }
+.phist-head { font-weight: 700; font-size: .9rem; margin-bottom: 2px; }
+.phist-sub { color: var(--muted); font-size: .74rem; margin-bottom: 10px; }
+.phist table { width: auto; background: none; font-size: .78rem; }
+.phist th { border-bottom: 1px solid var(--ink-2); font-size: .64rem; position: static; box-shadow: none; cursor: default; }
+.phist td, .phist th { padding: 4px 10px; }
+.phist td { border-bottom: 1px solid var(--grid); }
+.phist .up { color: var(--pos-good); font-weight: 700; }
+.phist .down { color: var(--pos-bad); font-weight: 700; }
+.phist-note { color: var(--ink-2); font-size: .82rem; margin: 10px 0 0; max-width: 780px; line-height: 1.5; }
+.scroll-x { overflow-x: auto; }
 
 .legend { display: flex; gap: 16px; align-items: center; flex-wrap: wrap;
           margin-top: 10px; font-size: .8rem; color: var(--muted); }
@@ -132,13 +156,15 @@ td.espn { text-align: right; font-variant-numeric: tabular-nums; }
     <div class="meta-chips" id="chips"></div>
   </header>
   <p class="sub">Every major ranking source, side by side. Green means a source is <b>higher</b> on a player
-  than the consensus, red means <b>lower</b>. <a href="analysis.html">Which sources are most accurate? &rarr;</a></p>
+  than the consensus, red means <b>lower</b>. Click any player for his season-by-season record.
+  <a href="analysis.html">Which sources are most accurate? &rarr;</a></p>
 
   <div class="bar">
     <div class="seg" id="fmt">
       <button data-fmt="half_ppr" class="on">Half PPR</button>
       <button data-fmt="ppr">PPR</button>
       <button data-fmt="standard">Standard</button>
+      <button data-fmt="all" title="Every source across all three formats, averaged">All</button>
     </div>
     <div class="seg" id="pos">
       <button data-pos="ALL" class="on">All</button>
@@ -154,10 +180,10 @@ td.espn { text-align: right; font-variant-numeric: tabular-nums; }
   <div class="tablewrap" id="board"><div class="empty">Loading…</div></div>
 
   <div class="legend">
-    <span><span class="sw" style="background:rgba(27,150,110,.55)"></span>ranked higher than consensus</span>
-    <span><span class="sw" style="background:rgba(205,66,66,.55)"></span>ranked lower than consensus</span>
-    <span><b>Range</b> = best and worst rank any source gave him</span>
-    <span><b>Cov</b> = how many sources rank him</span>
+    <span><span class="sw" style="background:rgba(27,150,110,.55)"></span>higher than consensus</span>
+    <span><span class="sw" style="background:rgba(205,66,66,.55)"></span>lower than consensus</span>
+    <span><b>Range</b> = where the sources spread him, centred on his consensus rank</span>
+    <span>Tint scales with draft depth — a 10-pick gap matters at 5, not at 200</span>
   </div>
 </div>
 
@@ -165,26 +191,30 @@ td.espn { text-align: right; font-variant-numeric: tabular-nums; }
 { const t = new URLSearchParams(location.search).get("theme");
   if (t === "light" || t === "dark") document.documentElement.dataset.theme = t; }
 
+const FMTS = ["half_ppr", "ppr", "standard"];
+const FMT_LABEL = {half_ppr: "Half PPR", ppr: "PPR", standard: "Standard", all: "all formats"};
 const LABEL = {
   fantasypros: "FantasyPros", espn: "ESPN", cbs: "CBS", nfl: "NFL.com", yahoo: "Yahoo",
-  "yahoo-adp": "Yahoo ADP", ringer: "The Ringer", pff: "PFF", rotoballer: "RotoBaller",
-  sharks: "FantasySharks", fftoday: "FFToday", walter: "WalterFootball",
-  ffcalc: "FF Calculator", mfl: "MyFantasyLeague", underdog: "Underdog", sleeper: "Sleeper"
+  "yahoo-adp": "Yahoo ADP", "espn-adp": "ESPN ADP", "cbs-adp": "CBS ADP",
+  ringer: "The Ringer", pff: "PFF", rotoballer: "RotoBaller", sharks: "FantasySharks",
+  fftoday: "FFToday", walter: "WalterFootball", ffcalc: "FF Calculator",
+  mfl: "MyFantasyLeague", underdog: "Underdog", sleeper: "Sleeper",
+  nffc: "NFFC", footballguys: "Footballguys"
 };
 const SHORT = {
-  fantasypros: "FPros", "yahoo-adp": "Yahoo ADP", rotoballer: "RotoB", sharks: "FShrk",
-  fftoday: "FFToday", ffcalc: "FFCalc", ringer: "Ringer", yahoo: "Yahoo"
+  fantasypros: "FPros", "yahoo-adp": "Yahoo ADP", "cbs-adp": "CBS ADP", rotoballer: "RotoB",
+  sharks: "FShrk", fftoday: "FFToday", ffcalc: "FFCalc", ringer: "Ringer", yahoo: "Yahoo",
+  footballguys: "FBGuys"
 };
 
 let DATA = null;
-let FMT = "half_ppr", POS = "ALL", Q = "", SORT = {key: "avg", dir: 1};
+let FMT = "half_ppr", POS = "ALL", Q = "", SORT = {key: "rank", dir: 1};
 
 const $ = s => document.querySelector(s);
 const esc = t => String(t).replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
 const label = s => LABEL[s] || s.replace(/[-_]/g, " ").replace(/\b\w/g, c => c.toUpperCase());
 const short = s => SHORT[s] || label(s);
-
-function initials(n){ return n.split(/\s+/).map(w => w[0]).slice(0, 2).join("").toUpperCase(); }
+const initials = n => n.split(/\s+/).map(w => w[0]).slice(0, 2).join("").toUpperCase();
 
 function face(p){
   const i = esc(initials(p.name));
@@ -198,18 +228,83 @@ function face(p){
          '" alt="" onerror="this.outerHTML=' + "'" + fb + "'" + '">';
 }
 
-/* Tint a rank by how far it sits from the consensus. Negative means this source
-   is higher on him than everyone else, which is the thing worth spotting. */
-function tint(rank, avg){
+/* How far a source has to stray before the cell lights up, scaled to where the
+   player sits on the board. Ten picks between adjacent players is a chasm at
+   pick 5 and noise at pick 200, so a fixed threshold made the whole tail of the
+   board saturate. Tolerance grows with depth; the floor keeps the top honest. */
+function tolerance(depth){ return Math.max(4, depth * 0.30); }
+
+function tint(rank, avg, depth){
   if (rank == null || avg == null) return "";
-  const m = Math.max(-1, Math.min(1, (rank - avg) / 10));
-  if (Math.abs(m) < 0.12) return "";
-  const a = (Math.abs(m) * 0.58).toFixed(3);
+  const m = Math.max(-1, Math.min(1, (rank - avg) / tolerance(depth)));
+  if (Math.abs(m) < 0.18) return "";
+  const a = (Math.abs(m) * 0.55).toFixed(3);
   return ' style="background:rgba(var(--' + (m < 0 ? "good" : "bad") + '),' + a + ')"';
 }
 
+/* "All" merges the three formats: a source that publishes more than one gets
+   the mean of its own ranks, so a site is never counted twice for saying the
+   same thing in two scoring systems. */
+function aggregate(){
+  const byId = new Map(), srcs = new Set();
+  FMTS.forEach(function(f){
+    const b = DATA.formats[f];
+    if (!b) return;
+    (b.sources || []).forEach(s => srcs.add(s));
+    b.players.forEach(function(p){
+      let rec = byId.get(p.id);
+      if (!rec){ rec = {id: p.id, name: p.name, pos: p.pos, team: p.team, _r: {}, espn: p.espn}; byId.set(p.id, rec); }
+      if (!rec.espn && p.espn) rec.espn = p.espn;
+      Object.keys(p.ranks || {}).forEach(function(s){ (rec._r[s] = rec._r[s] || []).push(p.ranks[s]); });
+    });
+  });
+  const players = [];
+  byId.forEach(function(rec){
+    const ranks = {};
+    Object.keys(rec._r).forEach(function(s){
+      const a = rec._r[s];
+      ranks[s] = Math.round(a.reduce((x, y) => x + y, 0) / a.length * 10) / 10;
+    });
+    const vals = Object.keys(ranks).map(k => ranks[k]);
+    if (vals.length < 2) return;
+    delete rec._r;
+    rec.ranks = ranks;
+    rec.avg = Math.round(vals.reduce((x, y) => x + y, 0) / vals.length * 10) / 10;
+    rec.n = vals.length;
+    rec.min = Math.min.apply(null, vals);
+    rec.max = Math.max.apply(null, vals);
+    players.push(rec);
+  });
+  players.sort((a, b) => a.avg - b.avg);
+  return {sources: Array.from(srcs), players: players};
+}
+
+let BOARD = null;
+function board(){
+  if (!DATA) return null;
+  if (FMT === "all"){
+    if (!BOARD) BOARD = aggregate();
+    return BOARD;
+  }
+  return DATA.formats[FMT];
+}
+
+function rangeCell(p, depth){
+  // window centred on his consensus rank, widening with depth so the bar stays
+  // legible whether the sources argue over 3 picks or 60
+  const win = Math.max(16, depth * 0.9);
+  const lo = depth - win / 2, hi = depth + win / 2;
+  const pct = v => Math.max(0, Math.min(100, ((v - lo) / (hi - lo)) * 100));
+  const a = pct(p.min), b = pct(p.max);
+  return '<td class="c-range"><span class="rng">' +
+    '<span class="rngtrack" title="' + p.n + ' sources rank him between ' + p.min + ' and ' + p.max + '">' +
+    '<i class="rngbar" style="left:' + a + '%;width:' + Math.max(2, b - a) + '%"></i>' +
+    '<i class="rngtick" style="left:' + pct(depth) + '%"></i></span>' +
+    '<span class="rngtxt">' + p.min + "–" + p.max + '</span></span></td>';
+}
+
 function render(){
-  const f = DATA && DATA.formats && DATA.formats[FMT];
+  const f = board();
   if (!f || !f.players || !f.players.length){
     $("#board").innerHTML = '<div class="empty">No board captured for this format yet.</div>';
     $("#chips").innerHTML = "";
@@ -218,60 +313,61 @@ function render(){
   const sources = f.sources || [];
   const hasEspn = f.players.some(p => p.espn && p.espn.adp != null);
 
+  // Consensus rank is fixed by the board, not by the current sort — so when you
+  // sort by one source you can still see that his 12th is the consensus 47th.
+  const byAvg = f.players.slice().sort((a, b) => a.avg - b.avg);
+  const crank = new Map();
+  byAvg.forEach((p, i) => crank.set(p.id, i + 1));
+
   let rows = f.players;
   if (POS !== "ALL") rows = rows.filter(p => p.pos === POS);
   if (Q) rows = rows.filter(p => p.name.toLowerCase().includes(Q));
 
   rows = rows.slice().sort(function(a, b){
-    const get = r => SORT.key === "avg" ? r.avg
-                   : SORT.key === "cov" ? -r.n
+    const get = r => SORT.key === "rank" ? crank.get(r.id)
                    : SORT.key === "espn" ? (r.espn && r.espn.adp != null ? r.espn.adp : Infinity)
                    : (r.ranks[SORT.key] != null ? r.ranks[SORT.key] : Infinity);
     const x = get(a), y = get(b);
-    if (x === Infinity && y === Infinity) return a.avg - b.avg;
+    if (x === Infinity && y === Infinity) return crank.get(a.id) - crank.get(b.id);
     if (x === Infinity) return 1;
     if (y === Infinity) return -1;
     return (x - y) * SORT.dir;
   });
 
-  const SPREAD_FULL = 40;   // a 40-rank disagreement fills the bar
   const caret = k => SORT.key === k ? (SORT.dir === 1 ? " ▲" : " ▼") : "";
-
   let h = "<table><thead><tr>" +
-    '<th class="c-rank">#</th><th class="c-player left">Player</th>' +
-    '<th data-sort="avg">Avg' + caret("avg") + '</th>' +
-    '<th class="left">Range</th>' +
-    '<th data-sort="cov">Cov' + caret("cov") + '</th>' +
+    '<th class="c-rank" data-sort="rank" title="Consensus rank across every source. Click to sort.">Rank' + caret("rank") + '</th>' +
+    '<th class="c-player left">Player</th>' +
+    '<th class="c-range left">Range</th>' +
     (hasEspn ? '<th class="espn" data-sort="espn" title="ESPN average draft position — the room you are drafting in">ESPN ADP' + caret("espn") + '</th>' : "") +
     sources.map(s => '<th data-sort="' + esc(s) + '" title="' + esc(label(s)) + ' — click to sort">' +
                      esc(short(s)) + caret(s) + '</th>').join("") +
     "</tr></thead><tbody>";
 
-  rows.forEach(function(p, i){
-    const spread = (p.max || 0) - (p.min || 0);
-    const width = Math.max(4, Math.min(100, (spread / SPREAD_FULL) * 100));
-    h += '<tr><td class="c-rank num">' + (i + 1) + '</td>' +
+  rows.forEach(function(p){
+    const depth = crank.get(p.id);
+    h += '<tr data-pid="' + esc(String(p.id)) + '" title="Click for his season-by-season record">' +
+      '<td class="c-rank num"><b>' + depth + '</b></td>' +
       '<td class="c-player"><span class="pcell">' + face(p) + '<span>' +
       '<span class="pname">' + esc(p.name) + '</span><br>' +
       '<span class="pmeta"><span class="pos pos-' + esc(p.pos) + '">' + esc(p.pos) + '</span>' +
-      esc(p.team || "") + '</span></span></span></td>' +
-      '<td class="num"><b>' + p.avg + '</b></td>' +
-      '<td><span class="range" title="' + sources.length + ' sources spread him from ' +
-      p.min + ' to ' + p.max + '">' +
-      '<i style="left:0;width:' + width + '%"></i></span>' +
-      '<span class="rangetxt">' + p.min + "–" + p.max + '</span></td>' +
-      '<td class="num" style="color:var(--muted)">' + p.n + '</td>';
+      esc(p.team || "") + ' · avg ' + p.avg + '</span></span></span></td>' +
+      rangeCell(p, depth);
     if (hasEspn){
       const e = p.espn || {};
+      // Show the ADP itself, not the round.pick slot. Several players with an
+      // ADP near 12 all round to "1.12", which reads like a duplicated value
+      // even though the underlying numbers differ; the slot lives on hover.
       h += e.adp != null
-        ? '<td class="espn"' + tint(e.adp_rank, p.avg) + '>' + e.adp +
-          (e.pick ? ' <span class="pick">' + esc(e.pick) + '</span>' : "") + '</td>'
+        ? '<td class="espn"' + tint(e.adp_rank, p.avg, depth) +
+          ' title="ADP ' + e.adp + (e.pick ? ", drafted around " + esc(String(e.pick)) : "") + '">' +
+          e.adp + '</td>'
         : '<td class="espn na">–</td>';
     }
     sources.forEach(function(s){
       const r = p.ranks[s];
       h += r == null ? '<td class="na">–</td>'
-                     : '<td class="src"' + tint(r, p.avg) + '>' + r + '</td>';
+                     : '<td class="src"' + tint(r, p.avg, depth) + '>' + r + '</td>';
     });
     h += "</tr>";
   });
@@ -285,10 +381,98 @@ function render(){
     (DATA.built_at ? '<span class="chip">updated <b>' + esc(String(DATA.built_at).slice(0, 10)) + '</b></span>' : "");
 }
 
+/* ---------- player drill-in: season-by-season record ---------- */
+let PLAYERS = null, PLAYERS_REQ = null;
+
+function fetchPlayers(){
+  if (PLAYERS) return Promise.resolve(PLAYERS);
+  PLAYERS_REQ = PLAYERS_REQ || fetch("data/players.json", {cache: "no-cache"})
+    .then(r => r.json()).then(d => { PLAYERS = d; return d; }).catch(() => null);
+  return PLAYERS_REQ;
+}
+
+function delta(d){
+  if (d == null) return "—";
+  const cls = d > 0 ? "up" : d < 0 ? "down" : "";
+  const txt = (d > 0 ? "+" : "") + d;
+  return cls ? '<span class="' + cls + '">' + txt + "</span>" : txt;
+}
+
+function playerDetail(pid){
+  const p = PLAYERS && PLAYERS.players && PLAYERS.players[pid];
+  if (!p) return '<div class="empty">No season-by-season data for this player.</div>';
+  // "All" has no single scoring system, so the record falls back to half-PPR
+  const fmt = FMT === "all" ? "half_ppr" : FMT;
+  const years = Object.keys(p.seasons).sort();
+  let rows = "", nBoth = 0, sumDelta = 0, over = 0, under = 0, nWk = 0, ppgSum = 0, ppgN = 0;
+  years.forEach(function(y){
+    const r = p.seasons[y][fmt];
+    if (!r) return;
+    const d = (r.pre != null && r.fin != null) ? r.pre - r.fin : null;
+    if (d != null){ nBoth++; sumDelta += d; }
+    const wk = r.wk || {};
+    if (wk.n){ over += wk.over; under += wk.under; nWk += wk.n; }
+    if (wk.ppg_proj != null){ ppgSum += (wk.ppg_act - wk.ppg_proj) * wk.n; ppgN += wk.n; }
+    rows += "<tr><td>" + y + "</td>" +
+      '<td class="num">' + (r.pre != null ? p.pos + r.pre : "—") + "</td>" +
+      '<td class="num">' + (r.fin != null ? p.pos + r.fin : "—") + "</td>" +
+      '<td class="num">' + delta(d) + "</td>" +
+      '<td class="num">' + (r.pts != null ? r.pts.toFixed(1) : "—") + "</td>" +
+      '<td class="num">' + (r.gp != null ? r.gp : "—") + "</td>" +
+      '<td class="num">' + (wk.n ? wk.over + "–" + wk.under : "—") + "</td>" +
+      '<td class="num">' + (wk.ppg_proj != null ? wk.ppg_proj.toFixed(1) + " / " + wk.ppg_act.toFixed(1) : "—") + "</td></tr>";
+  });
+  if (!rows) return '<div class="empty">No record for this player in ' + FMT_LABEL[fmt] + '.</div>';
+  const notes = [];
+  if (nBoth){
+    const bias = sumDelta / nBoth;
+    const dir = bias > 0.5 ? "finished better than drafted"
+              : bias < -0.5 ? "finished worse than drafted" : "matched his pre-draft rank";
+    notes.push("Over " + nBoth + " season" + (nBoth === 1 ? "" : "s") + " he " + dir +
+               " by " + Math.abs(bias).toFixed(1) + " positional ranks on average.");
+  }
+  if (nWk) notes.push("Beat his weekly consensus rank in " + over + " of " + nWk +
+                      " player-weeks (" + Math.round(over / nWk * 100) + "%).");
+  if (ppgN){
+    const d = ppgSum / ppgN;
+    notes.push("Scored " + (d >= 0 ? "+" : "") + d.toFixed(1) + " points per game against what his rank implied.");
+  }
+  return '<div class="phist">' +
+    '<div class="phist-head">' + esc(p.name) + " — season by season, " + FMT_LABEL[fmt] + "</div>" +
+    '<div class="phist-sub">Ranks are positional. Δ = pre-draft minus finish, so positive means he beat his draft slot. ' +
+    "O–U = weeks above vs. below his weekly consensus rank. PPG = rank-implied vs. actual.</div>" +
+    '<div class="scroll-x"><table><thead><tr><th>Season</th><th class="num">Pre-draft</th>' +
+    '<th class="num">Finish</th><th class="num">Δ</th><th class="num">Pts</th><th class="num">GP</th>' +
+    '<th class="num">O–U</th><th class="num">PPG</th></tr></thead><tbody>' + rows + "</tbody></table></div>" +
+    (notes.length ? '<p class="phist-note">' + notes.join(" ") + "</p>" : "");
+}
+
+function toggleDetail(tr){
+  const next = tr.nextElementSibling;
+  const open = next && next.classList.contains("detail-row");
+  document.querySelectorAll("#board .detail-row").forEach(r => r.remove());
+  if (open) return;
+  const cols = tr.children.length;
+  tr.insertAdjacentHTML("afterend",
+    '<tr class="detail-row"><td class="detail-td" colspan="' + cols + '">' +
+    '<div class="empty">Loading…</div></td></tr>');
+  fetchPlayers().then(function(){
+    const cell = tr.nextElementSibling && tr.nextElementSibling.querySelector(".detail-td");
+    if (cell) cell.innerHTML = PLAYERS ? playerDetail(tr.dataset.pid)
+                                       : '<div class="empty">Player history unavailable.</div>';
+  });
+}
+
+/* ---------- events ---------- */
 $("#fmt").addEventListener("click", function(e){
   const b = e.target.closest("button"); if (!b) return;
   FMT = b.dataset.fmt;
   $("#fmt").querySelectorAll("button").forEach(x => x.classList.toggle("on", x === b));
+  // a source column from the old format may not exist in the new one
+  if (SORT.key !== "rank" && SORT.key !== "espn"){
+    const f = board();
+    if (!f || (f.sources || []).indexOf(SORT.key) < 0) SORT = {key: "rank", dir: 1};
+  }
   render();
 });
 $("#pos").addEventListener("click", function(e){
@@ -298,15 +482,24 @@ $("#pos").addEventListener("click", function(e){
   render();
 });
 $("#q").addEventListener("input", function(e){ Q = e.target.value.trim().toLowerCase(); render(); });
+
 document.addEventListener("click", function(e){
-  const th = e.target.closest("#board th[data-sort]"); if (!th) return;
-  const k = th.dataset.sort;
-  SORT = SORT.key === k ? {key: k, dir: -SORT.dir} : {key: k, dir: 1};
-  render();
+  const th = e.target.closest("#board th[data-sort]");
+  if (th){
+    const k = th.dataset.sort;
+    SORT = SORT.key === k ? {key: k, dir: -SORT.dir} : {key: k, dir: 1};
+    render();
+    return;
+  }
+  if (e.target.closest("#board thead")) return;
+  const tr = e.target.closest("#board tbody tr[data-pid]");
+  if (tr) toggleDetail(tr);
 });
+
 $("#season").addEventListener("change", function(e){ load(Number(e.target.value)).then(render); });
 
 function load(year){
+  BOARD = null;
   return fetch("data/" + year + "/predraft.json")
     .then(r => r.ok ? r.json() : fetch("data/predraft.json").then(x => x.json()))
     .then(j => { DATA = j; });
@@ -317,8 +510,8 @@ fetch("data/seasons.json").then(r => r.json()).catch(() => null)
     const year = (idx && idx.current) || 2026;
     if (idx && idx.seasons && idx.seasons.length > 1){
       $("#season").innerHTML = idx.seasons.map(y =>
-        '<option value="' + y + '"' + (y === year ? " selected" : "") + '>' + y +
-        (y === idx.current ? " (upcoming)" : "") + '</option>').join("");
+        '<option value="' + y + '"' + (y === year ? " selected" : "") + ">" + y +
+        (y === idx.current ? " (upcoming)" : "") + "</option>").join("");
     } else {
       $("#season").style.display = "none";
     }

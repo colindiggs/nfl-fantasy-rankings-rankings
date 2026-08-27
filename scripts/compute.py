@@ -783,19 +783,19 @@ def main(season=None, is_current=True):
         write_json(DOCS / "data" / "summary.json", summary)
     log.info("%s/summary.json written (%d weeks evaluated)", season, len(weeks))
 
-    # ---- consensus pre-draft board for the site (top 200, per-source ranks)
+    # ---- consensus pre-draft board for the site (all players, per-source ranks)
     # Players ranked by some sources but not others: a player's consensus rank is
     # the mean of ranks from the sources that DO rank him, shown with coverage
     # (n of N sources) so thin consensus is visible rather than hidden. Players
     # need >= 2 ranking sources to appear.
     SHOW_POS = ("QB", "RB", "WR", "TE", "K", "DST")
     # Read each source deeper than the board shows. A player one source ranks
-    # 240th simply falls off a 200-deep read, and dropping him means his
+    # 240th simply falls off a shallow read, and dropping him means his
     # consensus is the mean of only the sources that liked him — biased
-    # optimistic exactly where the board is thinnest. Reading to 300 and
-    # displaying 200 means the bottom of the board is averaged over the same
-    # sources as the top.
-    RANK_DEPTH = 300
+    # optimistic exactly where the board is thinnest. The board now displays
+    # every player with at least two ranking sources, so the read has to go
+    # deeper still for that averaging to stay honest at the bottom.
+    RANK_DEPTH = 600
     espn_ref, espn_meta = espn_lane(predraft, matchers)
     comparison = {"season": season, "formats": {},
                   "espn": {"sources": espn_meta, "teams": league.TEAMS},
@@ -846,7 +846,9 @@ def main(season=None, is_current=True):
             rec["max"] = max(ranks)
             rows.append(rec)
         rows.sort(key=lambda r: (r["avg"], -r["n"]))
-        rows = rows[:200]
+        # No display cap: a drafter in the 14th round needs the tail as much as
+        # the top. Two-source minimum still applies, so the tail is thin rather
+        # than fabricated.
         annotate_value(rows, basis_of)
         annotate_tiers(rows, fmt)
         annotate_espn(rows, espn_ref)
