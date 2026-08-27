@@ -527,7 +527,7 @@ td.na { text-align: right; color: var(--baseline); }
      their place on a phone and coverage gives up its column instead. The
      range bar goes too: at this width the min–max numbers carry the
      disagreement and the bar is decoration. */
-  .col-cov, .col-edge { display: none; }
+  .col-cov { display: none; }
   .spread-cell .range { display: none; }
   .spread-num { font-size: .74rem; color: var(--ink-2); }
   /* PPR carries ten sources, so both the rank range and the coverage flag run
@@ -593,7 +593,9 @@ td.na { text-align: right; color: var(--baseline); }
     them, nearly every mid-round skill player's ADP runs about a round later than his rank, so
     a raw Arb of +17 there is the room's shape rather than a bargain. <b>Sort by Edge</b> to
     read the board as a ranked list of genuine mispricings; sort by Arb for the literal gap you
-    can check against the draft room.</p>
+    can check against the draft room. A <b>!</b> on an Edge means ESPN's own analysts
+    agree with ESPN's drafters — the industry is the one disagreeing, so check the player's
+    news before treating it as free money.</p>
     <p class="sub" id="espn-freshness"></p>
     <div class="board-controls">
       <div class="posfilter" id="posfilter">
@@ -969,9 +971,46 @@ function espnCell(p) {
     return '<td class="na col-espn" title="ESPN’s drafters have never taken him, so ESPN publishes no ADP for him">–</td>';
   }
   const tip = `ESPN ADP ${e.adp} — round ${e.pick} in a ${ESPN_TEAMS}-team draft` +
-    (e.rank != null ? ` · ESPN’s own board ranks him ${e.rank}` : "");
+    (e.rank != null
+      ? ` · ESPN’s own analysts rank him ${e.rank}, ${e.rank <= e.adp ? "ahead of" : "behind"} where their drafters take him`
+      : " · ESPN’s own board does not rank him");
   return `<td class="num col-espn" title="${esc(tip)}"><b>${e.adp.toFixed(1)}</b>` +
-    `<span class="pickslot">${esc(e.pick || "")}</span></td>`;
+    `<span class="pickslot">${esc(e.pick || "")}` +
+    (e.rank != null ? ` · rk${e.rank}` : "") + `</span></td>`;
+}
+
+/* The caveat that decides whether an edge is real.
+
+   An edge is exploitable when ESPN's *room* is slow and ESPN's own analysts
+   are not — the analysts have him where the industry has him, and the
+   drafters have not caught up. It is not exploitable when ESPN's analysts sit
+   next to their drafters and both sit far from everyone else: that is ESPN
+   disagreeing with the industry about the player, usually because of an
+   injury, a depth-chart move or a suspension one side has priced and the
+   other has not. The gap looks identical in the arithmetic and means the
+   opposite thing, so it has to be called out rather than sorted highly.
+
+   The test compares the two *detrended* deviations. Raw ones will not do:
+   ESPN's editorial board has its own drift down the board, far bigger than
+   the ADP's — by consensus 151-200 it runs about +71 — and the two raw
+   deviations are essentially uncorrelated (r = 0.05). Against raw numbers the
+   test fires on almost everything near the top, because two unrelated drifts
+   both happen to point the same way there. Detrended they correlate at 0.52,
+   which is the real signal: ESPN's analysts and ESPN's drafters do share
+   information, and the question is whether they share it here. */
+function espnConsensusSplit(p) {
+  const e = p.espn;
+  if (!e || e.rank == null || p.arb == null || p.espn_dev_adj == null
+      || p.arb_adj == null) return null;
+  if (Math.abs(p.arb) < 12) return null;     // too small a gap to be about anything
+  if (Math.sign(p.espn_dev_adj) !== Math.sign(p.arb_adj)) return null;
+  if (Math.abs(p.espn_dev_adj) < Math.abs(p.arb_adj) / 2) return null;
+  const dir = p.arb_adj >= 0 ? "lower" : "higher";
+  return `careful: ESPN’s own analysts rank him ${e.rank}, ${dir} than the ` +
+    `consensus by about as much as their drafters go ${p.arb_adj >= 0 ? "late" : "early"} ` +
+    `on him — so this is ESPN and the industry disagreeing about the player, ` +
+    `not a slow draft room. Check his injury and depth-chart news before acting ` +
+    `on it. The cleanest edges are the large ones without this mark`;
 }
 
 function edgeCell(p, maxEdge) {
@@ -985,9 +1024,12 @@ function edgeCell(p, maxEdge) {
   const verdict = p.arb_adj >= 0
     ? `— about ${Math.abs(p.arb_adj).toFixed(0)} picks of real discount`
     : `— about ${Math.abs(p.arb_adj).toFixed(0)} picks of real premium`;
-  return `<td class="num col-edge ${p.arb_adj >= 0 ? "epos" : "eneg"}" title="${esc(base + " " + verdict)}">` +
+  const w2 = espnConsensusSplit(p);
+  return `<td class="num col-edge ${p.arb_adj >= 0 ? "epos" : "eneg"}" title="${esc(base + " " + verdict + (w2 ? " — " + w2 : ""))}">` +
     `<span class="ebar"><i style="${side};background:${col}"></i></span>` +
-    `${p.arb_adj >= 0 ? "+" : "−"}${Math.abs(p.arb_adj).toFixed(0)}</td>`;
+    `${p.arb_adj >= 0 ? "+" : "−"}${Math.abs(p.arb_adj).toFixed(0)}` +
+    (w2 ? '<sup class="cov-thin" title="ESPN’s analysts agree with ESPN’s drafters here, so this is a disagreement about the player rather than a mispriced room — hover for detail">!</sup>' : "") +
+    "</td>";
 }
 
 function arbCell(p, maxArb) {
@@ -1099,7 +1141,7 @@ function renderBoard() {
     (anyTier ? `<th class="num sortable" data-sort="tier" title="Positional tier: players inside a tier are close enough in expected value to be treated as interchangeable. Click to sort.">Tier${caret("tier")}</th>` : "") +
     `<th class="num sortable" data-sort="avg" title="Mean rank across the sources that rank him. Click to sort.">Avg${caret("avg")}</th>` +
     (anyValue ? `<th class="num sortable" data-sort="value" title="Expert consensus rank minus market ADP. Positive (green) = the market lets him fall past where the experts rank him, so you can wait. Negative = the market drafts him ahead of expert opinion. From ${nExp} expert board${nExp === 1 ? "" : "s"} and ${nMkt} ADP source${nMkt === 1 ? "" : "s"}. Click to sort.">Value${caret("value")}</th>` : "") +
-    (anyEspn ? `<th class="num sortable col-espn" data-sort="espn" title="ESPN's own average draft position, and the round.pick it lands on in a ${ESPN_TEAMS}-team draft. This is the number in the ESPN draft room. Click to sort.">ESPN ADP${caret("espn")}</th>` : "") +
+    (anyEspn ? `<th class="num sortable col-espn" data-sort="espn" title="ESPN's own average draft position — the number in the ESPN draft room — with the round.pick it lands on in a ${ESPN_TEAMS}-team draft, and rk = where ESPN's own analysts rank him. Click to sort.">ESPN ADP${caret("espn")}</th>` : "") +
     (anyEspn ? `<th class="num sortable" data-sort="arb" title="ESPN ADP minus the consensus rank of the ${nSrc} non-ESPN source${nSrc === 1 ? "" : "s"}, in picks. Positive (green) = ESPN's room lets him fall past where the industry ranks him, so you can wait and take the discount. Negative (red) = ESPN's room reaches, so you pay above market or pass. Reads the same direction as Value. Click to sort.">Arb${caret("arb")}</th>` : "") +
     (anyEdge ? `<th class="num sortable col-edge" data-sort="arbadj" title="The same gap, measured against the drift at this part of the board instead of against zero. Every skill player's ESPN ADP runs later than his consensus rank, because ESPN's rooms spend picks on kickers, defenses and quarterbacks earlier than the industry ranks them — around the middle rounds the typical gap is a whole round. Edge is Arb minus that local drift, so it says who is mispriced relative to his neighbours rather than relative to the room's shape. This is the column to sort by. Click to sort.">Edge${caret("arbadj")}</th>` : "") +
     '<th title="Best and worst rank any source gave him — how much the sources disagree">Spread</th>' +

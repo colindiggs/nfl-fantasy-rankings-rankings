@@ -38,6 +38,22 @@ def refresh(season):
     return ok, failed
 
 
+def espn_wide(r):
+    """Is the whole of ESPN on one side and the industry on the other?
+
+    Compares the two detrended deviations, never the raw ones. ESPN's
+    editorial board drifts far more with depth than its ADP does, and the two
+    raw deviations are essentially uncorrelated (r = 0.05), so against raw
+    numbers this fires on nearly every player at the top of the edge list.
+    Detrended they correlate at 0.52, which is the real shared signal. See
+    compute.annotate_espn.
+    """
+    a, e = r.get("arb_adj"), r.get("espn_dev_adj")
+    if a is None or e is None or abs(r.get("arb") or 0) < 12:
+        return False
+    return (a > 0) == (e > 0) and abs(e) >= abs(a) / 2
+
+
 def _fmt_row(r):
     e = r.get("espn") or {}
     adj = r.get("arb_adj")
@@ -71,18 +87,32 @@ def report(fmt=None, top=15):
     print("  edge = the same gap net of the drift at that spot on the board.")
     print("         ESPN rooms run mid-round skill players about a round late,")
     print("         so edge is the part of the gap that is really a mispricing.")
-    print("  Ordered by edge.")
+    print("  Ordered by edge. The two headline lists exclude players where ESPN's")
+    print("  own analysts back their drafters - those are listed separately, because")
+    print("  a gap the whole of ESPN agrees on is news you are missing, not an edge.")
     print()
 
     skill = [r for r in rows if r["pos"] in SKILL]
     key = "arb_adj" if any(r.get("arb_adj") is not None for r in skill) else "arb"
     skill.sort(key=lambda r: -(r.get(key) if r.get(key) is not None else r["arb"]))
-    print(f"  WAIT ON HIM - ESPN's room lets him fall (top {top})")
-    for r in skill[:top]:
+    clean = [r for r in skill if not espn_wide(r)]
+    wide = [r for r in skill if espn_wide(r)]
+
+    print(f"  WAIT ON HIM - ESPN's room is behind its own analysts (top {top})")
+    for r in clean[:top]:
         print(_fmt_row(r))
-    print(f"\n  DON'T CHASE - ESPN's room reaches (top {top})")
-    for r in skill[-top:][::-1]:
+    print()
+    print(f"  DON'T CHASE - ESPN's room is ahead of its own analysts (top {top})")
+    for r in clean[-top:][::-1]:
         print(_fmt_row(r))
+
+    if wide:
+        print()
+        print(f"  CHECK THE NEWS FIRST - {len(wide)} players where ESPN's analysts back")
+        print("  their drafters and the industry is the one disagreeing. The gap is")
+        print("  real, but it is about the player, not about a slow room.")
+        for r in wide[:8]:
+            print(_fmt_row(r))
 
     kd = [r for r in rows if r["pos"] in ("K", "DST")]
     kd.sort(key=lambda r: -r["arb"])

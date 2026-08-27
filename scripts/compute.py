@@ -402,7 +402,20 @@ def annotate_espn(rows, espn_ref):
         r["arb"] = round(adp - r["avg"], 1)
         if r.get("exp") is not None:
             r["arb_exp"] = round(adp - r["exp"], 1)
-    annotate_arb_drift(rows)
+    # ESPN's editorial board carries a drift of its own, and a much bigger one:
+    # it ranks 400 players and its deviation from the consensus grows with
+    # depth (median +71 by consensus 151-200 on the 2026 board). Detrending it
+    # the same way is what makes "do ESPN's analysts agree with ESPN's
+    # drafters?" a real question — the two raw deviations are essentially
+    # uncorrelated (r = 0.05), so comparing them undetrended just asks whether
+    # two unrelated drifts happen to point the same way, which near the top of
+    # the board they almost always do.
+    for r in rows:
+        ref = espn_ref.get(r["id"]) or {}
+        r["espn_dev"] = (round(ref["rank"] - r["avg"], 1)
+                         if ref.get("rank") is not None else None)
+    annotate_arb_drift(rows, "arb", "arb_base", "arb_adj")
+    annotate_arb_drift(rows, "espn_dev", "espn_dev_base", "espn_dev_adj")
     return rows
 
 
@@ -436,8 +449,8 @@ def _median(vals):
     return vals[mid] if n % 2 else (vals[mid - 1] + vals[mid]) / 2.0
 
 
-def annotate_arb_drift(rows):
-    """`arb_adj`: the raw gap net of the drift around that spot on the board.
+def annotate_arb_drift(rows, field, base_field, adj_field):
+    """Detrend one deviation series against its own shape down the board.
 
     The baseline is built from skill positions only. Kickers and defenses have
     their own drift, several times larger and in the other direction, and
@@ -446,19 +459,19 @@ def annotate_arb_drift(rows):
     tells you, which is to take yours last.
     """
     pool = [r for r in rows
-            if r.get("arb") is not None and r["pos"] in _BASELINE_POS]
+            if r.get(field) is not None and r["pos"] in _BASELINE_POS]
     if len(pool) < 3 * ARB_WINDOW:
         return rows          # too thin a board to estimate a shape from
     pool.sort(key=lambda r: r["avg"])
     for r in rows:
-        if r.get("arb") is None:
+        if r.get(field) is None:
             continue
-        near = [q["arb"] for q in pool if abs(q["avg"] - r["avg"]) <= ARB_WINDOW]
+        near = [q[field] for q in pool if abs(q["avg"] - r["avg"]) <= ARB_WINDOW]
         base = _median(near)
         if base is None:
             continue
-        r["arb_base"] = round(base, 1)
-        r["arb_adj"] = round(r["arb"] - base, 1)
+        r[base_field] = round(base, 1)
+        r[adj_field] = round(r[field] - base, 1)
     return rows
 
 
@@ -776,6 +789,13 @@ def main(season=None, is_current=True):
     # (n of N sources) so thin consensus is visible rather than hidden. Players
     # need >= 2 ranking sources to appear.
     SHOW_POS = ("QB", "RB", "WR", "TE", "K", "DST")
+    # Read each source deeper than the board shows. A player one source ranks
+    # 240th simply falls off a 200-deep read, and dropping him means his
+    # consensus is the mean of only the sources that liked him — biased
+    # optimistic exactly where the board is thinnest. Reading to 300 and
+    # displaying 200 means the bottom of the board is averaged over the same
+    # sources as the top.
+    RANK_DEPTH = 300
     espn_ref, espn_meta = espn_lane(predraft, matchers)
     comparison = {"season": season, "formats": {},
                   "espn": {"sources": espn_meta, "teams": league.TEAMS},
@@ -801,7 +821,7 @@ def main(season=None, is_current=True):
                 pid = p.get("sleeper_id")
                 if pid and p.get("pos") in SHOW_POS and pid not in board:
                     board[pid] = {"rank": len(board) + 1, "p": p}
-                if len(board) >= 200:
+                if len(board) >= RANK_DEPTH:
                     break
             boards[source] = board
         players = {}
