@@ -19,17 +19,22 @@ POS_IDS = {"QB": 10, "RB": 20, "WR": 30, "TE": 40}
 # fall back to default when a preset is unknown
 WEEKLY_LEAGUE = {"standard": "1", "half_ppr": "26955", "ppr": "107644"}
 
+# The cell holding the player link can also carry an annotation icon — an
+# <img> with an "Upside:" or injury note — so the pattern has to allow markup
+# between </A> and </TD>. Requiring plain text there silently dropped every
+# annotated player: 44 of 225 slots on the 2026 board, Kenneth Walker (17) and
+# Ashton Jeanty (20) among them.
 ROW_RE = re.compile(
     r'>(\d+)</TD>\s*<TD[^>]*>((?:QB|RB|WR|TE|K|DEF)\d*)</TD>\s*'
-    r'<TD[^>]*><A HREF="/stats/players/\d+/[^"]*">([^<]+)</A>[^<]*</TD>\s*'
+    r'<TD[^>]*><A HREF="/stats/players/\d+/[^"]*">([^<]+)</A>.*?</TD>\s*'
     r'<TD[^>]*>([A-Z]{2,3})</TD>',
-    re.IGNORECASE,
+    re.DOTALL | re.IGNORECASE,
 )
 WEEK_ROW_RE = re.compile(
     r'>(\d+)</TD>\s*'
-    r'<TD[^>]*><A HREF="/stats/players/\d+/[^"]*">([^<]+)</A>[^<]*</TD>\s*'
+    r'<TD[^>]*><A HREF="/stats/players/\d+/[^"]*">([^<]+)</A>.*?</TD>\s*'
     r'<TD[^>]*>([A-Z]{2,3})</TD>',
-    re.IGNORECASE,
+    re.DOTALL | re.IGNORECASE,
 )
 
 
