@@ -54,8 +54,12 @@ def fetch_draft(fmt, season, sess=None):
             "espn_id": p.get("id"),
         })
     rows.sort(key=lambda r: r["adp"])
+    # The decimal ADP is carried alongside the rank because the draft room
+    # shows the decimal, not the ordinal: two players can sit one rank apart
+    # and four picks apart, and that gap is the whole arbitrage signal.
     out = [{"rank": i, "name": r["name"], "team": None, "pos": r["pos"],
-            "espn_id": r["espn_id"]} for i, r in enumerate(rows, 1)]
+            "espn_id": r["espn_id"], "adp": round(r["adp"], 1)}
+           for i, r in enumerate(rows, 1)]
     if len(out) < 150:
         raise RuntimeError(f"ESPN ADP returned only {len(out)} rows — API may have changed")
     log.info("ESPN ADP: %d players", len(out))

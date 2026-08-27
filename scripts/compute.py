@@ -10,6 +10,7 @@ from pathlib import Path
 from common import (DATA, DEFAULT_TAGS, DOCS, EXTRA_POSITIONS, FORMATS,
                     POSITIONS, SKILL_POSITIONS, get_logger, matches_baseline,
                     read_json, write_json)
+import league
 import rankvalue
 import sleeper
 import spec_engine
@@ -371,6 +372,96 @@ def annotate_value(rows, basis_of):
 TIER_WIDTH = 0.07   # a tier spans ~7% of the position's top-slot value
 
 
+def annotate_espn(rows, espn_ref):
+    """Attach ESPN's draft-room numbers and the edge against everyone else.
+
+    `arb` is ESPN's ADP minus the consensus rank of every non-ESPN source —
+    the same direction as the Value column, so the two read the same way.
+    Positive means ESPN's room lets him fall past where the rest of the
+    industry ranks him: he is still on the board later than he should be, so
+    wait and take the discount. Negative means ESPN's room reaches, and you
+    either pay above market or let someone else. `arb_exp` is the same figure
+    against the expert boards only, with the other sites' ADP excluded — the
+    stricter read for when the market as a whole has moved and the analysts
+    have not.
+
+    Both are expressed in draft picks, which is what the number means in the
+    room: +14 is "about a round and a bit of profit at 12 teams".
+    """
+    for r in rows:
+        ref = espn_ref.get(r["id"])
+        if not ref:
+            r["espn"] = None
+            r["arb"] = None
+            continue
+        r["espn"] = {k: v for k, v in ref.items() if v is not None}
+        adp = ref.get("adp") if ref.get("adp") is not None else ref.get("adp_rank")
+        if adp is None:
+            r["arb"] = None
+            continue
+        r["arb"] = round(adp - r["avg"], 1)
+        if r.get("exp") is not None:
+            r["arb_exp"] = round(adp - r["exp"], 1)
+    annotate_arb_drift(rows)
+    return rows
+
+
+# Every skill player's ESPN ADP runs later than his consensus rank, and by a
+# lot in the middle rounds — the 2026 board's median gap peaks near +17 around
+# consensus 61-100. That is not two dozen bargains, it is the shape of the
+# room: ESPN drafters take kickers, defenses and quarterbacks earlier than the
+# industry ranks them, and every pick spent that way pushes some skill player
+# a round later. Reading raw gaps against a baseline of zero would flag that
+# whole band as underpriced.
+#
+# So the raw gap is kept — it is literally true, and it is the number he can
+# check against the draft room — and a second figure measures each player
+# against the drift at *his own* part of the board. A +30 raw gap where the
+# neighbourhood already runs +17 is a 13-pick edge, not a 30-pick one.
+#
+# The baseline is a rolling median rather than a fit: medians survive the
+# handful of enormous outliers (an injured starter ESPN's rooms have written
+# off entirely) that would drag a mean, and no functional form is being
+# claimed for a curve whose shape comes from roster rules.
+ARB_WINDOW = 25
+_BASELINE_POS = ("QB", "RB", "WR", "TE")
+
+
+def _median(vals):
+    vals = sorted(vals)
+    n = len(vals)
+    if not n:
+        return None
+    mid = n // 2
+    return vals[mid] if n % 2 else (vals[mid - 1] + vals[mid]) / 2.0
+
+
+def annotate_arb_drift(rows):
+    """`arb_adj`: the raw gap net of the drift around that spot on the board.
+
+    The baseline is built from skill positions only. Kickers and defenses have
+    their own drift, several times larger and in the other direction, and
+    folding them in would bend the baseline that every skill player is then
+    judged against — and would also hide the one true thing K/DST arbitrage
+    tells you, which is to take yours last.
+    """
+    pool = [r for r in rows
+            if r.get("arb") is not None and r["pos"] in _BASELINE_POS]
+    if len(pool) < 3 * ARB_WINDOW:
+        return rows          # too thin a board to estimate a shape from
+    pool.sort(key=lambda r: r["avg"])
+    for r in rows:
+        if r.get("arb") is None:
+            continue
+        near = [q["arb"] for q in pool if abs(q["avg"] - r["avg"]) <= ARB_WINDOW]
+        base = _median(near)
+        if base is None:
+            continue
+        r["arb_base"] = round(base, 1)
+        r["arb_adj"] = round(r["arb"] - base, 1)
+    return rows
+
+
 def annotate_tiers(rows, fmt):
     """Positional tiers: "if I miss this player, is the next one equivalent?"
 
@@ -415,6 +506,53 @@ def annotate_tiers(rows, fmt):
                 tier += 1
                 anchor = r["implied"]
             r["tier"] = tier
+
+
+# ---------------------------------------------------------------- ESPN lane
+#
+# The draft happens in ESPN's room, so ESPN is not a peer of the other sources
+# here — it is the market being arbitraged. Its two boards are pulled out of
+# the consensus entirely and shown in their own columns, because leaving them
+# in would mean comparing ESPN against a consensus that already contains ESPN
+# and shrinking every edge toward zero.
+#
+# ESPN publishes draft ranks for STANDARD and PPR only, and one ADP figure
+# pooled across its league types (see sources/espn_adp.py). Neither is
+# half-PPR specific, so both are attached to every format's board unchanged
+# and labelled as ESPN's own numbers rather than relabelled per format.
+ESPN_LANE = ("espn-adp", "espn")
+
+
+def espn_lane(predraft, matchers):
+    """-> ({sleeper_id: {...}}, meta) for ESPN's ADP and editorial board."""
+    ref, meta = {}, {}
+    for source in ESPN_LANE:
+        payload = None
+        for fmt in ("ppr", "standard", "half_ppr"):
+            if (source, fmt) in predraft:
+                payload = predraft[(source, fmt)]
+                meta[source] = {"format": fmt,
+                                "captured_at": payload.get("captured_at")}
+                break
+        if not payload:
+            continue
+        for p in attach_ids(payload["players"], matchers):
+            pid = p.get("sleeper_id")
+            if not pid:
+                continue
+            slot = ref.setdefault(pid, {})
+            if source == "espn-adp":
+                # the decimal ADP is the draft-room number; the ordinal is the
+                # fallback for snapshots captured before it was carried through
+                slot.setdefault("adp", p.get("adp"))
+                slot.setdefault("adp_rank", p["rank"])
+            else:
+                slot.setdefault("rank", p["rank"])
+    for pid, slot in ref.items():
+        overall = slot.get("adp") if slot.get("adp") is not None else slot.get("adp_rank")
+        if overall is not None:
+            slot["pick"] = league.pick_label(overall)
+    return ref, meta
 
 
 def is_baseline(payload, source=None):
@@ -638,13 +776,21 @@ def main(season=None, is_current=True):
     # (n of N sources) so thin consensus is visible rather than hidden. Players
     # need >= 2 ranking sources to appear.
     SHOW_POS = ("QB", "RB", "WR", "TE", "K", "DST")
-    comparison = {"season": season, "formats": {}}
+    espn_ref, espn_meta = espn_lane(predraft, matchers)
+    comparison = {"season": season, "formats": {},
+                  "espn": {"sources": espn_meta, "teams": league.TEAMS},
+                  "league": {"teams": league.TEAMS, "starters": league.STARTERS,
+                             "bench": league.BENCH, "format": league.FORMAT},
+                  "built_at": datetime.now(timezone.utc)
+                      .strftime("%Y-%m-%dT%H:%M:%SZ")}
     for fmt in FORMATS:
         boards = {}
         basis_of = {}
         for (source, f2), payload in predraft.items():
             if f2 != fmt:
                 continue
+            if source in ESPN_LANE:
+                continue  # the market being arbitraged, not a peer — see espn_lane
             if not is_baseline(payload, source):
                 continue  # superflex / IDP / best-ball — different question
             if sum(1 for p in payload["players"] if p["rank"] == 1) > 1:
@@ -683,6 +829,7 @@ def main(season=None, is_current=True):
         rows = rows[:200]
         annotate_value(rows, basis_of)
         annotate_tiers(rows, fmt)
+        annotate_espn(rows, espn_ref)
         comparison["formats"][fmt] = {
             "sources": sorted(boards, key=lambda s: len(boards[s]), reverse=True),
             "experts": sorted(s for s, b in basis_of.items() if b == "expert"),

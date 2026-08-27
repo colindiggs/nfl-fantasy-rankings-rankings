@@ -360,8 +360,9 @@ th.sortable:hover { color: var(--ink); }
 .ebar { display: inline-block; width: 56px; height: 7px; background: var(--chip); border-radius: var(--r-sm); vertical-align: middle; margin-right: 6px; position: relative; }
 .ebar::before { content: ""; position: absolute; left: 50%; top: -1px; bottom: -1px; width: 1px; background: var(--baseline); }
 .ebar i { position: absolute; top: 0; height: 7px; border-radius: var(--r-sm); }
-td.epos { color: var(--s6); font-weight: 700; }
-td.eneg { color: var(--s8); font-weight: 700; }
+.pickslot { display: block; font-size: .6875rem; color: var(--muted); font-variant-numeric: tabular-nums; }
+td.epos, .epos { color: var(--s6); font-weight: 700; }
+td.eneg, .eneg { color: var(--s8); font-weight: 700; }
 .dpill {
   display: inline-block; font-family: var(--font-mono); font-size: .66rem;
   border: 1px solid var(--grid); border-radius: var(--r-sm); padding: 0 5px;
@@ -526,7 +527,7 @@ td.na { text-align: right; color: var(--baseline); }
      their place on a phone and coverage gives up its column instead. The
      range bar goes too: at this width the min–max numbers carry the
      disagreement and the bar is decoration. */
-  .col-cov { display: none; }
+  .col-cov, .col-edge { display: none; }
   .spread-cell .range { display: none; }
   .spread-num { font-size: .74rem; color: var(--ink-2); }
   /* PPR carries ten sources, so both the rank range and the coverage flag run
@@ -581,6 +582,19 @@ td.na { text-align: right; color: var(--baseline); }
     expert opinion justifies. <b>Cov</b> = number of sources ranking the player (minimum 2 to appear).
     Green and red ranks mark a player's best and worst rank across sources. Click a row for his
     multi-season record.</p>
+    <p class="sub"><b>ESPN ADP</b> is the number in the ESPN draft room — the decimal average
+    draft position across ESPN's own leagues, with the round.pick it lands on underneath.
+    ESPN is deliberately <i>not</i> one of the consensus sources: it is the market you are
+    drafting against, so counting it in the consensus would shrink every edge toward zero.
+    <b>Arb</b> is that ADP minus the consensus rank — green means ESPN's room lets him fall
+    past where everyone else ranks him, so wait; red means ESPN's room reaches, so pay up or
+    pass. <b>Edge</b> is the same gap net of the drift at that point on the board: because ESPN
+    rooms spend picks on kickers, defenses and quarterbacks earlier than the industry ranks
+    them, nearly every mid-round skill player's ADP runs about a round later than his rank, so
+    a raw Arb of +17 there is the room's shape rather than a bargain. <b>Sort by Edge</b> to
+    read the board as a ranked list of genuine mispricings; sort by Arb for the literal gap you
+    can check against the draft room.</p>
+    <p class="sub" id="espn-freshness"></p>
     <div class="board-controls">
       <div class="posfilter" id="posfilter">
         <button data-pos="ALL" class="active">All</button>
@@ -898,6 +912,101 @@ function valueCell(p, maxVal) {
     `<span class="${p.value >= 0 ? "epos" : "eneg"}">${p.value >= 0 ? "+" : "−"}${Math.abs(p.value).toFixed(0)}</span>`;
 }
 
+/* ESPN's two numbers, side by side with the edge against them.
+
+   The ADP shown is the decimal, not its ordinal: by the back of round nine
+   ESPN's 100th-ranked player already has an ADP near 108, so the ordinal
+   quietly understates where he actually goes by most of a round. The
+   round.pick label is what makes it actionable — "9.12" is a decision, "107.6"
+   is a statistic. */
+let ESPN_TEAMS = 12;
+
+/* The league is described by the data, not hardcoded in the page: compute.py
+   writes it from scripts/league.py, so changing the league in one place moves
+   every round.pick label on the site with it. */
+/* ADP moves every day of draft season, so the board has to say how old its
+   numbers are. A stale ESPN ADP is worse than none: it is an edge you would
+   act on that the room has already priced in. */
+function ageWords(iso) {
+  if (!iso) return null;
+  const hrs = (Date.now() - Date.parse(iso)) / 3.6e6;
+  if (!isFinite(hrs)) return null;
+  if (hrs < 1.5) return "less than an hour ago";
+  if (hrs < 36) return Math.round(hrs) + " hours ago";
+  return Math.round(hrs / 24) + " days ago";
+}
+
+function renderFreshness() {
+  const el = document.getElementById("espn-freshness");
+  if (!el) return;
+  const meta = PREDRAFT && PREDRAFT.espn && PREDRAFT.espn.sources;
+  const adp = meta && meta["espn-adp"];
+  if (!adp) { el.innerHTML = ""; return; }
+  const age = ageWords(adp.captured_at);
+  const hrs = (Date.now() - Date.parse(adp.captured_at)) / 3.6e6;
+  const stale = hrs > 30;
+  const others = (PREDRAFT.built_at ? ageWords(PREDRAFT.built_at) : null);
+  // Which sources the consensus is actually built from matters as much as how
+  // fresh it is: half-PPR is the thinnest of the three formats, because
+  // several major boards (CBS, PFF, Footballguys, NFFC) publish PPR only.
+  const blk = PREDRAFT.formats && PREDRAFT.formats[FMT];
+  const cov = blk ? `Arbitraged against ${blk.sources.length} non-ESPN source` +
+    (blk.sources.length === 1 ? "" : "s") + `: ${blk.sources.map(srcName).join(", ")}.` : "";
+  el.innerHTML = `<b>Captured:</b> ESPN ADP ${esc(age || "at an unknown time")}` +
+    (others ? `, everything else rebuilt ${esc(others)}` : "") +
+    (stale ? ' — <span class="eneg" style="font-weight:700">re-run the refresh before you draft</span>, ADP moves daily in draft season.' : ".") +
+    (cov ? " " + esc(cov) : "");
+}
+
+function adoptLeague(pre) {
+  const t = pre && pre.league && pre.league.teams;
+  if (t) ESPN_TEAMS = t;
+}
+
+function espnCell(p) {
+  const e = p.espn;
+  if (!e || e.adp == null) {
+    return '<td class="na col-espn" title="ESPN’s drafters have never taken him, so ESPN publishes no ADP for him">–</td>';
+  }
+  const tip = `ESPN ADP ${e.adp} — round ${e.pick} in a ${ESPN_TEAMS}-team draft` +
+    (e.rank != null ? ` · ESPN’s own board ranks him ${e.rank}` : "");
+  return `<td class="num col-espn" title="${esc(tip)}"><b>${e.adp.toFixed(1)}</b>` +
+    `<span class="pickslot">${esc(e.pick || "")}</span></td>`;
+}
+
+function edgeCell(p, maxEdge) {
+  if (p.arb_adj == null) return '<td class="na col-edge">–</td>';
+  const w = Math.min(50, Math.abs(p.arb_adj) / maxEdge * 50);
+  const side = p.arb_adj >= 0 ? `left:50%;width:${w}%` : `left:${50 - w}%;width:${w}%`;
+  const col = p.arb_adj >= 0 ? "var(--s6)" : "var(--s8)";
+  const base = p.arb_base != null
+    ? `players ranked near him go ${p.arb_base >= 0 ? "" : "−"}${Math.abs(p.arb_base).toFixed(0)} picks ${p.arb_base >= 0 ? "later" : "earlier"} than their rank in ESPN rooms, and he goes ${Math.abs(p.arb).toFixed(0)} ${p.arb >= 0 ? "later" : "earlier"}`
+    : "";
+  const verdict = p.arb_adj >= 0
+    ? `— about ${Math.abs(p.arb_adj).toFixed(0)} picks of real discount`
+    : `— about ${Math.abs(p.arb_adj).toFixed(0)} picks of real premium`;
+  return `<td class="num col-edge ${p.arb_adj >= 0 ? "epos" : "eneg"}" title="${esc(base + " " + verdict)}">` +
+    `<span class="ebar"><i style="${side};background:${col}"></i></span>` +
+    `${p.arb_adj >= 0 ? "+" : "−"}${Math.abs(p.arb_adj).toFixed(0)}</td>`;
+}
+
+function arbCell(p, maxArb) {
+  if (p.arb == null) {
+    return '<td class="na" title="No ESPN ADP for him, so there is nothing to arbitrage against">–</td>';
+  }
+  const w = Math.min(50, Math.abs(p.arb) / maxArb * 50);
+  const side = p.arb >= 0 ? `left:50%;width:${w}%` : `left:${50 - w}%;width:${w}%`;
+  const col = p.arb >= 0 ? "var(--s6)" : "var(--s8)";
+  const tip = `consensus ${p.avg} (${p.n} sources) · ESPN ADP ${p.espn.adp}` +
+    (p.arb_exp != null ? ` · ${p.arb_exp >= 0 ? "+" : "−"}${Math.abs(p.arb_exp).toFixed(0)} against the expert boards alone` : "") +
+    " · " + (p.arb >= 0
+      ? `ESPN’s room lets him fall about ${Math.abs(p.arb).toFixed(0)} picks past the consensus — wait for him`
+      : `ESPN’s room takes him about ${Math.abs(p.arb).toFixed(0)} picks ahead of the consensus — reach or pass`);
+  return `<td class="num ${p.arb >= 0 ? "epos" : "eneg"}" title="${esc(tip)}">` +
+    `<span class="ebar"><i style="${side};background:${col}"></i></span>` +
+    `${p.arb >= 0 ? "+" : "−"}${Math.abs(p.arb).toFixed(0)}</td>`;
+}
+
 /* The toggle only means anything next to an actual table. Every early return
    below used to skip the code that labels it, leaving a full-width blank
    button on screen whenever the board was empty — visible on any format with
@@ -949,6 +1058,14 @@ function renderBoard() {
                    // value sorts best-first, and "no market coverage" is
                    // missing data rather than a zero-value verdict
                    : SORT.key === "value" ? (r.value != null ? -r.value : Infinity)
+                   // ESPN's own two numbers, and the edge against them. Like
+                   // value, "ESPN doesn't list him" is missing data, so those
+                   // players sort last in either direction rather than
+                   // winning whichever end of the table a zero would win.
+                   : SORT.key === "arb" ? (r.arb != null ? -r.arb : Infinity)
+                   : SORT.key === "arbadj" ? (r.arb_adj != null ? -r.arb_adj : Infinity)
+                   : SORT.key === "espn" ? ((r.espn && r.espn.adp != null) ? r.espn.adp : Infinity)
+                   : SORT.key === "espnrank" ? ((r.espn && r.espn.rank != null) ? r.espn.rank : Infinity)
                    : (r.ranks[SORT.key] != null ? r.ranks[SORT.key] : Infinity);
     const va = get(a), vb = get(b);
     if (va === Infinity && vb === Infinity) return a.avg - b.avg;
@@ -969,11 +1086,22 @@ function renderBoard() {
   const anyValue = rows.some(r => r.value != null);
   const anyTier = rows.some(r => r.tier != null);
   const maxVal = Math.max(5, ...rows.map(r => Math.abs(r.value || 0)));
+  const maxArb = Math.max(5, ...rows.map(r => Math.abs(r.arb || 0)));
+  const maxEdge = Math.max(5, ...rows.map(r => Math.abs(r.arb_adj || 0)));
   const nExp = (data.experts || []).length, nMkt = (data.market || []).length;
+  // ESPN sits outside the consensus by construction (see compute.espn_lane),
+  // so these columns appear whenever the lane was captured, in every format —
+  // ESPN publishes no half-PPR board of its own and one pooled ADP.
+  const anyEspn = rows.some(r => r.espn && r.espn.adp != null);
+  const anyEdge = rows.some(r => r.arb_adj != null);
+  const nSrc = sources.length;
   let html = '<table><thead><tr><th class="num">#</th><th class="pcol">Player</th>' +
     (anyTier ? `<th class="num sortable" data-sort="tier" title="Positional tier: players inside a tier are close enough in expected value to be treated as interchangeable. Click to sort.">Tier${caret("tier")}</th>` : "") +
     `<th class="num sortable" data-sort="avg" title="Mean rank across the sources that rank him. Click to sort.">Avg${caret("avg")}</th>` +
     (anyValue ? `<th class="num sortable" data-sort="value" title="Expert consensus rank minus market ADP. Positive (green) = the market lets him fall past where the experts rank him, so you can wait. Negative = the market drafts him ahead of expert opinion. From ${nExp} expert board${nExp === 1 ? "" : "s"} and ${nMkt} ADP source${nMkt === 1 ? "" : "s"}. Click to sort.">Value${caret("value")}</th>` : "") +
+    (anyEspn ? `<th class="num sortable col-espn" data-sort="espn" title="ESPN's own average draft position, and the round.pick it lands on in a ${ESPN_TEAMS}-team draft. This is the number in the ESPN draft room. Click to sort.">ESPN ADP${caret("espn")}</th>` : "") +
+    (anyEspn ? `<th class="num sortable" data-sort="arb" title="ESPN ADP minus the consensus rank of the ${nSrc} non-ESPN source${nSrc === 1 ? "" : "s"}, in picks. Positive (green) = ESPN's room lets him fall past where the industry ranks him, so you can wait and take the discount. Negative (red) = ESPN's room reaches, so you pay above market or pass. Reads the same direction as Value. Click to sort.">Arb${caret("arb")}</th>` : "") +
+    (anyEdge ? `<th class="num sortable col-edge" data-sort="arbadj" title="The same gap, measured against the drift at this part of the board instead of against zero. Every skill player's ESPN ADP runs later than his consensus rank, because ESPN's rooms spend picks on kickers, defenses and quarterbacks earlier than the industry ranks them — around the middle rounds the typical gap is a whole round. Edge is Arb minus that local drift, so it says who is mispriced relative to his neighbours rather than relative to the room's shape. This is the column to sort by. Click to sort.">Edge${caret("arbadj")}</th>` : "") +
     '<th title="Best and worst rank any source gave him — how much the sources disagree">Spread</th>' +
     // Coverage is a data-quality caveat rather than a draft decision, so it
     // gives up its column on a phone. Partial coverage is still flagged on
@@ -1000,6 +1128,8 @@ function renderBoard() {
       (anyTier ? `<td class="num"><span class="tierbadge" title="${esc(p.pos)} tier ${p.tier}${p.implied != null ? " · slot worth about " + Math.round(p.implied) + " pts" : ""}">${p.tier != null ? p.tier : "–"}</span></td>` : "") +
       `<td class="num"><b>${p.avg}</b></td>` +
       (anyValue ? `<td class="num">${valueCell(p, maxVal)}</td>` : "") +
+      (anyEspn ? espnCell(p) + arbCell(p, maxArb) : "") +
+      (anyEdge ? edgeCell(p, maxEdge) : "") +
       `<td>${spread}</td>` +
       `<td class="num col-cov"><span class="cov">${p.n}/${sources.length}</span></td>`;
     if (SHOW_SRC) sources.forEach(s => {
@@ -1012,6 +1142,7 @@ function renderBoard() {
   });
   $("#board").innerHTML = html + "</tbody></table>";
   setSrcToggle(sources.length);
+  renderFreshness();
 }
 
 /* ---------- across all seasons ----------
@@ -2183,7 +2314,7 @@ function loadSeason(year) {
   return Promise.all([
     fetch(base + "summary.json", {cache: "no-cache"}).then(r => r.json()),
     fetch(base + "predraft.json", {cache: "no-cache"}).then(r => r.json()).catch(() => null),
-  ]).then(([s, p]) => { SUMMARY = s; PREDRAFT = p; });
+  ]).then(([s, p]) => { SUMMARY = s; PREDRAFT = p; adoptLeague(p); });
 }
 
 function renderSeasonSelect() {
@@ -2213,7 +2344,7 @@ fetch("data/seasons.json", {cache: "no-cache"}).then(r => r.json())
     return Promise.all([
       fetch("data/summary.json", {cache: "no-cache"}).then(r => r.json()),
       fetch("data/predraft.json", {cache: "no-cache"}).then(r => r.json()).catch(() => null),
-    ]).then(([s, p]) => { SUMMARY = s; PREDRAFT = p; });
+    ]).then(([s, p]) => { SUMMARY = s; PREDRAFT = p; adoptLeague(p); });
   })
   .then(renderAll)
   .catch(() => fail("No data yet — first capture pending."));
