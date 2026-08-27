@@ -1,0 +1,2360 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Analysis · NFL Rankings of Rankings</title>
+<style>
+/* ------------------------------------------------------------------
+   "The Stat Sheet" — a printed stat sheet brought to the web.
+   Sans for words, condensed mono for every numeral, paper-and-ink
+   surfaces, hairline rules instead of cards, one field-green accent.
+   ------------------------------------------------------------------ */
+:root {
+  color-scheme: light;
+  --font-sans: system-ui, "Segoe UI", -apple-system, Roboto, sans-serif;
+  --font-mono: ui-monospace, "Cascadia Mono", "SF Mono", Consolas, monospace;
+  --page: #faf9f7; --surface: #ffffff;
+  --ink: #16181d; --ink-2: #565b64; --muted: #5f6570;
+  --grid: #e2e0db; --baseline: #b9b5ac; --border: #e2e0db;
+  --s1: #3a6ea5; --s2: #d0842a; --s3: #3d9970; --s4: #7c6ca8;
+  --s5: #2a8f9d; --s6: #2f855a; --s7: #c94f6d; --s8: #c53030;
+  --accent: #0b6e4f; --accent-ink: #ffffff;
+  --chip: #f1efe9; --rowhover: rgba(11,110,79,0.06);
+  --r: 4px;      /* controls, chips, tooltips */
+  --r-sm: 2px;   /* inline badges and data bars */
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --page: #15171b; --surface: #1c1f24;
+    --ink: #e8e6e1; --ink-2: #9aa0a8; --muted: #9aa0a8;
+    --grid: #2c3037; --baseline: #4a4f56; --border: #2c3037;
+    --s1: #6da3d8; --s2: #e6a355; --s3: #57c08d; --s4: #a394d6;
+    --s5: #5cc4d2; --s6: #6fcf97; --s7: #e07a92; --s8: #f07575;
+    --accent: #4fd1a1; --accent-ink: #10231c;
+    --chip: #262a30; --rowhover: rgba(79,209,161,0.08);
+  }
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --page: #15171b; --surface: #1c1f24;
+  --ink: #e8e6e1; --ink-2: #9aa0a8; --muted: #9aa0a8;
+  --grid: #2c3037; --baseline: #4a4f56; --border: #2c3037;
+  --s1: #6da3d8; --s2: #e6a355; --s3: #57c08d; --s4: #a394d6;
+  --s5: #5cc4d2; --s6: #6fcf97; --s7: #e07a92; --s8: #f07575;
+  --accent: #4fd1a1; --accent-ink: #10231c;
+  --chip: #262a30; --rowhover: rgba(79,209,161,0.08);
+}
+* { box-sizing: border-box; }
+body {
+  margin: 0; background: var(--page); color: var(--ink);
+  font-family: var(--font-sans);
+  line-height: 1.5;
+}
+.wrap { max-width: 1160px; margin: 0 auto; padding: 32px 18px 64px; }
+button, input, select { font-family: var(--font-sans); }
+:is(button, input, select, a, summary):focus-visible {
+  outline: 2px solid var(--accent); outline-offset: 2px; border-radius: var(--r);
+}
+
+/* header */
+.hero { margin-bottom: 24px; }
+.eyebrow {
+  font-family: var(--font-mono); font-size: .72rem; letter-spacing: .14em;
+  text-transform: uppercase; color: var(--accent); margin: 0 0 8px; font-weight: 600;
+}
+.hero h1 { font-size: 1.75rem; margin: 0 0 8px; letter-spacing: -0.02em; font-weight: 800; }
+.hero .tag { color: var(--ink-2); margin: 0 0 16px; font-size: .9375rem; max-width: 640px; }
+.hero .chips { display: flex; gap: 8px; flex-wrap: wrap; }
+.hero .chip {
+  font-family: var(--font-mono); font-size: .72rem;
+  background: var(--chip); border: 1px solid var(--border); border-radius: var(--r);
+  padding: 3px 12px; color: var(--ink-2);
+}
+.hero .chip b { color: var(--ink); font-weight: 700; }
+
+/* controls */
+.tabs { display: flex; gap: 4px; flex-wrap: wrap; }
+.tabs button {
+  background: var(--surface); color: var(--ink-2); border: 1px solid var(--border);
+  border-radius: var(--r); padding: 6px 14px; cursor: pointer; font: inherit; font-size: .875rem;
+  transition: color .15s, background-color .15s, border-color .15s;
+}
+.tabs button:hover { color: var(--ink); border-color: var(--ink-2); }
+.tabs button.active {
+  color: var(--accent-ink); background: var(--accent); border-color: var(--accent); font-weight: 600;
+}
+.controls {
+  display: flex; gap: 24px; align-items: flex-end; flex-wrap: wrap;
+  margin: 24px 0 12px; padding: 12px 14px;
+  background: var(--surface); border: 1px solid var(--border); border-radius: var(--r);
+}
+.ctl { display: flex; flex-direction: column; gap: 6px; }
+.ctl > label {
+  font-family: var(--font-mono); font-size: .66rem; text-transform: uppercase;
+  letter-spacing: .1em; color: var(--muted); font-weight: 600;
+}
+.controls .tabs { margin: 0; }
+#season-select {
+  background: var(--surface); color: var(--ink); border: 1px solid var(--border);
+  border-radius: var(--r); padding: 6px 10px; font: inherit; font-size: .875rem; cursor: pointer;
+}
+.baseline-note { color: var(--ink-2); font-size: .8125rem; margin: 0 0 24px; }
+.baseline-note b { color: var(--ink); font-weight: 600; }
+
+/* sections: ruled, not boxed */
+.card {
+  background: none; border: 0; border-top: 2px solid var(--ink);
+  border-radius: 0; padding: 14px 0 4px; margin-bottom: 40px; box-shadow: none;
+}
+h2 { font-size: 1.1875rem; margin: 0 0 4px; letter-spacing: -0.01em; font-weight: 700; }
+.sub { color: var(--ink-2); margin: 0 0 14px; font-size: .875rem; max-width: 860px; }
+.takeaway {
+  color: var(--ink-2); font-size: .875rem; max-width: 860px;
+  margin: 14px 0 4px; padding: 8px 0 8px 14px; border-left: 3px solid var(--accent);
+}
+.takeaway::before {
+  content: "Takeaway"; display: block; font-family: var(--font-mono);
+  font-size: .66rem; text-transform: uppercase; letter-spacing: .1em;
+  color: var(--accent); font-weight: 600; margin-bottom: 4px;
+}
+
+table { border-collapse: collapse; width: 100%; font-size: .875rem; background: var(--surface); }
+th, td { text-align: left; padding: 6px 10px; border-bottom: 1px solid var(--grid); white-space: nowrap; }
+th {
+  font-family: var(--font-mono); color: var(--muted); font-weight: 600;
+  font-size: .68rem; text-transform: uppercase; letter-spacing: .08em;
+  border-bottom: 2px solid var(--ink);
+}
+td.num, th.num { text-align: right; }
+td.num, td.rk, .bar-val, .spread-num, .cov, #tooltip b {
+  font-family: var(--font-mono); font-variant-numeric: tabular-nums;
+}
+tbody tr:hover { background: var(--rowhover); }
+.rnk-chip {
+  display: inline-block; min-width: 20px; text-align: center; padding: 0 4px;
+  background: var(--ink); color: var(--page); border-radius: var(--r-sm); font-weight: 700;
+}
+.dot { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 7px; background: var(--muted); flex: none; }
+.srccell { display: inline-flex; align-items: center; }
+.legend { display: flex; gap: 16px; font-size: .8125rem; color: var(--ink-2); margin: 12px 0 0; flex-wrap: wrap; }
+.legend span { display: inline-flex; align-items: center; }
+.empty { color: var(--ink-2); font-style: italic; padding: 12px 0; }
+.scroll-x { overflow-x: auto; }
+.meta { color: var(--muted); font-size: .8125rem; margin-top: 8px; line-height: 1.7; border-top: 2px solid var(--ink); padding-top: 14px; }
+
+/* chart */
+.chartbox { position: relative; }
+/* Charts are drawn at the container's own pixel width (see chartWidth), so the
+   viewBox maps 1:1 to CSS pixels and label text stays at its intended size
+   instead of being scaled down to 4px on a phone. No horizontal scroll. */
+.chartbox svg { width: 100%; height: auto; display: block; }
+#tooltip {
+  position: absolute; pointer-events: none; display: none;
+  background: var(--surface); border: 1px solid var(--ink); border-radius: var(--r);
+  padding: 8px 10px; font-size: .8125rem; z-index: 5;
+  min-width: 140px;
+}
+#tooltip .tt-week { font-family: var(--font-mono); color: var(--muted); margin-bottom: 4px; font-size: .72rem; text-transform: uppercase; letter-spacing: .08em; }
+#tooltip .row { display: flex; justify-content: space-between; gap: 12px; }
+svg text { fill: var(--muted); font-size: 10.5px; font-family: var(--font-mono); }
+circle.wk-dot { cursor: pointer; }
+circle.wk-dot:hover { stroke: var(--ink); stroke-width: 3; }
+circle.cal-dot:hover { opacity: 1; stroke: var(--ink); stroke-width: 1.5; }
+.quad-note { font-size: 11px; font-weight: 600; font-family: var(--font-sans); }
+a { color: var(--accent); }
+.navback { margin: 0 0 14px; font-size: .9rem; }
+
+/* consensus board */
+.board-controls { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; margin-bottom: 12px; }
+.posfilter { display: flex; gap: 4px; flex-wrap: wrap; }
+.posfilter button, .calib-controls button {
+  background: var(--chip); color: var(--ink-2); border: 1px solid var(--border);
+  border-radius: var(--r); padding: 4px 10px; cursor: pointer; font: inherit; font-size: .8125rem;
+  transition: color .15s, border-color .15s;
+}
+.posfilter button:hover, .calib-controls button:hover { color: var(--ink); border-color: var(--ink-2); }
+.posfilter button.active, .calib-controls button.active {
+  color: var(--accent-ink); background: var(--accent); border-color: var(--accent); font-weight: 600;
+}
+#search {
+  background: var(--surface); color: var(--ink); border: 1px solid var(--border);
+  border-radius: var(--r); padding: 5px 12px; font: inherit; font-size: .875rem; width: 200px;
+}
+#search::placeholder { color: var(--muted); }
+.board-wrap { overflow: auto; max-height: 72vh; border: 1px solid var(--grid); background: var(--surface); }
+.board-wrap table { font-size: .8125rem; }
+.board-wrap thead th { position: sticky; top: 0; background: var(--surface); z-index: 3; box-shadow: 0 2px 0 var(--ink); border-bottom: 0; }
+.board-wrap th.pcol, .board-wrap td.pcol {
+  position: sticky; left: 0; background: var(--surface); z-index: 2; min-width: 210px;
+  box-shadow: 1px 0 0 var(--grid);
+}
+.board-wrap thead th.pcol { z-index: 4; box-shadow: 1px 0 0 var(--grid), 0 2px 0 var(--ink); }
+tbody tr:hover td.pcol { background: color-mix(in srgb, var(--surface) 94%, var(--accent)); }
+.pcell { display: flex; align-items: center; gap: 10px; }
+.face {
+  width: 42px; height: 42px; border-radius: 50%; object-fit: cover; object-position: top;
+  background: var(--chip); flex: none; border: 1px solid var(--border);
+}
+/* team logos want padding and no crop, unlike headshots */
+.face.logo { object-fit: contain; object-position: center; padding: 3px; background: var(--chip); }
+.mark {
+  display: inline-flex; align-items: center; justify-content: center;
+  min-width: 26px; height: 18px; padding: 0 5px; margin-right: 7px;
+  border-radius: var(--r); background: var(--chip); border: 1px solid var(--border);
+  color: var(--ink-2); font-size: .62rem; font-weight: 700;
+  letter-spacing: .02em; flex: none; line-height: 1; font-family: var(--font-mono);
+}
+th .mark { margin: 0 auto; }
+.calib-controls { display: flex; gap: 4px; flex-wrap: wrap; align-items: center; margin-bottom: 12px; }
+.calib-sep { width: 12px; }
+.bar-row { display: flex; align-items: center; gap: 10px; margin-bottom: 6px; font-size: .8125rem; }
+.bar-label { width: 42px; color: var(--ink-2); font-weight: 600; flex: none; font-family: var(--font-mono); font-size: .75rem; }
+.bar-track { flex: 1; background: var(--chip); border-radius: var(--r-sm); height: 14px; }
+.bar-fill { height: 14px; border-radius: var(--r-sm); display: block; }
+.bar-val { width: 72px; text-align: right; color: var(--ink-2); flex: none; font-size: .75rem; }
+.bar-group { margin-bottom: 20px; }
+.bar-group h4 { margin: 0 0 8px; font-size: .8125rem; font-weight: 700; color: var(--ink); display: flex; align-items: center; }
+/* Block, not flex. As a flex container every inline child became a flex item,
+   so a link inside the note was squeezed to its min-content width and broke
+   "Across all seasons" into a three-line column in the middle of a sentence. */
+.chart-note { color: var(--muted); font-size: .78rem; margin: 0 0 14px; line-height: 1.5; }
+.chart-note .arrow { color: var(--s3); margin-right: 6px; font-size: .7rem; }
+.note-sep { width: 1px; height: 12px; background: var(--grid); margin: 0 12px; display: inline-block; }
+th.sortable { cursor: pointer; user-select: none; }
+th.sortable:hover { color: var(--ink); }
+.spread-cell { display: flex; align-items: center; gap: 8px; }
+.spread-num { color: var(--muted); font-size: .72rem; white-space: nowrap; }
+/* Stands in for the Cov column only where that column is hidden; alongside it
+   the two would just say the same thing twice. */
+.cov-thin {
+  display: none;
+  font-family: var(--font-mono); font-size: .58rem; color: var(--muted);
+  margin-left: 3px; font-weight: 600;
+}
+.tag-pill {
+  display: inline-block; font-size: .62rem; font-weight: 600; border-radius: var(--r-sm);
+  padding: 1px 6px; margin-left: 6px; background: none; color: var(--muted);
+  border: 1px solid var(--baseline); text-transform: uppercase; letter-spacing: .05em;
+  font-family: var(--font-mono);
+}
+.face-fallback {
+  width: 42px; height: 42px; border-radius: 50%; background: var(--chip); color: var(--ink-2);
+  display: inline-flex; align-items: center; justify-content: center; font-size: .72rem;
+  font-weight: 600; flex: none; border: 1px solid var(--border);
+}
+.pname { font-weight: 700; line-height: 1.25; }
+.pmeta { color: var(--muted); font-size: .72rem; line-height: 1.4; }
+.posbadge {
+  display: inline-block; font-size: .64rem; font-weight: 700; border-radius: var(--r-sm);
+  padding: 0 5px; margin-right: 5px; color: var(--pos, var(--ink-2));
+  border: 1px solid var(--pos, var(--ink-2)); background: none;
+  font-family: var(--font-mono); letter-spacing: .03em;
+}
+.pos-QB { --pos: var(--s7); } .pos-RB { --pos: var(--s3); }
+.pos-WR { --pos: var(--s1); } .pos-TE { --pos: var(--s2); }
+.pos-K  { --pos: var(--s4); } .pos-DST{ --pos: var(--muted); }
+.tierbadge {
+  display: inline-block; min-width: 20px; text-align: center; padding: 0 5px;
+  border: 1px solid var(--border); background: var(--chip); border-radius: var(--r-sm);
+  font-family: var(--font-mono); font-size: .72rem; font-weight: 700; color: var(--ink-2);
+}
+.srctoggle {
+  background: var(--chip); color: var(--ink-2); border: 1px solid var(--border);
+  border-radius: var(--r); padding: 5px 12px; cursor: pointer; font: inherit;
+  font-size: .8125rem; margin-left: auto;
+}
+.srctoggle:hover { color: var(--ink); border-color: var(--ink-2); }
+.range { display: inline-block; width: 78px; height: 6px; background: var(--chip); border-radius: var(--r-sm); position: relative; vertical-align: middle; flex: none; }
+.range i { position: absolute; top: 0; height: 6px; background: var(--accent); opacity: .85; border-radius: var(--r-sm); min-width: 3px; }
+.cov { color: var(--muted); font-size: .75rem; }
+
+/* pipeline health */
+.health-banner {
+  border: 1px solid var(--s8); border-left: 3px solid var(--s8);
+  background: var(--surface); border-radius: var(--r);
+  padding: 10px 14px; margin: 0 0 20px; font-size: .875rem;
+}
+.health-banner b { color: var(--s8); }
+.hstate {
+  display: inline-block; font-family: var(--font-mono); font-size: .62rem;
+  font-weight: 700; letter-spacing: .05em; text-transform: uppercase;
+  border-radius: var(--r-sm); padding: 1px 6px; border: 1px solid var(--baseline);
+  color: var(--muted);
+}
+.hstate.ok { border-color: var(--s6); color: var(--s6); }
+.hstate.flaky { border-color: var(--s2); color: var(--s2); }
+.hstate.broken { border-color: var(--s8); color: var(--s8); }
+.herr { color: var(--muted); font-size: .75rem; font-family: var(--font-mono); }
+
+/* across-seasons card */
+.verdict {
+  border: 1px solid var(--border); border-left: 3px solid var(--accent);
+  background: var(--surface); border-radius: var(--r);
+  padding: 10px 14px; margin: 0 0 16px; font-size: .875rem; max-width: 880px;
+}
+.verdict b { font-weight: 700; }
+/* Forest plot of the paired interval. The centre rule is zero — an interval
+   crossing it is a difference the data cannot establish. */
+.fp {
+  display: inline-block; position: relative; width: 120px; height: 14px;
+  vertical-align: middle; margin-right: 8px; flex: none;
+}
+/* Zero is the whole point of this plot — an interval touching it is a
+   difference the data cannot establish — so the rule has to be clearly
+   visible, not a hairline the eye loses against the row. */
+.fp::before {
+  content: ""; position: absolute; left: 50%; top: -1px; bottom: -1px;
+  width: 1px; background: var(--muted);
+}
+.fp-ci { position: absolute; top: 6px; height: 2px; background: var(--ink-2); border-radius: 1px; }
+.fp-dot {
+  position: absolute; top: 3.5px; width: 7px; height: 7px; margin-left: -3.5px;
+  border-radius: 50%; background: var(--ink);
+}
+.fp-ci.tied { background: var(--baseline); }
+.fp-dot.tied { background: var(--muted); }
+.fp-dot.sep { background: var(--s8); }
+.vchip {
+  display: inline-block; font-family: var(--font-mono); font-size: .62rem;
+  font-weight: 700; letter-spacing: .05em; text-transform: uppercase;
+  border-radius: var(--r-sm); padding: 1px 6px; border: 1px solid var(--baseline);
+  color: var(--muted);
+}
+.vchip.ref { border-color: var(--accent); color: var(--accent); }
+.vchip.tied { border-color: var(--baseline); color: var(--ink-2); }
+.vchip.behind { border-color: var(--s8); color: var(--s8); }
+.vchip.ahead { border-color: var(--s6); color: var(--s6); }
+.vchip.thin { border-style: dashed; }
+.matrix table { font-size: .78rem; }
+.matrix td.yr { text-align: right; font-family: var(--font-mono); font-variant-numeric: tabular-nums; }
+.matrix th.yr { text-align: right; }
+.matrix td.srccol { position: sticky; left: 0; background: var(--surface); z-index: 2; box-shadow: 1px 0 0 var(--grid); }
+.matrix th.srccol { position: sticky; left: 0; background: var(--surface); z-index: 4; }
+.history-h3 { font-size: .8125rem; font-weight: 700; margin: 26px 0 4px; }
+
+/* expectation model */
+.model-grid { display: grid; grid-template-columns: minmax(300px, 5fr) minmax(320px, 7fr); gap: 28px; }
+/* Grid items default to min-width:auto, so the wide predictions table refused
+   to shrink and pushed the whole page into horizontal scroll on a phone. The
+   table still scrolls — inside its own box, which is the point. */
+.model-grid > * { min-width: 0; }
+@media (max-width: 900px) { .model-grid { grid-template-columns: 1fr; } }
+.model-h3 { font-size: .8125rem; font-weight: 700; margin: 0 0 10px; }
+.model-h3:not(:first-child) { margin-top: 22px; }
+.coef-row { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; font-size: .75rem; }
+.coef-label { width: 168px; flex: none; color: var(--ink-2); text-align: right; }
+.coef-track { flex: 1; position: relative; height: 13px; }
+.coef-track::before { content: ""; position: absolute; left: 50%; top: -2px; bottom: -2px; width: 1px; background: var(--baseline); }
+.coef-bar { position: absolute; top: 1.5px; height: 10px; border-radius: var(--r-sm); }
+.coef-val { width: 46px; flex: none; font-family: var(--font-mono); color: var(--ink-2); font-size: .72rem; }
+.model-tablewrap { max-height: 560px; overflow: auto; border: 1px solid var(--grid); }
+.model-tablewrap thead th { position: sticky; top: 0; background: var(--surface); z-index: 2; box-shadow: 0 2px 0 var(--ink); border-bottom: 0; }
+.model-tablewrap td { white-space: nowrap; }
+.minitables { display: flex; gap: 24px; flex-wrap: wrap; }
+.minitables table { width: auto; }
+.minitables td, .minitables th { padding: 3px 9px; font-size: .72rem; }
+.mini-cap { font-size: .72rem; color: var(--muted); margin: 0 0 6px; font-family: var(--font-mono); text-transform: uppercase; letter-spacing: .06em; cursor: help; }
+.pbar { display: inline-block; width: 44px; height: 7px; background: var(--chip); border-radius: var(--r-sm); vertical-align: middle; margin-right: 6px; }
+.pbar i { display: block; height: 7px; background: var(--accent); border-radius: var(--r-sm); }
+.ebar { display: inline-block; width: 56px; height: 7px; background: var(--chip); border-radius: var(--r-sm); vertical-align: middle; margin-right: 6px; position: relative; }
+.ebar::before { content: ""; position: absolute; left: 50%; top: -1px; bottom: -1px; width: 1px; background: var(--baseline); }
+.ebar i { position: absolute; top: 0; height: 7px; border-radius: var(--r-sm); }
+.pickslot { display: block; font-size: .6875rem; color: var(--muted); font-variant-numeric: tabular-nums; }
+td.epos, .epos { color: var(--s6); font-weight: 700; }
+td.eneg, .eneg { color: var(--s8); font-weight: 700; }
+.dpill {
+  display: inline-block; font-family: var(--font-mono); font-size: .66rem;
+  border: 1px solid var(--grid); border-radius: var(--r-sm); padding: 0 5px;
+  margin-right: 4px; color: var(--ink-2); background: var(--chip);
+}
+.dpill b { font-weight: 700; }
+.dpill b.pos { color: var(--s6); } .dpill b.neg { color: var(--s8); }
+#model-search {
+  background: var(--surface); color: var(--ink); border: 1px solid var(--border);
+  border-radius: var(--r); padding: 5px 12px; font: inherit; font-size: .875rem; width: 180px;
+}
+#model-search::placeholder { color: var(--muted); }
+#calib-tip {
+  position: absolute; pointer-events: none; display: none;
+  background: var(--surface); border: 1px solid var(--ink); border-radius: var(--r);
+  padding: 7px 10px; font-size: .8125rem; z-index: 5; white-space: nowrap;
+}
+#calib-tip .tt-week { font-family: var(--font-mono); color: var(--muted); font-size: .72rem; text-transform: uppercase; letter-spacing: .08em; margin-bottom: 2px; }
+#calib-tip b { font-family: var(--font-mono); }
+#model-meta { display: flex; gap: 8px; flex-wrap: wrap; margin: 0 0 18px; }
+#model-meta .chip {
+  font-family: var(--font-mono); font-size: .72rem; background: var(--chip);
+  border: 1px solid var(--border); border-radius: var(--r); padding: 3px 12px; color: var(--ink-2);
+}
+#model-meta .chip b { color: var(--ink); }
+
+/* player drill-in */
+.board-wrap tbody tr[data-pid] { cursor: pointer; }
+tr.detail-row:hover, tr.detail-row:hover td.pcol { background: none; }
+.detail-td { background: var(--page); padding: 14px 16px 16px; white-space: normal; }
+.phist { position: sticky; left: 16px; display: inline-block; max-width: min(880px, 86vw); }
+.phist-head { font-weight: 700; font-size: .8125rem; margin-bottom: 2px; }
+.phist-sub { color: var(--muted); font-size: .72rem; margin-bottom: 10px; font-family: var(--font-mono); }
+.phist table { width: auto; background: none; font-size: .75rem; }
+.phist th { border-bottom: 1px solid var(--ink); font-size: .62rem; }
+.phist td, .phist th { padding: 4px 9px; }
+.phist td { border-bottom: 1px solid var(--grid); }
+.phist .delta-pos { color: var(--s6); font-weight: 700; }
+.phist .delta-neg { color: var(--s8); font-weight: 700; }
+.phist-note { color: var(--ink-2); font-size: .8125rem; margin: 10px 0 0; max-width: 760px; }
+td.best { color: var(--s6); font-weight: 700; }
+td.worst { color: var(--s8); font-weight: 700; }
+td.rk { text-align: right; color: var(--ink-2); }
+th.rk { text-align: right; }
+td.na { text-align: right; color: var(--baseline); }
+
+@media (max-width: 640px) {
+  .wrap { padding: 20px 12px 48px; }
+  .hero h1 { font-size: 1.4rem; }
+  .hero .tag { font-size: .875rem; }
+  .controls { gap: 14px; padding: 10px 12px; }
+  .bar-val { width: 58px; }
+  /* search and the column toggle share a row rather than stacking; three
+     stacked full-width controls pushed the first data row off the screen */
+  #search { flex: 1 1 130px; width: auto; min-width: 0; }
+  #model-search { flex: 1 1 auto; width: auto; min-width: 0; }
+  .srctoggle { flex: 0 0 auto; width: auto; margin-left: 0; white-space: nowrap; }
+
+  /* Tap targets. Everything interactive was 30-35px tall; thumbs want ~44.
+     The filter rows are the worst offenders because they are also narrow. */
+  .tabs button, .posfilter button, .calib-controls button,
+  #season-select, .srctoggle, #search, #model-search {
+    min-height: 40px; padding-top: 8px; padding-bottom: 8px;
+  }
+  .posfilter button, .calib-controls button { min-width: 42px; }
+  .posfilter, .calib-controls, .tabs { gap: 6px; }
+  .board-controls { gap: 8px; }
+  /* Scoring and Defense fit on one row together; forcing every control group
+     onto its own row made the block 236px tall and pushed the first row of
+     real data off a phone screen entirely. */
+  .controls { gap: 10px 12px; padding: 10px 12px; }
+  .ctl { flex: 0 1 auto; }
+  .ctl:last-child { flex: 1 1 100%; }
+  #season-select { width: 100%; }
+  .ctl > label { font-size: .62rem; }
+  /* trimming the horizontal padding is what lets Scoring (3 tabs) and Defense
+     (2 tabs) share one row inside a 325px content box */
+  #fmt-tabs button, #roster-tabs button { padding-left: 10px; padding-right: 10px; }
+
+  /* Section rhythm: hairline-ruled sections need more air when the content
+     above them is a dense scrolling table. */
+  .card { margin-bottom: 30px; }
+  h2 { font-size: 1.0625rem; }
+  .sub, .takeaway, .verdict { font-size: .8125rem; }
+  .verdict { padding: 9px 11px; }
+
+  /* Wide analysis tables: drop the columns that are context, keep the ones
+     that carry the conclusion. Both remain available on a wider screen. */
+  .col-desc { display: none; }
+  /* The source cell was the widest column in every analysis table: a mark
+     chip, a full label and its tags all on one nowrap line came to 285px of a
+     351px container. Letting it wrap costs two lines and buys the rest of the
+     table. */
+  /* The monogram chip and the full name say the same thing. Side by side in a
+     wrapped 124px cell they cost an extra line per row and squeeze the plot
+     next to them, so the name alone carries it on a phone. */
+  .srccol .mark { display: none; }
+  .srccol { white-space: normal; max-width: 118px; }
+  .srccell { display: inline; }
+  .tag-pill { margin-left: 0; }
+  #history-board th, #history-board td,
+  #weekly-board th, #weekly-board td,
+  #predraft-board th, #predraft-board td { padding: 5px 6px; }
+  .fp { width: 86px; margin-right: 4px; }
+  .matrix table { font-size: .72rem; }
+  .matrix td.yr, .matrix th.yr { padding: 4px 6px; }
+
+  /* Coefficient labels were taking half the width of the model panel */
+  .coef-label { width: 104px; font-size: .7rem; }
+  .coef-val { width: 38px; }
+  .model-tablewrap td, .model-tablewrap th { padding: 5px 7px; }
+  .model-tablewrap td:first-child { max-width: 122px; white-space: normal; }
+  .pbar { width: 26px; margin-right: 4px; }
+  .minitables { gap: 14px; }
+
+  /* Drill-in stats table: ten columns will always scroll on a phone, but it
+     should scroll a little rather than a lot. */
+  .phist td, .phist th { padding: 3px 6px; font-size: .7rem; }
+  .detail-td { padding: 12px 10px 14px; }
+  .phist-note { font-size: .75rem; }
+
+  /* Section explanations run to 10-14 lines. On a phone that is a wall of
+     text between the reader and the data, so clamp it and let them open it.
+     The prose is worth keeping — it just should not be the first thing
+     between you and the board. */
+  .sub.clamped {
+    display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+  .sub.clamped.open { display: block; -webkit-line-clamp: unset; overflow: visible; }
+  .submore {
+    background: none; border: 0; padding: 2px 0 6px; margin: 0 0 8px;
+    color: var(--accent); font: inherit; font-size: .78rem; font-weight: 600;
+    cursor: pointer; text-decoration: underline; min-height: 0;
+  }
+
+  /* Tooltips are positioned panels; keep them inside a 375px screen */
+  #tooltip, #calib-tip { max-width: 88vw; }
+  #calib-tip { white-space: normal; }
+  /* Draft day is a phone. The sticky player column was eating 212px of a
+     349px board, leaving room for about one number; a smaller headshot and a
+     tighter name column fit the whole decision — tier, rank, value — on
+     screen without sideways scrolling. */
+  .board-wrap th.pcol, .board-wrap td.pcol { min-width: 126px; white-space: normal; }
+  /* The row number is redundant on a list you are already reading in order,
+     and dropping it is what brings the board inside the viewport. Scope this
+     to the board's own rows: an unscoped version also matched the rows of the
+     per-player history table nested inside the drill-in, silently hiding its
+     Season column and leaving a table of ranks with no year against them. */
+  .board-wrap > table > thead > tr > th:first-child,
+  .board-wrap > table > tbody > tr:not(.detail-row) > td:first-child { display: none; }
+  .face, .face-fallback { width: 30px; height: 30px; }
+  .pcell { gap: 7px; }
+  .pname { font-size: .8125rem; }
+  /* PPR carries more sources, so the coverage cell reads "10/10" instead of
+     "7/7" and the board tipped back over the edge; these few pixels are what
+     keep every format fitting without sideways scroll. */
+  .board-wrap th, .board-wrap td { padding: 5px 4px; }
+  .ebar { width: 28px; margin-right: 4px; }
+  .tierbadge { padding: 0 3px; }
+  /* Spread and Value are the two columns you actually draft off, so they keep
+     their place on a phone and coverage gives up its column instead. The
+     range bar goes too: at this width the min–max numbers carry the
+     disagreement and the bar is decoration. */
+  .col-cov { display: none; }
+  .spread-cell .range { display: none; }
+  .spread-num { font-size: .74rem; color: var(--ink-2); }
+  /* PPR carries ten sources, so both the rank range and the coverage flag run
+     wider than in half-PPR; these keep every format inside the same box. */
+  .cov-thin { display: inline; font-size: .54rem; margin-left: 2px; }
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <p class="navback"><a href="./">&larr; Back to the draft board</a></p>
+  <div class="health-banner" id="health-banner" hidden></div>
+
+  <div class="hero">
+    <p class="eyebrow">Fantasy football &middot; accuracy benchmark</p>
+    <h1>Analysis</h1>
+    <p class="tag">Expert rankings from major fantasy sites are snapshotted before games are played,
+    then scored against actual fantasy points. Sources are compared only on weeks and formats they publish.</p>
+    <div class="chips" id="hero-chips"></div>
+  </div>
+
+  <div class="controls">
+    <div class="ctl">
+      <label for="fmt-tabs">Scoring</label>
+      <div class="tabs" id="fmt-tabs">
+        <button data-fmt="half_ppr" class="active">Half PPR</button>
+        <button data-fmt="ppr">PPR</button>
+        <button data-fmt="standard">Standard</button>
+      </div>
+    </div>
+    <div class="ctl">
+      <label for="roster-tabs">Defense</label>
+      <div class="tabs" id="roster-tabs">
+        <button data-roster="offense" class="active"
+          title="Team defense — standard redraft">DST</button>
+        <button data-roster="idp"
+          title="Individual defensive players ranked alongside offense">IDP</button>
+      </div>
+    </div>
+    <div class="ctl">
+      <label for="season-select">Season</label>
+      <select id="season-select" aria-label="Season"></select>
+    </div>
+  </div>
+  <p class="baseline-note" id="baseline-note"></p>
+
+  <div class="card" id="history-card" hidden>
+    <h2>Across all seasons</h2>
+    <p class="sub" id="history-sub"></p>
+    <div class="calib-controls" id="history-controls">
+      <button data-hkind="weekly" class="active">Weekly rankings</button>
+      <button data-hkind="predraft">Pre-draft boards</button>
+    </div>
+    <p class="verdict" id="history-verdict"></p>
+    <div class="scroll-x" id="history-board"></div>
+    <h3 class="history-h3">Season by season</h3>
+    <p class="chart-note" id="history-matrix-note"></p>
+    <div class="scroll-x matrix" id="history-matrix"></div>
+    <p class="takeaway" id="history-takeaway"></p>
+  </div>
+
+  <div class="card">
+    <h2>In-season leaderboard</h2>
+    <p class="sub">Positions QB/RB/WR/TE/K/DST, averaged over scored weeks.
+    <b>Accuracy gap</b>: mean absolute difference, in fantasy points, between the points implied by a
+    source's rank and the points actually scored. Lower is better. <b>Spearman</b>: rank correlation
+    between predicted and actual positional order; 1.0 is a perfect ordering.</p>
+    <div id="weekly-board"></div>
+    <p class="takeaway">The two metrics weight errors differently: Spearman treats every rank inversion
+    equally, while the accuracy gap scales with the points at stake, so a miss at RB2 costs more than one
+    at RB45. A source can lead one metric and trail the other.</p>
+  </div>
+
+  <div class="card">
+    <h2>Week-by-week accuracy</h2>
+    <p class="sub">Mean Spearman correlation per week, averaged across positions. Click a point to load
+    that source-week in the scatter plot below.</p>
+    <div class="chartbox" id="chartbox">
+      <div id="trend-chart"></div>
+      <div id="tooltip"></div>
+    </div>
+    <div class="legend" id="trend-legend"></div>
+  </div>
+
+  <div class="card">
+    <h2>Average error by position</h2>
+    <p class="sub">Mean accuracy gap per position, in fantasy points, averaged over the season's scored
+    weeks. Lower is better.</p>
+    <div id="pos-breakdown"></div>
+  </div>
+
+  <div class="card">
+    <h2>Projected rank vs. actual finish</h2>
+    <p class="sub">One point per ranked player-week. Hover a point for the player, week, ranks, and points scored.</p>
+    <div class="calib-controls" id="calib-controls"></div>
+    <div class="chartbox" id="calib-box"><div id="calib-chart"></div><div id="calib-tip"></div></div>
+  </div>
+
+  <div class="card">
+    <h2>Pre-draft rankings vs. season results</h2>
+    <p class="sub">Each source's pre-draft board, frozen at kickoff, scored against cumulative season
+    points. Accuracy gap is measured over full-season totals and is therefore on a larger scale than the
+    weekly table. Overall = Spearman over the top-150 board order; blank for sources that publish
+    positional ranks only.</p>
+    <div id="predraft-board"></div>
+  </div>
+
+  <div class="card" id="model-card" hidden>
+    <h2>Expectation model</h2>
+    <p class="sub" id="model-sub"></p>
+    <div id="model-meta"></div>
+    <div class="model-grid">
+      <div>
+        <h3 class="model-h3">Coefficients — points of POE per SD of input</h3>
+        <div id="model-coefs"></div>
+        <h3 class="model-h3">Validation, test seasons</h3>
+        <div class="minitables">
+          <div>
+            <p class="mini-cap" title="Test player-seasons grouped into fifths by predicted POE; a working model shows observed means rising with predicted means.">Points over expectation, by predicted quintile</p>
+            <table id="model-quintiles"></table>
+          </div>
+          <div>
+            <p class="mini-cap" title="Test player-seasons grouped into tenths by predicted probability.">P(beat slot): predicted vs. observed</p>
+            <table id="model-reliability"></table>
+          </div>
+        </div>
+      </div>
+      <div>
+        <h3 class="model-h3" id="model-pred-head"></h3>
+        <div class="board-controls">
+          <div class="posfilter" id="model-posfilter">
+            <button data-mpos="ALL" class="active">All</button>
+            <button data-mpos="QB">QB</button><button data-mpos="RB">RB</button>
+            <button data-mpos="WR">WR</button><button data-mpos="TE">TE</button>
+          </div>
+          <input id="model-search" type="search" placeholder="Search players…">
+        </div>
+        <div class="model-tablewrap" id="model-table"></div>
+      </div>
+    </div>
+    <p class="takeaway" id="model-takeaway"></p>
+  </div>
+
+  <div class="card" id="health-card" hidden>
+    <h2>Pipeline health</h2>
+    <p class="sub">Every source this project captures, and whether the last automated run
+    actually got anything from it. A scraper that breaks does not announce itself — it just
+    stops contributing while the rest of the page carries on looking normal — so the state is
+    published here rather than left in a log file.</p>
+    <div class="scroll-x" id="health-board"></div>
+    <p class="chart-note" id="health-runs"></p>
+  </div>
+
+  <p class="meta" id="meta"></p>
+</div>
+
+<script>
+{
+  const t = new URLSearchParams(location.search).get("theme");
+  if (t === "light" || t === "dark") document.documentElement.dataset.theme = t;
+}
+const SRC_LABEL = {};
+const SRC_SHORT = {
+  fantasypros: "FPros", espn: "ESPN", cbs: "CBS", nfl: "NFL", yahoo: "Yahoo",
+  ringer: "Ringer", pff: "PFF", ffcalc: "FFC", mfl: "MFL", sharks: "Sharks",
+  sleeper: "Sleeper", "draftsharks-idp": "DShrk IDP", "ringer-superflex": "Ringer SF",
+  fftoday: "FFT", walter: "Walter", rotoballer: "RBall", draftsharks: "DSharks",
+  underdog: "UDog", nffc: "NFFC", footballguys: "FBG",
+  "yahoo-adp": "Yahoo ADP", "espn-adp": "ESPN ADP", "cbs-adp": "CBS ADP",
+};
+const SRC_ORDER = ["fantasypros", "espn", "sleeper", "cbs", "nfl", "fftoday", "yahoo", "pff",
+                   "ringer", "rotoballer", "footballguys", "draftsharks", "sharks",
+                   "ffcalc", "nffc", "yahoo-adp", "espn-adp", "cbs-adp", "mfl",
+                   "underdog", "walter"];
+const SRC_COLOR = {};
+SRC_ORDER.forEach((s, i) => { SRC_COLOR[s] = i < 8 ? `var(--s${i + 1})` : "var(--muted)"; });
+function dotStyle(s) { return `style="background:${SRC_COLOR[s] || "var(--muted)"}"`; }
+// Half PPR / 1QB / K+DST / single flex is the default league lens.
+let SUMMARY = null, PREDRAFT = null, SEASONS = null, HISTORY = null;
+let FMT = "half_ppr", POS = "ALL", QUERY = "", SEASON = null;
+// The league scores QB/RB/WR/TE/K/DST, so the leaderboard does too. Both scopes
+// are still computed and stored; per-position detail lives in the charts below,
+// which is where the K/DST noise is actually legible rather than hidden in an
+// average.
+const SCOPE = "all";
+let ROSTER = "offense";   // "offense" = team DST (default), "idp" = IDP leagues
+// board sort: "avg", "tier", "value", "cov", or a source slug; dir 1 = best first
+let SORT = {key: "avg", dir: 1};
+/* Per-source rank columns are the widest part of the board and the least
+   useful mid-draft. On a phone they pushed everything but the name off screen,
+   so they start collapsed on narrow viewports and stay available on a toggle.
+   The default tracks the viewport until the reader overrides it — otherwise a
+   page that first loaded narrow would stay collapsed after rotating. */
+let SHOW_SRC = !window.matchMedia("(max-width: 820px)").matches;
+let SRC_TOGGLED = false;
+function syncShowSrc() {
+  if (SRC_TOGGLED) return;
+  SHOW_SRC = !window.matchMedia("(max-width: 820px)").matches;
+}
+
+// History spans seasons whose sources may not appear in the season currently
+// loaded, so tags and labels fall back to the cross-season union.
+const srcTags = s => (SUMMARY && SUMMARY.source_tags && SUMMARY.source_tags[s])
+                     || (HISTORY && HISTORY.source_tags && HISTORY.source_tags[s]) || {};
+// a source can be an expert board pre-draft and a projection weekly (ESPN is),
+// so weekly views badge from the weekly tags
+const weeklyTags = s => (SUMMARY && SUMMARY.weekly_tags && SUMMARY.weekly_tags[s])
+                        || srcTags(s);
+
+/* A source belongs in the current view when its roster type matches and it
+   isn't answering a different question (superflex / best ball). */
+function inView(s) {
+  const t = srcTags(s);
+  if ((t.roster || "offense") !== ROSTER) return false;
+  if ((t.qb || "1qb") !== "1qb") return false;
+  if ((t.scope || "redraft") !== "redraft") return false;
+  return true;
+}
+
+/* Short badges explaining why a source is what it is. */
+function tagPills(s, scope) {
+  const t = scope === "weekly" ? weeklyTags(s) : srcTags(s);
+  const out = [];
+  if (t.basis === "adp") out.push(["ADP", "Market average draft position, not an expert opinion"]);
+  if (t.basis === "projection") out.push(["PROJECTION",
+    "Ranked by projected points rather than by expert opinion — it answers who scores most, not who you should start"]);
+  if (t.scope === "bestball") out.push(["BEST BALL", "Best-ball ADP — no waivers, streaming or start/sit, and no K/DST"]);
+  if (t.scope === "dynasty-mixed") out.push(["DYNASTY MIX",
+    "ADP pooled across redraft, keeper and dynasty leagues — rookies are drafted about 190 ranks earlier than the redraft consensus, so it is not comparable to a redraft board"]);
+  if (t.qb === "superflex") out.push(["SUPERFLEX", "Two-QB format — not comparable to a 1QB board"]);
+  if (t.roster === "idp") out.push(["IDP", "Individual defensive players ranked alongside offense"]);
+  if (t.order === "positional") out.push(["BY POSITION", "Ranks restart at 1 per position — no overall board"]);
+  return out.map(([txt, tip]) => `<span class="tag-pill" title="${esc(tip)}">${esc(txt)}</span>`).join("");
+}
+
+// leaderboard.{weekly,predraft}[fmt] is {skill:[...], all:[...]}
+function boardFor(kind) {
+  const b = (SUMMARY.leaderboard[kind] || {})[FMT];
+  if (!b) return [];
+  const rows = Array.isArray(b) ? b : (b[SCOPE] || []);   // arrays = pre-scope data
+  return rows.filter(r => inView(r.source));
+}
+function weekScore(entry, w) {
+  const wk = entry.weeks[String(w)];
+  if (!wk) return null;
+  const sc = wk.scopes && wk.scopes[SCOPE];
+  return sc ? sc.avg_spearman : (SCOPE === "skill" ? wk.avg_spearman : null);
+}
+
+const $ = s => document.querySelector(s) || {};
+const FALLBACK_LABEL = {
+  nffc: "NFFC (ADP)", footballguys: "Footballguys", "yahoo-adp": "Yahoo (ADP)",
+  "espn-adp": "ESPN (ADP)", "cbs-adp": "CBS (ADP)", nfl: "NFL.com",
+};
+const srcName = s => (SUMMARY && SUMMARY.labels && SUMMARY.labels[s])
+                     || (HISTORY && HISTORY.labels && HISTORY.labels[s])
+                     || FALLBACK_LABEL[s] || SRC_LABEL[s] || s;
+const srcShort = s => SRC_SHORT[s] || srcName(s).slice(0, 6);
+const esc = t => String(t).replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+
+function orderSources(list) {
+  return [...list].sort((a, b) => {
+    const ia = SRC_ORDER.indexOf(a), ib = SRC_ORDER.indexOf(b);
+    return (ia < 0 ? 99 : ia) - (ib < 0 ? 99 : ib);
+  });
+}
+
+function initials(name) {
+  return name.split(/\s+/).map(w => w[0]).slice(0, 2).join("").toUpperCase();
+}
+
+function faceHtml(p) {
+  const init = esc(initials(p.name));
+  if (!p.id) return `<span class="face-fallback">${init}</span>`;
+  // defenses are keyed by team code, and Sleeper serves team logos off the
+  // same CDN as player headshots
+  const src = p.pos === "DST"
+    ? `https://sleepercdn.com/images/team_logos/nfl/${String(p.id).toLowerCase()}.png`
+    : `https://sleepercdn.com/content/nfl/players/thumb/${p.id}.jpg`;
+  const cls = p.pos === "DST" ? "face logo" : "face";
+  // the replacement markup lives inside a double-quoted attribute, so its own
+  // quotes have to be entities or they close the attribute early
+  const fb = `<span class=&quot;face-fallback&quot;>${init}</span>`;
+  return `<img class="${cls}" loading="lazy" src="${src}" alt="" ` +
+         `onerror="this.outerHTML='${fb}'">`;
+}
+
+/* Source marks. Favicons proved unreliable at this size (ESPN serves an empty
+   body, CBS a 26px gif), so each source gets a neutral monogram chip instead —
+   always renders, no third-party request, readable in both themes. Chips are
+   deliberately uncolored: color is reserved for data (chart series, positions). */
+const SRC_MARK = {
+  fantasypros: "FPros", espn: "ESPN", cbs: "CBS",
+  nfl: "NFL", yahoo: "Yahoo", ringer: "Ringer",
+  "ringer-superflex": "Ringer SF", pff: "PFF",
+  rotoballer: "RotoB", draftsharks: "DShrk",
+  "draftsharks-idp": "DShrk IDP", sharks: "FShrk",
+  fftoday: "FFToday", walter: "Walter",
+  ffcalc: "FFCalc", mfl: "MFL", underdog: "Underdog",
+  sleeper: "Sleeper", nffc: "NFFC", footballguys: "FBguys",
+  "yahoo-adp": "Yahoo ADP", "espn-adp": "ESPN ADP", "cbs-adp": "CBS ADP",
+};
+
+function srcMark(s, withName) {
+  const txt = SRC_MARK[s] || (SRC_SHORT[s] || s).slice(0, 2).toUpperCase();
+  const chip = `<span class="mark">${esc(txt)}</span>`;
+  return withName ? `<span class="srccell">${chip}${esc(srcName(s))}</span>` : chip;
+}
+
+function renderHero() {
+  // Count the sources that actually reach a leaderboard, not every source with
+  // a captured board. A source can be captured and still be unscoreable this
+  // season, and a hero chip claiming more sources than the tables list reads
+  // as a bug.
+  const inFmt = new Set();
+  boardFor("weekly").forEach(r => inFmt.add(r.source));
+  boardFor("predraft").forEach(r => inFmt.add(r.source));
+  // preseason: nothing is scored yet, so fall back to what has been captured
+  if (!inFmt.size) {
+    Object.keys(SUMMARY.weekly[FMT] || {}).forEach(s => inView(s) && inFmt.add(s));
+    Object.keys(SUMMARY.predraft[FMT] || {}).forEach(s => inView(s) && inFmt.add(s));
+  }
+  const updated = (SUMMARY.generated_at || "").slice(0, 10);
+  const wks = SUMMARY.weeks_evaluated.length;
+  const nSeasons = (SEASONS && SEASONS.scored || []).length;
+  $("#hero-chips").innerHTML =
+    `<span class="chip"><b>${SUMMARY.season}</b> season</span>` +
+    `<span class="chip"><b>${inFmt.size}</b> ${inFmt.size === 1 ? "source" : "sources"} in this view</span>` +
+    `<span class="chip"><b>${wks}</b> ${wks === 1 ? "week" : "weeks"} scored</span>` +
+    (nSeasons > 1 ? `<span class="chip"><b>${nSeasons}</b> seasons of history</span>` : "") +
+    `<span class="chip">updated <b>${updated}</b></span>`;
+}
+
+/* ---------- consensus board ---------- */
+/* The single actionable cell on a draft board: where expert opinion and the
+   market disagree, and by how much. */
+function valueCell(p, maxVal) {
+  if (p.value == null) {
+    return '<span class="na" title="No market ADP source ranks him, so there is nothing to compare expert opinion against">–</span>';
+  }
+  const w = Math.min(50, Math.abs(p.value) / maxVal * 50);
+  const side = p.value >= 0 ? `left:50%;width:${w}%` : `left:${50 - w}%;width:${w}%`;
+  const col = p.value >= 0 ? "var(--s6)" : "var(--s8)";
+  const tip = `experts ${p.exp} (${p.n_exp}) · market ${p.adp} (${p.n_adp}) · ` +
+    (p.value >= 0 ? `falls ${Math.abs(p.value)} picks past expert value`
+                  : `drafted ${Math.abs(p.value)} picks ahead of expert value`);
+  return `<span class="ebar" title="${esc(tip)}"><i style="${side};background:${col}"></i></span>` +
+    `<span class="${p.value >= 0 ? "epos" : "eneg"}">${p.value >= 0 ? "+" : "−"}${Math.abs(p.value).toFixed(0)}</span>`;
+}
+
+/* ESPN's two numbers, side by side with the edge against them.
+
+   The ADP shown is the decimal, not its ordinal: by the back of round nine
+   ESPN's 100th-ranked player already has an ADP near 108, so the ordinal
+   quietly understates where he actually goes by most of a round. The
+   round.pick label is what makes it actionable — "9.12" is a decision, "107.6"
+   is a statistic. */
+let ESPN_TEAMS = 12;
+
+/* The league is described by the data, not hardcoded in the page: compute.py
+   writes it from scripts/league.py, so changing the league in one place moves
+   every round.pick label on the site with it. */
+/* ADP moves every day of draft season, so the board has to say how old its
+   numbers are. A stale ESPN ADP is worse than none: it is an edge you would
+   act on that the room has already priced in. */
+function ageWords(iso) {
+  if (!iso) return null;
+  const hrs = (Date.now() - Date.parse(iso)) / 3.6e6;
+  if (!isFinite(hrs)) return null;
+  if (hrs < 1.5) return "less than an hour ago";
+  if (hrs < 36) return Math.round(hrs) + " hours ago";
+  return Math.round(hrs / 24) + " days ago";
+}
+
+function renderFreshness() {
+  const el = document.getElementById("espn-freshness");
+  if (!el) return;
+  const meta = PREDRAFT && PREDRAFT.espn && PREDRAFT.espn.sources;
+  const adp = meta && meta["espn-adp"];
+  if (!adp) { el.innerHTML = ""; return; }
+  const age = ageWords(adp.captured_at);
+  const hrs = (Date.now() - Date.parse(adp.captured_at)) / 3.6e6;
+  const stale = hrs > 30;
+  const others = (PREDRAFT.built_at ? ageWords(PREDRAFT.built_at) : null);
+  // Which sources the consensus is actually built from matters as much as how
+  // fresh it is: half-PPR is the thinnest of the three formats, because
+  // several major boards (CBS, PFF, Footballguys, NFFC) publish PPR only.
+  const blk = PREDRAFT.formats && PREDRAFT.formats[FMT];
+  const cov = blk ? `Arbitraged against ${blk.sources.length} non-ESPN source` +
+    (blk.sources.length === 1 ? "" : "s") + `: ${blk.sources.map(srcName).join(", ")}.` : "";
+  el.innerHTML = `<b>Captured:</b> ESPN ADP ${esc(age || "at an unknown time")}` +
+    (others ? `, everything else rebuilt ${esc(others)}` : "") +
+    (stale ? ' — <span class="eneg" style="font-weight:700">re-run the refresh before you draft</span>, ADP moves daily in draft season.' : ".") +
+    (cov ? " " + esc(cov) : "");
+}
+
+function adoptLeague(pre) {
+  const t = pre && pre.league && pre.league.teams;
+  if (t) ESPN_TEAMS = t;
+}
+
+function espnCell(p) {
+  const e = p.espn;
+  if (!e || e.adp == null) {
+    return '<td class="na col-espn" title="ESPN’s drafters have never taken him, so ESPN publishes no ADP for him">–</td>';
+  }
+  const tip = `ESPN ADP ${e.adp} — round ${e.pick} in a ${ESPN_TEAMS}-team draft` +
+    (e.rank != null
+      ? ` · ESPN’s own analysts rank him ${e.rank}, ${e.rank <= e.adp ? "ahead of" : "behind"} where their drafters take him`
+      : " · ESPN’s own board does not rank him");
+  return `<td class="num col-espn" title="${esc(tip)}"><b>${e.adp.toFixed(1)}</b>` +
+    `<span class="pickslot">${esc(e.pick || "")}` +
+    (e.rank != null ? ` · rk${e.rank}` : "") + `</span></td>`;
+}
+
+/* The caveat that decides whether an edge is real.
+
+   An edge is exploitable when ESPN's *room* is slow and ESPN's own analysts
+   are not — the analysts have him where the industry has him, and the
+   drafters have not caught up. It is not exploitable when ESPN's analysts sit
+   next to their drafters and both sit far from everyone else: that is ESPN
+   disagreeing with the industry about the player, usually because of an
+   injury, a depth-chart move or a suspension one side has priced and the
+   other has not. The gap looks identical in the arithmetic and means the
+   opposite thing, so it has to be called out rather than sorted highly.
+
+   The test compares the two *detrended* deviations. Raw ones will not do:
+   ESPN's editorial board has its own drift down the board, far bigger than
+   the ADP's — by consensus 151-200 it runs about +71 — and the two raw
+   deviations are essentially uncorrelated (r = 0.05). Against raw numbers the
+   test fires on almost everything near the top, because two unrelated drifts
+   both happen to point the same way there. Detrended they correlate at 0.52,
+   which is the real signal: ESPN's analysts and ESPN's drafters do share
+   information, and the question is whether they share it here. */
+function espnConsensusSplit(p) {
+  const e = p.espn;
+  if (!e || e.rank == null || p.arb == null || p.espn_dev_adj == null
+      || p.arb_adj == null) return null;
+  if (Math.abs(p.arb) < 12) return null;     // too small a gap to be about anything
+  if (Math.sign(p.espn_dev_adj) !== Math.sign(p.arb_adj)) return null;
+  if (Math.abs(p.espn_dev_adj) < Math.abs(p.arb_adj) / 2) return null;
+  const dir = p.arb_adj >= 0 ? "lower" : "higher";
+  return `careful: ESPN’s own analysts rank him ${e.rank}, ${dir} than the ` +
+    `consensus by about as much as their drafters go ${p.arb_adj >= 0 ? "late" : "early"} ` +
+    `on him — so this is ESPN and the industry disagreeing about the player, ` +
+    `not a slow draft room. Check his injury and depth-chart news before acting ` +
+    `on it. The cleanest edges are the large ones without this mark`;
+}
+
+function edgeCell(p, maxEdge) {
+  if (p.arb_adj == null) return '<td class="na col-edge">–</td>';
+  const w = Math.min(50, Math.abs(p.arb_adj) / maxEdge * 50);
+  const side = p.arb_adj >= 0 ? `left:50%;width:${w}%` : `left:${50 - w}%;width:${w}%`;
+  const col = p.arb_adj >= 0 ? "var(--s6)" : "var(--s8)";
+  const base = p.arb_base != null
+    ? `players ranked near him go ${p.arb_base >= 0 ? "" : "−"}${Math.abs(p.arb_base).toFixed(0)} picks ${p.arb_base >= 0 ? "later" : "earlier"} than their rank in ESPN rooms, and he goes ${Math.abs(p.arb).toFixed(0)} ${p.arb >= 0 ? "later" : "earlier"}`
+    : "";
+  const verdict = p.arb_adj >= 0
+    ? `— about ${Math.abs(p.arb_adj).toFixed(0)} picks of real discount`
+    : `— about ${Math.abs(p.arb_adj).toFixed(0)} picks of real premium`;
+  const w2 = espnConsensusSplit(p);
+  return `<td class="num col-edge ${p.arb_adj >= 0 ? "epos" : "eneg"}" title="${esc(base + " " + verdict + (w2 ? " — " + w2 : ""))}">` +
+    `<span class="ebar"><i style="${side};background:${col}"></i></span>` +
+    `${p.arb_adj >= 0 ? "+" : "−"}${Math.abs(p.arb_adj).toFixed(0)}` +
+    (w2 ? '<sup class="cov-thin" title="ESPN’s analysts agree with ESPN’s drafters here, so this is a disagreement about the player rather than a mispriced room — hover for detail">!</sup>' : "") +
+    "</td>";
+}
+
+function arbCell(p, maxArb) {
+  if (p.arb == null) {
+    return '<td class="na" title="No ESPN ADP for him, so there is nothing to arbitrage against">–</td>';
+  }
+  const w = Math.min(50, Math.abs(p.arb) / maxArb * 50);
+  const side = p.arb >= 0 ? `left:50%;width:${w}%` : `left:${50 - w}%;width:${w}%`;
+  const col = p.arb >= 0 ? "var(--s6)" : "var(--s8)";
+  const tip = `consensus ${p.avg} (${p.n} sources) · ESPN ADP ${p.espn.adp}` +
+    (p.arb_exp != null ? ` · ${p.arb_exp >= 0 ? "+" : "−"}${Math.abs(p.arb_exp).toFixed(0)} against the expert boards alone` : "") +
+    " · " + (p.arb >= 0
+      ? `ESPN’s room lets him fall about ${Math.abs(p.arb).toFixed(0)} picks past the consensus — wait for him`
+      : `ESPN’s room takes him about ${Math.abs(p.arb).toFixed(0)} picks ahead of the consensus — reach or pass`);
+  return `<td class="num ${p.arb >= 0 ? "epos" : "eneg"}" title="${esc(tip)}">` +
+    `<span class="ebar"><i style="${side};background:${col}"></i></span>` +
+    `${p.arb >= 0 ? "+" : "−"}${Math.abs(p.arb).toFixed(0)}</td>`;
+}
+
+/* The toggle only means anything next to an actual table. Every early return
+   below used to skip the code that labels it, leaving a full-width blank
+   button on screen whenever the board was empty — visible on any format with
+   no captured boards, and in the IDP lens. */
+function setSrcToggle(nSources) {
+  const btn = document.getElementById("src-toggle");
+  if (!btn) return;
+  if (!nSources) { btn.hidden = true; return; }
+  btn.hidden = false;
+  // the short label shares a row with the search box on a phone
+  btn.textContent = isNarrow()
+    ? (SHOW_SRC ? "Hide " : "Show ") + nSources + " src"
+    : (SHOW_SRC ? "Hide " : "Show ") + nSources + " source column" +
+      (nSources === 1 ? "" : "s");
+  btn.title = (SHOW_SRC ? "Hide" : "Show") + " the per-source rank columns";
+  btn.setAttribute("aria-pressed", String(SHOW_SRC));
+}
+
+function renderBoard() {
+  // Always resolve the column default against the live viewport. Relying on
+  // the value captured when the script first parsed left the board collapsed
+  // on a wide screen whenever the two disagreed.
+  syncShowSrc();
+  setSrcToggle(0);   // re-shown below only when a table is actually drawn
+  // the consensus is built from 1QB offense boards only; in the IDP lens there
+  // is no consensus to show, so say so instead of showing contradictory data
+  if (ROSTER !== "offense") {
+    $("#board").innerHTML = '<div class="empty" style="padding:14px">The consensus board aggregates 1QB offense boards only. One IDP source is captured (Draft Sharks), which is not sufficient to form a consensus; its accuracy is reported in the leaderboards below. Switch Defense to DST to view the board.</div>';
+    return;
+  }
+  const data = PREDRAFT && PREDRAFT.formats[FMT];
+  if (!data || !data.players || !data.players.length) {
+    $("#board").innerHTML = '<div class="empty" style="padding:14px">No boards captured for this format yet.</div>';
+    return;
+  }
+  const sources = orderSources(data.sources);
+  let rows = data.players;
+  if (POS !== "ALL") rows = rows.filter(p => p.pos === POS);
+  if (QUERY) rows = rows.filter(p => p.name.toLowerCase().includes(QUERY));
+  // scale to the widest rank actually displayed — against a fixed 200 the
+  // top of the board collapses into an unreadable sliver
+  // Sort by consensus, coverage, or any single source's ranking. Players a
+  // source didn't rank always sort last: "unranked" is missing data, not a
+  // good or bad score, so it shouldn't win either end of the table.
+  rows = rows.slice().sort((a, b) => {
+    const get = r => SORT.key === "avg" ? r.avg
+                   : SORT.key === "cov" ? -r.n
+                   : SORT.key === "tier" ? (r.tier != null ? r.tier : Infinity)
+                   // value sorts best-first, and "no market coverage" is
+                   // missing data rather than a zero-value verdict
+                   : SORT.key === "value" ? (r.value != null ? -r.value : Infinity)
+                   // ESPN's own two numbers, and the edge against them. Like
+                   // value, "ESPN doesn't list him" is missing data, so those
+                   // players sort last in either direction rather than
+                   // winning whichever end of the table a zero would win.
+                   : SORT.key === "arb" ? (r.arb != null ? -r.arb : Infinity)
+                   : SORT.key === "arbadj" ? (r.arb_adj != null ? -r.arb_adj : Infinity)
+                   : SORT.key === "espn" ? ((r.espn && r.espn.adp != null) ? r.espn.adp : Infinity)
+                   : SORT.key === "espnrank" ? ((r.espn && r.espn.rank != null) ? r.espn.rank : Infinity)
+                   : (r.ranks[SORT.key] != null ? r.ranks[SORT.key] : Infinity);
+    const va = get(a), vb = get(b);
+    if (va === Infinity && vb === Infinity) return a.avg - b.avg;
+    if (va === Infinity) return 1;
+    if (vb === Infinity) return -1;
+    return (va - vb) * SORT.dir;
+  });
+  if (!rows.length) {
+    const what = [QUERY && `\u201c${esc(QUERY)}\u201d`, POS !== "ALL" && POS]
+      .filter(Boolean).join(" at ");
+    $("#board").innerHTML = `<div class="empty" style="padding:14px">No players match ${what || "these filters"} \u2014 clear the search or position filter.</div>`;
+    setSrcToggle(sources.length);   // the board exists, this filter just found nothing
+    return;
+  }
+  const caret = k => SORT.key === k ? (SORT.dir === 1 ? " \u25b2" : " \u25bc") : "";
+  const maxRank = Math.max(10, ...rows.map(r => r.max));
+  // seasons computed before these columns existed simply omit them
+  const anyValue = rows.some(r => r.value != null);
+  const anyTier = rows.some(r => r.tier != null);
+  const maxVal = Math.max(5, ...rows.map(r => Math.abs(r.value || 0)));
+  const maxArb = Math.max(5, ...rows.map(r => Math.abs(r.arb || 0)));
+  const maxEdge = Math.max(5, ...rows.map(r => Math.abs(r.arb_adj || 0)));
+  const nExp = (data.experts || []).length, nMkt = (data.market || []).length;
+  // ESPN sits outside the consensus by construction (see compute.espn_lane),
+  // so these columns appear whenever the lane was captured, in every format —
+  // ESPN publishes no half-PPR board of its own and one pooled ADP.
+  const anyEspn = rows.some(r => r.espn && r.espn.adp != null);
+  const anyEdge = rows.some(r => r.arb_adj != null);
+  const nSrc = sources.length;
+  let html = '<table><thead><tr><th class="num">#</th><th class="pcol">Player</th>' +
+    (anyTier ? `<th class="num sortable" data-sort="tier" title="Positional tier: players inside a tier are close enough in expected value to be treated as interchangeable. Click to sort.">Tier${caret("tier")}</th>` : "") +
+    `<th class="num sortable" data-sort="avg" title="Mean rank across the sources that rank him. Click to sort.">Avg${caret("avg")}</th>` +
+    (anyValue ? `<th class="num sortable" data-sort="value" title="Expert consensus rank minus market ADP. Positive (green) = the market lets him fall past where the experts rank him, so you can wait. Negative = the market drafts him ahead of expert opinion. From ${nExp} expert board${nExp === 1 ? "" : "s"} and ${nMkt} ADP source${nMkt === 1 ? "" : "s"}. Click to sort.">Value${caret("value")}</th>` : "") +
+    (anyEspn ? `<th class="num sortable col-espn" data-sort="espn" title="ESPN's own average draft position — the number in the ESPN draft room — with the round.pick it lands on in a ${ESPN_TEAMS}-team draft, and rk = where ESPN's own analysts rank him. Click to sort.">ESPN ADP${caret("espn")}</th>` : "") +
+    (anyEspn ? `<th class="num sortable" data-sort="arb" title="ESPN ADP minus the consensus rank of the ${nSrc} non-ESPN source${nSrc === 1 ? "" : "s"}, in picks. Positive (green) = ESPN's room lets him fall past where the industry ranks him, so you can wait and take the discount. Negative (red) = ESPN's room reaches, so you pay above market or pass. Reads the same direction as Value. Click to sort.">Arb${caret("arb")}</th>` : "") +
+    (anyEdge ? `<th class="num sortable col-edge" data-sort="arbadj" title="The same gap, measured against the drift at this part of the board instead of against zero. Every skill player's ESPN ADP runs later than his consensus rank, because ESPN's rooms spend picks on kickers, defenses and quarterbacks earlier than the industry ranks them — around the middle rounds the typical gap is a whole round. Edge is Arb minus that local drift, so it says who is mispriced relative to his neighbours rather than relative to the room's shape. This is the column to sort by. Click to sort.">Edge${caret("arbadj")}</th>` : "") +
+    '<th title="Best and worst rank any source gave him — how much the sources disagree">Spread</th>' +
+    // Coverage is a data-quality caveat rather than a draft decision, so it
+    // gives up its column on a phone. Partial coverage is still flagged on
+    // the spread number itself, where it actually changes the reading.
+    `<th class="num sortable col-cov" data-sort="cov" title="How many sources rank him. Click to sort.">Cov${caret("cov")}</th>` +
+    (SHOW_SRC ? sources.map(s => `<th class="rk sortable" data-sort="${esc(s)}" title="${esc(srcName(s))} \u2014 click to sort by this source">${srcMark(s)}${caret(s)}</th>`).join("") : "") +
+    "</tr></thead><tbody>";
+  rows.forEach((p, i) => {
+    const left = (p.min - 1) / maxRank * 100, width = Math.max(2, (p.max - p.min) / maxRank * 100);
+    // A rank range built from 3 of 8 sources means something different from
+    // one built from all 8, so flag the thin ones right where the range is
+    // read rather than relying on a Cov column that may be hidden.
+    const thin = p.n < sources.length;
+    const covFlag = thin
+      ? `<sup class="cov-thin" title="Ranked by only ${p.n} of ${sources.length} sources">${p.n}/${sources.length}</sup>`
+      : "";
+    const spread = `<span class="spread-cell"><span class="range" title="Best rank ${p.min}, worst ${p.max}"><i style="left:${left}%;width:${width}%"></i></span><span class="spread-num">${p.min}–${p.max}${covFlag}</span></span>`;
+    const rnk = i < 3 && SORT.key === "avg" && SORT.dir === 1
+      ? `<span class="rnk-chip">${i + 1}</span>` : String(i + 1);
+    html += `<tr data-pid="${esc(p.id || "")}" tabindex="0" role="button" aria-expanded="false"` +
+      ` title="Click for multi-season history"><td class="num">${rnk}</td>` +
+      `<td class="pcol"><span class="pcell">${faceHtml(p)}<span><span class="pname">${esc(p.name)}</span><br>` +
+      `<span class="pmeta"><span class="posbadge pos-${p.pos}">${p.pos}</span>${esc(p.team || "")}</span></span></span></td>` +
+      (anyTier ? `<td class="num"><span class="tierbadge" title="${esc(p.pos)} tier ${p.tier}${p.implied != null ? " · slot worth about " + Math.round(p.implied) + " pts" : ""}">${p.tier != null ? p.tier : "–"}</span></td>` : "") +
+      `<td class="num"><b>${p.avg}</b></td>` +
+      (anyValue ? `<td class="num">${valueCell(p, maxVal)}</td>` : "") +
+      (anyEspn ? espnCell(p) + arbCell(p, maxArb) : "") +
+      (anyEdge ? edgeCell(p, maxEdge) : "") +
+      `<td>${spread}</td>` +
+      `<td class="num col-cov"><span class="cov">${p.n}/${sources.length}</span></td>`;
+    if (SHOW_SRC) sources.forEach(s => {
+      const r = p.ranks[s];
+      if (r == null) { html += '<td class="na">–</td>'; return; }
+      const cls = (r === p.min && p.max !== p.min) ? "rk best" : (r === p.max && p.max !== p.min) ? "rk worst" : "rk";
+      html += `<td class="${cls}">${r}</td>`;
+    });
+    html += "</tr>";
+  });
+  $("#board").innerHTML = html + "</tbody></table>";
+  setSrcToggle(sources.length);
+  renderFreshness();
+}
+
+/* ---------- across all seasons ----------
+   A single season routinely separates sources by less than the noise in the
+   measurement, so the durable question is only answerable across seasons —
+   and only on the weeks the sources actually share. */
+let HKIND = "weekly";
+const HKIND_LABEL = {weekly: "weekly rankings", predraft: "pre-draft boards"};
+
+function historyBlock() {
+  if (!HISTORY) return null;
+  const byFmt = (HISTORY.kinds && HISTORY.kinds[HKIND]) || {};
+  return (byFmt[FMT] || {})[SCOPE] || null;
+}
+
+function fmtDelta3(v) { return (v >= 0 ? "+" : "−") + Math.abs(v).toFixed(3); }
+
+function renderHistory() {
+  const card = document.getElementById("history-card");
+  if (!card) return;
+  const block = historyBlock();
+  const rows = block ? block.sources.filter(r => inView(r.source)) : [];
+  if (!block || rows.length < 2) {
+    card.hidden = !block;
+    if (block) {
+      $("#history-verdict").innerHTML = rows.length
+        ? `Only one source in this view has a multi-season record of ${esc(HKIND_LABEL[HKIND])} in ` +
+          `this format (${esc(srcName(rows[0].source))}, ${rows[0].n_seasons} ` +
+          `season${rows[0].n_seasons === 1 ? "" : "s"}) — there is nothing to compare it against.`
+        : `No source in this view has a multi-season record of ${esc(HKIND_LABEL[HKIND])} in this ` +
+          `format yet. Comparison needs at least two sources scored on overlapping ` +
+          `${HKIND === "weekly" ? "weeks" : "seasons"}.`;
+      $("#history-board").innerHTML = "";
+      $("#history-matrix").innerHTML = "";
+      $("#history-matrix-note").innerHTML = "";
+      $("#history-takeaway").innerHTML = "";
+    }
+    return;
+  }
+  card.hidden = false;
+
+  const ref = block.leader;
+  const refRow = rows.find(r => r.source === ref);
+  const nSeasons = (HISTORY.seasons || []).length;
+
+  // Order by the paired comparison, not the raw average: the averages are not
+  // taken over the same weeks, so they cannot settle an ordering.
+  const ordered = [...rows].sort((a, b) => {
+    const da = a.vs_leader ? a.vs_leader.delta : -99;
+    const db = b.vs_leader ? b.vs_leader.delta : -99;
+    return db - da;
+  });
+
+  $("#history-sub").innerHTML =
+    `Every source's ${esc(HKIND_LABEL[HKIND])} across all ${nSeasons} scored seasons. ` +
+    `Sources publish different seasons, so career averages are not taken over the same ` +
+    `games and cannot rank anyone on their own. The <b>vs. reference</b> column is the ` +
+    `comparison that holds: a paired difference computed only on the ` +
+    `${HKIND === "weekly" ? "weeks" : "seasons"} both sources actually covered, with a 95% ` +
+    `confidence interval. An interval crossing zero is a difference this data cannot establish.`;
+
+  const tiedNames = (block.tied_with_leader || [])
+    .filter(s => s !== ref && rows.some(r => r.source === s)).map(srcName);
+  const behindNames = (block.behind_leader || [])
+    .filter(s => rows.some(r => r.source === s)).map(srcName);
+  const aheadNames = (block.ahead_on_shared || [])
+    .filter(s => rows.some(r => r.source === s)).map(srcName);
+  const list = a => a.length === 1 ? a[0]
+    : a.slice(0, -1).join(", ") + " and " + a[a.length - 1];
+
+  let verdict = "";
+  if (!block.separable) {
+    verdict = `<b>No source in this view separates from any other.</b> Over ${nSeasons} seasons, ` +
+      `every board's paired interval against ${esc(srcName(ref))} contains zero. The ordering ` +
+      `below is real arithmetic on real results, but the gaps it shows are inside the margin of ` +
+      `error — treating them as a ranking would be reading noise.`;
+  } else {
+    verdict = `Measured against <b>${esc(srcName(ref))}</b> (the reference: most ` +
+      `${HKIND === "weekly" ? "weeks" : "seasons"} scored, so the tightest intervals)`;
+    const parts = [];
+    if (tiedNames.length) parts.push(`<b>${esc(list(tiedNames))}</b> ${tiedNames.length === 1 ? "is" : "are"} statistically tied with it`);
+    if (behindNames.length) parts.push(`<b>${esc(list(behindNames))}</b> ${behindNames.length === 1 ? "sits" : "sit"} measurably behind`);
+    if (aheadNames.length) parts.push(`<b>${esc(list(aheadNames))}</b> ${aheadNames.length === 1 ? "is" : "are"} measurably ahead on shared ${HKIND === "weekly" ? "weeks" : "seasons"}`);
+    verdict += parts.length ? ": " + list(parts) + "." : ", nothing separates.";
+  }
+  // Testing everyone against one reference hides separations between two
+  // sources that are both tied with it — which is exactly where this data's
+  // only weekly result lives, so state it rather than let it vanish.
+  const pairs = [];
+  ordered.forEach(r => (r.beaten_by || []).forEach(w => {
+    if (rows.some(x => x.source === w)) pairs.push([w, r.source]);
+  }));
+  const hidden = pairs.filter(([w, l]) => w !== ref && l !== ref);
+  if (hidden.length) {
+    verdict += ` Within that group one pair still separates: ` +
+      list(hidden.map(([w, l]) => `<b>${esc(srcName(w))}</b> beats ${esc(srcName(l))}`)) +
+      ` head-to-head on the ${HKIND === "weekly" ? "weeks" : "seasons"} they share.`;
+  }
+  if (block.pooled_disagrees) {
+    verdict += ` Note the average column and the paired column disagree on the order — that is ` +
+      `the coverage difference showing, not a contradiction.`;
+  }
+  $("#history-verdict").innerHTML = verdict;
+
+  // forest plot domain, symmetric about zero
+  const bounds = ordered.filter(r => r.vs_leader && !r.vs_leader.is_leader)
+    .flatMap(r => [Math.abs(r.vs_leader.lo), Math.abs(r.vs_leader.hi)]);
+  const dom = Math.max(0.02, ...bounds);
+  const pct = v => 50 + (v / dom) * 50;
+
+  // Conclusion first, description second: the paired interval and its verdict
+  // are what the reader should act on, and the career averages are context.
+  let html = '<table><thead><tr><th class="num" title="Ordered by the paired comparison, not by career average">#</th>' +
+    '<th>Source</th>' +
+    `<th title="Paired difference in Spearman against the reference, 95% confidence interval. Crossing zero = not established. The table is ordered by this column.">${isNarrow() ? "vs. ref" : "vs. reference"} ▼</th>` +
+    '<th class="num">&nbsp;</th><th>Verdict</th>' +
+    // the verdict chip already flags a thin sample, so the raw season count is
+    // context rather than conclusion on a narrow screen
+    '<th class="num col-desc" title="Seasons in which this source was scored for this format">Seasons</th>' +
+    `<th class="num col-desc" title="${HKIND === "weekly" ? "Scored weeks" : "Scored seasons"} behind the average">${HKIND === "weekly" ? "Weeks" : "Yrs"}</th>` +
+    '<th class="num col-desc" title="Career mean Spearman over whatever seasons this source covered. Because coverage differs, a higher average here does not mean a better source — the paired column is what settles that.">Avg rho *</th>' +
+    '<th class="num col-desc" title="Career mean accuracy gap in fantasy points. Lower is better.">Gap *</th>' +
+    "</tr></thead><tbody>";
+
+  ordered.forEach((r, i) => {
+    const v = r.vs_leader;
+    let plot = '<span class="fp"></span>', num = "—", chip = '<span class="vchip">untested</span>';
+    if (v && v.is_leader) {
+      plot = '<span class="fp"><i class="fp-dot" style="left:50%"></i></span>';
+      num = "—";
+      chip = '<span class="vchip ref">reference</span>';
+    } else if (v) {
+      const lo = pct(v.lo), hi = pct(v.hi), p = pct(v.delta);
+      const tie = v.tied ? " tied" : "";
+      const dotCls = v.tied ? "tied" : (v.delta < 0 ? "sep" : "");
+      plot = `<span class="fp" title="95% CI ${fmtDelta3(v.lo)} to ${fmtDelta3(v.hi)} over ${v.n} shared ${HKIND === "weekly" ? "weeks" : "seasons"}">` +
+        `<i class="fp-ci${tie}" style="left:${Math.min(lo, hi)}%;width:${Math.max(1.5, Math.abs(hi - lo))}%"></i>` +
+        `<i class="fp-dot ${dotCls}" style="left:${p}%"></i></span>`;
+      num = fmtDelta3(v.delta);
+      chip = v.tied ? '<span class="vchip tied">tied</span>'
+           : v.delta < 0 ? '<span class="vchip behind">behind</span>'
+           : '<span class="vchip ahead">ahead</span>';
+    }
+    if (r.thin) chip += ' <span class="vchip thin">thin sample</span>';
+    html += `<tr><td class="num">${i + 1}</td>` +
+      `<td class="srccol">${srcMark(r.source, true)}${tagPills(r.source, HKIND === "weekly" ? "weekly" : "predraft")}</td>` +
+      `<td>${plot}</td><td class="num">${num}</td><td>${chip}</td>` +
+      `<td class="num col-desc">${r.n_seasons}</td>` +
+      `<td class="num col-desc">${r.n_obs}</td>` +
+      `<td class="num col-desc" title="95% CI ${r.score_lo != null ? r.score_lo.toFixed(3) + " to " + r.score_hi.toFixed(3) : "n/a"}">${r.score.toFixed(3)}</td>` +
+      `<td class="num col-desc">${r.gap != null ? r.gap.toFixed(1) : "—"}</td></tr>`;
+  });
+  $("#history-board").innerHTML = html + "</tbody></table>" +
+    '<p class="chart-note" style="margin-top:10px">* Starred columns average over different ' +
+    'sets of games — a source scored on 3 seasons is not averaging the same weeks as one ' +
+    'scored on 13. They describe each source; they do not rank the field.</p>';
+
+  // ---- season-by-season matrix
+  const years = [...(HISTORY.seasons || [])].sort((a, b) => a - b);
+  const all = ordered.flatMap(r => years.map(y => (r.by_season[String(y)] || {}).score)
+    .filter(v => v != null));
+  const lo = Math.min(...all), hi = Math.max(...all);
+  $("#history-matrix-note").innerHTML =
+    `<span class="arrow">▶</span>Mean Spearman per season. Darker is stronger. ` +
+    `Blank means the source published nothing scoreable that season in this format.`;
+  let m = '<table><thead><tr><th class="srccol">Source</th>' +
+    years.map(y => `<th class="yr">${String(y).slice(2)}</th>`).join("") + "</tr></thead><tbody>";
+  ordered.forEach(r => {
+    m += `<tr><td class="srccol">${srcMark(r.source, true)}</td>`;
+    years.forEach(y => {
+      const cell = r.by_season[String(y)];
+      if (!cell || cell.score == null) { m += '<td class="yr na">–</td>'; return; }
+      const t = hi > lo ? (cell.score - lo) / (hi - lo) : 0.5;
+      const bg = `color-mix(in srgb, var(--accent) ${(8 + t * 34).toFixed(0)}%, transparent)`;
+      m += `<td class="yr" style="background:${bg}" title="${esc(srcName(r.source))} ${y}: rho ${cell.score.toFixed(3)}` +
+        (cell.gap != null ? `, gap ${cell.gap.toFixed(1)} pts` : "") +
+        (cell.n > 1 ? `, ${cell.n} weeks` : "") + `">${cell.score.toFixed(2)}</td>`;
+    });
+    m += "</tr>";
+  });
+  $("#history-matrix").innerHTML = m + "</tbody></table>";
+
+  $("#history-takeaway").innerHTML = !block.separable
+    ? `The useful conclusion from ${nSeasons} seasons is that picking a ranking site is not where ` +
+      `fantasy edges come from — in this view the field is one undifferentiated blob. Where the sources ` +
+      `<i>disagree</i> on a given player is far more informative than which source you follow, which is ` +
+      `what the spread column on the draft board is for.`
+    : `Differences that survive a paired test across ${nSeasons} seasons are the only ones worth acting ` +
+      `on. A source topping a single season's table is usually the same field reshuffled by noise — ` +
+      `compare the season-by-season row above against the interval to see how much a one-year lead moves around.`;
+  applyClamps();
+}
+
+const _el_history_controls = document.getElementById("history-controls"); if (_el_history_controls) _el_history_controls.addEventListener("click", e => {
+  const b = e.target.closest("button"); if (!b) return;
+  HKIND = b.dataset.hkind;
+  document.querySelectorAll("#history-controls button")
+    .forEach(x => x.classList.toggle("active", x === b));
+  renderHistory();
+});
+
+/* ---------- leaderboards ---------- */
+/* Both season leaderboards are sortable, and the rank column follows whichever
+   metric is active. Previously rows were sorted by Spearman while accuracy gap
+   sat in the leftmost metric column, so the #1 row could hold the worse of the
+   two numbers a reader saw first. */
+const LB_SORT = {weekly: {key: "score", dir: -1}, predraft: {key: "score", dir: -1}};
+// -1 = larger is better (correlation), 1 = smaller is better (error in points)
+const LB_DEFAULT_DIR = {score: -1, accuracy_gap: 1, overall: -1, weeks: -1, through_week: -1};
+
+function sortBoard(rows, kind) {
+  const {key, dir} = LB_SORT[kind];
+  return [...rows].sort((a, b) => {
+    const va = a[key], vb = b[key];
+    if (va == null && vb == null) return 0;
+    if (va == null) return 1;          // missing metric sorts last either way
+    if (vb == null) return -1;
+    return (va - vb) * dir;
+  });
+}
+
+/* Column headings are the widest text in these tables and the least
+   informative per pixel, so narrow screens get the abbreviation and keep the
+   full wording in the tooltip. */
+function lbHead(kind, key, label, title, short) {
+  const s = LB_SORT[kind];
+  const caret = s.key === key ? (s.dir === 1 ? " ▲" : " ▼") : "";
+  const text = (isNarrow() && short) ? short : label;
+  return `<th class="num sortable" data-lbkind="${kind}" data-lbsort="${key}" ` +
+         `title="${esc(label)} — ${esc(title)} Click to sort.">${esc(text)}${caret}</th>`;
+}
+
+document.addEventListener("click", e => {
+  const th = e.target.closest("th[data-lbsort]");
+  if (!th) return;
+  const kind = th.dataset.lbkind, key = th.dataset.lbsort;
+  const s = LB_SORT[kind];
+  LB_SORT[kind] = (s.key === key) ? {key, dir: -s.dir}
+                                  : {key, dir: LB_DEFAULT_DIR[key] || -1};
+  if (kind === "weekly") renderWeeklyBoard(); else renderPredraftBoard();
+});
+
+function renderWeeklyBoard() {
+  const board = boardFor("weekly");
+  if (!board.length) {
+    $("#weekly-board").innerHTML = emptyWithHistory(
+      "No games played yet this season.");
+    return;
+  }
+  let html = '<div class="scroll-x"><table><thead><tr><th class="num">#</th><th>Source</th>' +
+    lbHead("weekly", "accuracy_gap", "Accuracy gap",
+      "Mean |points implied by the predicted rank − points actually scored|. Lower is better.", "Gap") +
+    lbHead("weekly", "score", "Spearman",
+      "Rank correlation with actual finish. 1.0 = perfect ordering.", "Rho") +
+    lbHead("weekly", "weeks", "Weeks", "Scored weeks behind the averages.", "Wks") +
+    "</tr></thead><tbody>";
+  sortBoard(board, "weekly").forEach((r, i) => {
+    html += `<tr><td class="num">${i + 1}</td><td class="srccol">${srcMark(r.source, true)}${tagPills(r.source, "weekly")}</td>` +
+            `<td class="num">${r.accuracy_gap != null ? r.accuracy_gap.toFixed(1) : "—"}</td>` +
+            `<td class="num">${r.score.toFixed(3)}</td><td class="num">${r.weeks}</td></tr>`;
+  });
+  $("#weekly-board").innerHTML = html + "</tbody></table></div>" + lbFootnote(board.length);
+}
+
+/* One season is a small sample and the sources sit close together; say so
+   where the ordering is read, not only in the cross-season card. */
+function lbFootnote(n) {
+  if (n < 2) return "";
+  return '<p class="chart-note" style="margin-top:10px"><span class="arrow">▶</span>' +
+    'One season separates these sources by less than the measurement noise. ' +
+    'See <a href="#history-card">Across all seasons</a> for which gaps survive a paired test.</p>';
+}
+
+function renderPredraftBoard() {
+  const board = boardFor("predraft");
+  if (!board.length) {
+    $("#predraft-board").innerHTML = emptyWithHistory(
+      "Pre-draft boards are scored after week 1 completes.");
+    return;
+  }
+  let html = '<div class="scroll-x"><table><thead><tr><th class="num">#</th><th>Source</th>' +
+    lbHead("predraft", "accuracy_gap", "Accuracy gap",
+      "Mean |points implied by the predicted rank − points actually scored| over full-season totals. Lower is better.", "Gap") +
+    lbHead("predraft", "score", "Avg pos Spearman",
+      "Mean positional rank correlation against cumulative season points.", "Pos rho") +
+    lbHead("predraft", "overall", "Overall",
+      "Spearman over the top-150 board order; blank for positional-only boards.", "Ovr") +
+    lbHead("predraft", "through_week", "Through week", "Weeks of results scored against.", "Thru") +
+    "</tr></thead><tbody>";
+  sortBoard(board, "predraft").forEach((r, i) => {
+    html += `<tr><td class="num">${i + 1}</td><td class="srccol">${srcMark(r.source, true)}${tagPills(r.source)}</td>` +
+            `<td class="num">${r.accuracy_gap != null ? r.accuracy_gap.toFixed(1) : "—"}</td>` +
+            `<td class="num">${r.score.toFixed(3)}</td>` +
+            `<td class="num">${r.overall != null ? r.overall.toFixed(3) : "—"}</td>` +
+            `<td class="num">${r.through_week}</td></tr>`;
+  });
+  $("#predraft-board").innerHTML = html + "</tbody></table></div>" + lbFootnote(board.length);
+}
+
+/* ---------- charts ----------
+   Drawn at the container's measured width so one viewBox unit is one CSS
+   pixel: text keeps its real size on a phone instead of shrinking with the
+   drawing, and nothing has to scroll sideways. */
+let DRAWN = {};   // container id -> width the chart was last drawn at
+function chartWidth(el, fallback) {
+  const w = el && el.clientWidth ? el.clientWidth : 0;
+  if (el && el.id) DRAWN[el.id] = w;   // 0 records "measured before layout"
+  return Math.max(300, Math.round(w || fallback));
+}
+const isNarrow = () => window.matchMedia("(max-width: 640px)").matches;
+
+/* A chart drawn before its container has been laid out measures 0 and falls
+   back to a fixed width, which would then stay wrong for the life of the
+   page. Resize events don't fire for it and a ResizeObserver only delivers
+   while the document is rendering, so verify explicitly once things have
+   settled and redraw anything measured against the wrong width. */
+function recheckWidths() {
+  if (!SUMMARY) return;
+  const staleChart = ["chartbox", "calib-box"].some(id => {
+    const el = document.getElementById(id);
+    return el && el.clientWidth && Math.abs(el.clientWidth - (DRAWN[id] || 0)) > 8;
+  });
+  // The board's column state can be stale even when every chart measured
+  // correctly, so it needs its own test rather than riding along on the
+  // charts': matchMedia at script-parse time does not always agree with the
+  // settled layout, and without this the board stays collapsed on a wide
+  // screen with nothing to trigger a correction.
+  const staleCols = !SRC_TOGGLED &&
+    SHOW_SRC === window.matchMedia("(max-width: 820px)").matches;
+  if (staleChart || staleCols) redrawForWidth();
+}
+
+/* Width-bound rendering has to survive rotation, window resizing, and the
+   case where a chart is drawn before its container has been laid out (a
+   clientWidth of 0 falls back to the desktop size and would otherwise stay
+   wrong forever). A ResizeObserver catches all three; a plain resize listener
+   catches none of the last one. */
+let RESIZE_T = null, LAST_W = 0;
+function redrawForWidth() {
+  if (!SUMMARY) return;
+  syncShowSrc();
+  [renderTrend, renderCalibration, renderWeeklyBoard, renderPredraftBoard,
+   renderHistory, renderBoard].forEach(fn => {
+    try { fn(); } catch (e) { console.error(fn.name, e); }
+  });
+  applyClamps();
+}
+function onWidthChange() {
+  const w = document.documentElement.clientWidth;
+  // ignore the reflow our own redraw causes; only real width changes matter
+  if (Math.abs(w - LAST_W) < 8) return;
+  LAST_W = w;
+  clearTimeout(RESIZE_T);
+  RESIZE_T = setTimeout(redrawForWidth, 150);
+}
+window.addEventListener("resize", onWidthChange);
+window.addEventListener("orientationchange", onWidthChange);
+// fonts and images can settle after first paint and change the layout width
+window.addEventListener("load", () => setTimeout(recheckWidths, 0));
+if (document.fonts && document.fonts.ready) {
+  document.fonts.ready.then(() => setTimeout(recheckWidths, 0));
+}
+if (window.ResizeObserver) {
+  // observe the content column itself: it is a real layout box, so its first
+  // callback also covers the case where a chart was measured before layout
+  const wrap = document.querySelector(".wrap");
+  if (wrap) new ResizeObserver(onWidthChange).observe(wrap);
+}
+
+function renderTrend() {
+  const weekly = SUMMARY.weekly[FMT] || {};
+  const sources = orderSources(Object.keys(weekly)
+    .filter(s => Object.keys(weekly[s].weeks || {}).length && inView(s)));
+  const weeks = SUMMARY.weeks_evaluated || [];
+  // legend dots use the series color so the key maps to the lines
+  $("#trend-legend").innerHTML = sources.map(s =>
+    `<span><span class="dot" ${dotStyle(s)}></span>${esc(srcName(s))}</span>`).join("");
+  if (!sources.length || !weeks.length) {
+    $("#trend-chart").innerHTML = emptyWithHistory("No weekly scores for this season yet.");
+    return;
+  }
+  const narrow = isNarrow();
+  const W = chartWidth(document.getElementById("chartbox"), 940);
+  // End-of-line source labels need a right gutter; on a phone there isn't one
+  // to spare, so the legend above the chart carries the key instead.
+  const H = narrow ? 240 : 300, L = narrow ? 30 : 44,
+        R = narrow ? 8 : 70, T = 14, B = 30;
+  const pw = W - L - R, ph = H - T - B;
+  const vals = [];
+  sources.forEach(s => weeks.forEach(w => {
+    const v = weekScore(weekly[s], w);
+    if (v != null) vals.push(v);
+  }));
+  // A fixed ceiling keeps seasons comparable, but 0.8 was well above anything
+  // ever recorded: across 13 seasons the highest weekly score is 0.574 and
+  // most sit under 0.45, so a quarter of the plot was permanently empty and
+  // the differences between sources were squashed into the lower half. 0.6
+  // still covers every season on record. Zero stays pinned because it is a
+  // meaningful floor for a rank correlation — it is "no signal".
+  let lo = Math.min(0, ...vals), hi = Math.max(0.6, ...vals);
+  lo = Math.floor(lo * 5) / 5; hi = Math.ceil(hi * 5) / 5;
+  const x = w => weeks.length === 1 ? L + pw / 2 : L + pw * (weeks.indexOf(w) / (weeks.length - 1));
+  const y = v => T + ph * (1 - (v - lo) / (hi - lo));
+  let g = "";
+  const endLabels = [];
+  for (let v = lo; v <= hi + 1e-9; v += 0.2) {
+    const yy = y(v);
+    g += `<line x1="${L}" y1="${yy}" x2="${W - R}" y2="${yy}" stroke="var(--grid)" stroke-width="1" stroke-dasharray="2 4"/>` +
+         `<text x="${L - 8}" y="${yy + 4}" text-anchor="end">${v.toFixed(1)}</text>`;
+  }
+  // 18 week labels collide well before a phone's width; thin them out and let
+  // the tooltip carry the exact week.
+  const everyN = Math.max(1, Math.ceil(weeks.length / (narrow ? 6 : 18)));
+  weeks.forEach((w, i) => {
+    if (i % everyN && i !== weeks.length - 1) return;
+    g += `<text x="${x(w)}" y="${H - 8}" text-anchor="middle">${narrow ? "" : "W"}${w}</text>`;
+  });
+  sources.forEach(s => {
+    const pts = weeks.map(w => [w, weekScore(weekly[s], w)]).filter(p => p[1] != null);
+    if (!pts.length) return;
+    const d = pts.map((p, i) => `${i ? "L" : "M"}${x(p[0]).toFixed(1)},${y(p[1]).toFixed(1)}`).join(" ");
+    g += `<path d="${d}" fill="none" stroke="${SRC_COLOR[s]}" stroke-width="2" stroke-linejoin="round"/>`;
+    pts.forEach(p => {
+      g += `<circle class="wk-dot" data-src="${esc(s)}" data-week="${p[0]}" ` +
+           `cx="${x(p[0]).toFixed(1)}" cy="${y(p[1]).toFixed(1)}" r="5" ` +
+           `fill="${SRC_COLOR[s]}" stroke="var(--surface)" stroke-width="2">` +
+           `<title>${esc(srcName(s))} \u00b7 week ${p[0]} \u00b7 ${p[1].toFixed(3)}` +
+           ` \u2014 click to inspect this week</title></circle>`;
+    });
+    const last = pts[pts.length - 1];
+    endLabels.push({s, ly: y(last[1]) + 4});
+  });
+  // direct end-of-line labels: short names, nudged apart when lines finish close
+  if (!narrow) {
+    endLabels.sort((a, b) => a.ly - b.ly);
+    for (let i = 1; i < endLabels.length; i++) {
+      if (endLabels[i].ly - endLabels[i - 1].ly < 13) endLabels[i].ly = endLabels[i - 1].ly + 13;
+    }
+    endLabels.forEach(({s, ly}) => {
+      g += `<text x="${W - R + 8}" y="${Math.min(ly, H - B - 2)}" style="fill:${SRC_COLOR[s]};font-weight:600">${esc(srcShort(s))}</text>`;
+    });
+  }
+  $("#trend-chart").innerHTML = `<svg viewBox="0 0 ${W} ${H}" id="trend-svg">${g}</svg>`;
+  attachHover(weeks, sources, weekly, x, W);
+}
+
+/* Pointer events rather than mouse events: a phone has no hover, so the
+   week-by-week tooltip was simply unreachable on touch. Tapping now opens it
+   and dragging scrubs across weeks, while the mouse behaviour is unchanged. */
+function attachHover(weeks, sources, weekly, x, W) {
+  const svg = $("#trend-svg"), tip = $("#tooltip"), box = $("#chartbox");
+  let pressed = false;
+
+  function show(e) {
+    const r = svg.getBoundingClientRect();
+    const mx = (e.clientX - r.left) * (W / r.width);
+    let best = null, bd = 1e9;
+    weeks.forEach(w => { const d = Math.abs(x(w) - mx); if (d < bd) { bd = d; best = w; } });
+    if (best == null) return;
+    let rows = "";
+    orderSources(sources).forEach(s => {
+      const v = weekScore(weekly[s], best);
+      if (v != null) rows += `<div class="row"><span><span class="dot" ${dotStyle(s)}></span>${esc(srcName(s))}</span><b>${v.toFixed(3)}</b></div>`;
+    });
+    tip.innerHTML = `<div class="tt-week">Week ${best}</div>${rows}`;
+    tip.style.display = "block";
+    // measure after filling, and keep the panel inside the chart box on a
+    // narrow screen instead of trusting a hardcoded width
+    const bx = box.getBoundingClientRect();
+    const tw = tip.offsetWidth, th = tip.offsetHeight;
+    let px = e.clientX - bx.left + 14;
+    if (px + tw > bx.width - 4) px = e.clientX - bx.left - tw - 14;
+    let py = e.clientY - bx.top + 10;
+    if (py + th > bx.height - 4) py = Math.max(0, e.clientY - bx.top - th - 10);
+    tip.style.left = Math.max(2, Math.min(px, bx.width - tw - 2)) + "px";
+    tip.style.top = Math.max(0, py) + "px";
+  }
+
+  svg.addEventListener("pointerdown", e => { pressed = true; show(e); });
+  svg.addEventListener("pointermove", e => {
+    if (e.pointerType === "mouse" || pressed) show(e);
+  });
+  svg.addEventListener("pointerup", () => { pressed = false; });
+  svg.addEventListener("pointercancel", () => { pressed = false; });
+  svg.addEventListener("pointerleave", () => {
+    pressed = false;
+    if (matchMedia("(hover: hover)").matches) tip.style.display = "none";
+  });
+  // on touch there is no "leave", so dismiss by tapping anywhere else
+  document.addEventListener("pointerdown", e => {
+    if (!svg.contains(e.target)) tip.style.display = "none";
+  });
+}
+
+/* Collapse the long section explanations on a phone, with a control to open
+   each one. Re-run after any render that rewrites a .sub, and on width change,
+   since the clamp only applies on narrow screens. */
+function applyClamps() {
+  const narrow = isNarrow();
+  document.querySelectorAll(".sub").forEach(el => {
+    let btn = el.nextElementSibling;
+    if (!btn || !btn.classList.contains("submore")) btn = null;
+    if (!narrow) {
+      el.classList.remove("clamped", "open");
+      if (btn) btn.remove();
+      return;
+    }
+    el.classList.add("clamped");
+    // measure against the clamp: nothing to open if it already fits
+    const clipped = el.scrollHeight > el.clientHeight + 2;
+    if (!clipped && !el.classList.contains("open")) {
+      el.classList.remove("clamped");
+      if (btn) btn.remove();
+      return;
+    }
+    if (!btn) {
+      btn = document.createElement("button");
+      btn.className = "submore";
+      btn.addEventListener("click", () => {
+        const open = el.classList.toggle("open");
+        btn.textContent = open ? "Show less" : "What this shows";
+        btn.setAttribute("aria-expanded", String(open));
+      });
+      el.insertAdjacentElement("afterend", btn);
+    }
+    const open = el.classList.contains("open");
+    btn.textContent = open ? "Show less" : "What this shows";
+    btn.setAttribute("aria-expanded", String(open));
+  });
+}
+
+/* An empty panel during the preseason should route somewhere useful rather
+   than just reporting that it's empty. */
+function emptyWithHistory(msg) {
+  const scored = (SEASONS && SEASONS.scored) || [];
+  const last = scored.filter(y => y !== SEASON)[0];
+  if (!last) return `<div class="empty">${esc(msg)}</div>`;
+  return `<div class="empty">${esc(msg)} ` +
+    `<a href="#" onclick="jumpSeason(${last});return false;">See ${last} results</a>` +
+    ` — ${scored.length} seasons of history available.</div>`;
+}
+
+function jumpSeason(year) {
+  const sel = document.getElementById("season-select");
+  if (sel) sel.value = String(year);
+  loadSeason(year).then(() => { renderSeasonSelect(); renderAll(); });
+}
+
+function renderBaselineNote() {
+  const all = Object.keys(SUMMARY.source_tags || {});
+  const hidden = all.filter(s => !inView(s));
+  const lens = ROSTER === "idp"
+    ? "IDP leagues — individual defensive players ranked alongside offense"
+    : "1QB redraft with a team defense and a single RB/WR/TE flex";
+  let html = `Scoring every board against <b>${esc(lens)}</b>.`;
+  // Coverage varies a lot by format on historical seasons: ESPN and
+  // MyFantasyLeague publish standard and PPR but no half-PPR, so a backfilled
+  // half-PPR season looks thinner than it is. Point that out rather than
+  // leaving it to be discovered.
+  const countFmt = f => new Set([
+    ...Object.keys(SUMMARY.predraft[f] || {}),
+    ...Object.keys(SUMMARY.weekly[f] || {})].filter(inView)).size;
+  const here = countFmt(FMT);
+  const better = ["ppr", "standard", "half_ppr"]
+    .filter(f => f !== FMT).map(f => [f, countFmt(f)])
+    .filter(([, n]) => n > here).sort((a, b) => b[1] - a[1])[0];
+  if (better) {
+    const nice = {ppr: "PPR", standard: "Standard", half_ppr: "Half PPR"}[better[0]];
+    html += ` This season has <b>${here}</b> ${here === 1 ? "source" : "sources"} in ` +
+      `${{ppr: "PPR", standard: "Standard", half_ppr: "Half PPR"}[FMT]}; ` +
+      `<b>${nice}</b> has ${better[1]}.`;
+  }
+  if (hidden.length) {
+    // in IDP mode nearly everything is excluded, so name a few and count the rest
+    const show = hidden.slice(0, 4);
+    let names = show.map(s => `${esc(srcName(s))}${tagPills(s)}`).join(", ");
+    if (hidden.length > show.length) names += `, and ${hidden.length - show.length} more`;
+    html += ` Not in this view: ${names}.`;
+  }
+  $("#baseline-note").innerHTML = html;
+}
+
+/* ---------- accuracy gap by position ---------- */
+const POS_COLOR = {QB: "var(--s7)", RB: "var(--s3)", WR: "var(--s1)",
+                   TE: "var(--s2)", K: "var(--s4)", DST: "var(--muted)"};
+const ALL_POS = ["QB", "RB", "WR", "TE", "K", "DST"];
+
+/* source -> pos -> mean accuracy gap across the season's scored weeks */
+function seasonPositionGaps() {
+  const weekly = SUMMARY.weekly[FMT] || {};
+  const out = {};
+  Object.keys(weekly).filter(inView).forEach(s => {
+    const acc = {};
+    Object.values(weekly[s].weeks || {}).forEach(wk => {
+      ALL_POS.forEach(pos => {
+        const m = (wk.positions || {})[pos];
+        if (m && m.accuracy_gap != null) (acc[pos] = acc[pos] || []).push(m.accuracy_gap);
+      });
+    });
+    const means = {};
+    Object.entries(acc).forEach(([pos, xs]) => {
+      means[pos] = xs.reduce((a, b) => a + b, 0) / xs.length;
+    });
+    if (Object.keys(means).length) out[s] = means;
+  });
+  return out;
+}
+
+function renderPosBreakdown() {
+  const gaps = seasonPositionGaps();
+  const sources = orderSources(Object.keys(gaps));
+  if (!sources.length) {
+    $("#pos-breakdown").innerHTML = emptyWithHistory("No scored weeks for this season yet.");
+    return;
+  }
+  const max = Math.max(...sources.flatMap(s => Object.values(gaps[s])));
+  const legend = '<p class="chart-note">Bar length is mean absolute error in fantasy points; shorter is more accurate.</p>';
+  $("#pos-breakdown").innerHTML = legend + sources.map(s => {
+    const rows = ALL_POS.filter(pos => gaps[s][pos] != null).map(pos => {
+      const v = gaps[s][pos];
+      const w = Math.max(1, v / max * 100);
+      return '<div class="bar-row"><span class="bar-label">' + pos + '</span>' +
+        '<span class="bar-track"><span class="bar-fill" style="width:' + w +
+        '%;background:' + POS_COLOR[pos] + '"></span></span>' +
+        '<span class="bar-val">' + v.toFixed(1) + ' pts</span></div>';
+    }).join("");
+    return '<div class="bar-group"><h4>' + srcMark(s) + esc(srcName(s)) + "</h4>" + rows + "</div>";
+  }).join("");
+}
+
+/* ---------- calibration scatter ---------- */
+let CALIB_SRC = null, CALIB_POS = "RB", CALIB_WEEK = null;
+
+function calibrationPairs(source, pos) {
+  const entry = (SUMMARY.weekly[FMT] || {})[source];
+  if (!entry) return [];
+  const pts = [];
+  Object.entries(entry.weeks || {}).forEach(([wk, data]) => {
+    if (CALIB_WEEK != null && Number(wk) !== CALIB_WEEK) return;
+    const m = (data.positions || {})[pos];
+    if (m && m.calibration) m.calibration.forEach(c =>
+      pts.push([c[0], c[1], c[2] || "", Number(wk), c[3] != null ? c[3] : null]));
+  });
+  return pts;
+}
+
+/* clicking a point on the week-by-week chart drills into that source-week */
+document.addEventListener("click", e => {
+  const dot = e.target.closest("circle.wk-dot");
+  if (!dot) return;
+  CALIB_SRC = dot.dataset.src;
+  CALIB_WEEK = Number(dot.dataset.week);
+  renderCalibration();
+  const el = document.getElementById("calib-chart");
+  if (el) el.scrollIntoView({behavior: "smooth", block: "center"});
+});
+
+function renderCalibration() {
+  const weekly = SUMMARY.weekly[FMT] || {};
+  const sources = orderSources(Object.keys(weekly).filter(inView));
+  if (!sources.length) {
+    $("#calib-controls").innerHTML = "";
+    $("#calib-chart").innerHTML = emptyWithHistory("No scored weeks for this season yet.");
+    return;
+  }
+  if (!sources.includes(CALIB_SRC)) CALIB_SRC = sources[0];
+  $("#calib-controls").innerHTML =
+    sources.map(s => '<button data-csrc="' + esc(s) + '" class="' +
+      (s === CALIB_SRC ? "active" : "") + '">' + esc(srcName(s)) + "</button>").join("") +
+    '<span class="calib-sep"></span>' +
+    ALL_POS.map(pp => '<button data-cpos="' + pp + '" class="' +
+      (pp === CALIB_POS ? "active" : "") + '">' + pp + "</button>").join("") +
+    '<span class="calib-sep"></span>' +
+    '<button data-callweeks="1" class="' + (CALIB_WEEK == null ? "active" : "") + '">' +
+    (CALIB_WEEK == null ? "All weeks" : "Week " + CALIB_WEEK + " \u2014 show all") + "</button>";
+
+  const pairs = calibrationPairs(CALIB_SRC, CALIB_POS);
+  if (pairs.length < 5) {
+    $("#calib-chart").innerHTML = '<div class="empty">Not enough data for this combination.</div>';
+    return;
+  }
+  const narrow = isNarrow();
+  const W = chartWidth(document.getElementById("calib-box"), 940);
+  // the scatter reads as a square — a wide short box hides the diagonal, which
+  // is the whole point of the plot
+  const H = narrow ? Math.round(W * 0.95) : 420;
+  const L = narrow ? 34 : 54, R = narrow ? 10 : 22, T = 16, B = narrow ? 40 : 46;
+  const pw = W - L - R, ph = H - T - B;
+  const hi = Math.max(10, Math.ceil(Math.max(...pairs.map(c => Math.max(c[0], c[1]))) / 10) * 10);
+  const x = v => L + pw * (v / hi);
+  const y = v => T + ph * (v / hi);
+  const step = Math.max(5, Math.round(hi / 6 / 5) * 5);
+  let g = "";
+  for (let v = 0; v <= hi; v += step) {
+    g += '<line x1="' + L + '" y1="' + y(v) + '" x2="' + (W - R) + '" y2="' + y(v) + '" stroke="var(--grid)" stroke-dasharray="2 4"/>' +
+         '<text x="' + (L - 8) + '" y="' + (y(v) + 4) + '" text-anchor="end">' + v + "</text>" +
+         '<line x1="' + x(v) + '" y1="' + T + '" x2="' + x(v) + '" y2="' + (H - B) + '" stroke="var(--grid)" stroke-dasharray="2 4"/>' +
+         '<text x="' + x(v) + '" y="' + (H - B + 16) + '" text-anchor="middle">' + v + "</text>";
+  }
+  // Bigger dots help a finger find one, but 800 points in a 350px box at r=6
+  // is a solid mass — and the shape of the cloud is what this chart is for.
+  // r=4 keeps the distribution readable and stays findable by tap.
+  const dotR = narrow ? 4 : 3.5;
+  pairs.forEach(c => {
+    g += '<circle class="cal-dot" cx="' + x(c[0]).toFixed(1) + '" cy="' + y(c[1]).toFixed(1) +
+         '" r="' + dotR + '" fill="' + POS_COLOR[CALIB_POS] + '" opacity="0.4"' +
+         ' data-n="' + esc(c[2]) + '" data-w="' + c[3] + '" data-pr="' + c[0] +
+         '" data-ar="' + Math.round(c[1]) + '"' +
+         (c[4] != null ? ' data-pts="' + c[4] + '"' : "") + '></circle>';
+  });
+  g += '<text x="' + (L + pw / 2) + '" y="' + (H - 6) +
+       '" text-anchor="middle" style="fill:var(--ink-2)">Projected rank \u2192 (1 = ranked best)</text>';
+  g += '<text x="15" y="' + (T + ph / 2) + '" text-anchor="middle" transform="rotate(-90 15 ' +
+       (T + ph / 2) + ')" style="fill:var(--ink-2)">\u2190 Actual finish (1 = scored most)</text>';
+  // quadrant annotations. Above the diagonal = finished better than ranked.
+  // The second line of each annotation restates the first; on a small plot it
+  // is 196px of text sitting on top of the data, so narrow layouts keep only
+  // the headline and leave the restatement to the caption below.
+  g += '<text class="quad-note" x="' + (W - R - 14) + '" y="' + (T + 22) +
+       '" text-anchor="end" style="fill:var(--s3)">Outperformed' + (narrow ? "" : " projection") + '</text>';
+  if (!narrow) {
+    g += '<text class="quad-note" x="' + (W - R - 14) + '" y="' + (T + 38) +
+         '" text-anchor="end" style="fill:var(--muted)">actual finish better than projected rank</text>';
+  }
+  g += '<text class="quad-note" x="' + (L + 14) + '" y="' + (H - B - (narrow ? 10 : 26)) +
+       '" style="fill:var(--s8)">Underperformed' + (narrow ? "" : " projection") + '</text>';
+  if (!narrow) {
+    g += '<text class="quad-note" x="' + (L + 14) + '" y="' + (H - B - 10) +
+         '" style="fill:var(--muted)">actual finish worse than projected rank</text>';
+  }
+
+  const mean = a => a.reduce((s, v) => s + v, 0) / a.length;
+  const mx = mean(pairs.map(c => c[0])), my = mean(pairs.map(c => c[1]));
+  const num = pairs.reduce((s, c) => s + (c[0] - mx) * (c[1] - my), 0);
+  const den = Math.sqrt(pairs.reduce((s, c) => s + Math.pow(c[0] - mx, 2), 0) *
+                        pairs.reduce((s, c) => s + Math.pow(c[1] - my, 2), 0));
+  const r = den ? num / den : 0;
+  $("#calib-chart").innerHTML =
+    '<svg viewBox="0 0 ' + W + " " + H + '" style="width:100%;height:auto;display:block">' + g + "</svg>" +
+    '<p class="sub" style="margin-top:10px">n = ' + pairs.length.toLocaleString() +
+    " player-weeks \u00b7 Pearson r = <b>" + r.toFixed(2) +
+    "</b>. Concentration along the diagonal indicates calibrated ranks; dispersion indicates low predictive signal.</p>";
+}
+
+document.addEventListener("click", e => {
+  const b = e.target.closest("#calib-controls button");
+  if (!b) return;
+  if (b.dataset.callweeks) CALIB_WEEK = null;
+  if (b.dataset.csrc) CALIB_SRC = b.dataset.csrc;
+  if (b.dataset.cpos) CALIB_POS = b.dataset.cpos;
+  renderCalibration();
+});
+
+/* instant tooltip for scatter points — native SVG titles are slow and
+   invisible on touch, so position a real element next to the dot */
+function showCalibTip(e) {
+  const dot = e.target.closest && e.target.closest("#calib-chart circle.cal-dot");
+  const tip = document.getElementById("calib-tip");
+  if (!dot) { if (tip) tip.style.display = "none"; return; }
+  const d = dot.dataset;
+  tip.innerHTML = `<div class="tt-week">Week ${esc(d.w)}</div>` +
+    (d.n ? `<b>${esc(d.n)}</b><br>` : "") +
+    `projected ${CALIB_POS}${esc(d.pr)} · finished ${CALIB_POS}${esc(d.ar)}` +
+    (d.pts != null ? ` · ${esc(d.pts)} pts` : "");
+  const box = document.getElementById("calib-box").getBoundingClientRect();
+  const r = dot.getBoundingClientRect();
+  tip.style.display = "block";
+  let px = r.left - box.left + 12, py = r.top - box.top - 10;
+  if (px + tip.offsetWidth > box.width - 8) px -= tip.offsetWidth + 20;
+  // the panel is wider than a phone in landscape-heavy cases; clamp both axes
+  px = Math.max(2, Math.min(px, box.width - tip.offsetWidth - 2));
+  py = Math.min(py, box.height - tip.offsetHeight - 2);
+  tip.style.left = px + "px";
+  tip.style.top = Math.max(0, py) + "px";
+}
+
+document.addEventListener("mouseover", showCalibTip);
+// touch has no hover: tap a point to read it, tap elsewhere to dismiss
+document.addEventListener("pointerdown", e => {
+  if (e.pointerType !== "mouse") showCalibTip(e);
+});
+
+/* ---------- player drill-in: multi-season record ---------- */
+const FMT_LABEL = {ppr: "PPR", standard: "Standard", half_ppr: "Half PPR"};
+let PLAYERS = null, PLAYERS_REQ = null;
+
+function fetchPlayers() {
+  if (PLAYERS) return Promise.resolve(PLAYERS);
+  PLAYERS_REQ = PLAYERS_REQ || fetch("data/players.json", {cache: "no-cache"}).then(r => r.json())
+    .then(d => { PLAYERS = d; return d; }).catch(() => null);
+  return PLAYERS_REQ;
+}
+
+function fmtDelta(d) {
+  if (d == null) return "—";
+  const cls = d > 0 ? "delta-pos" : d < 0 ? "delta-neg" : "";
+  const txt = (d > 0 ? "+" : "") + d;
+  return cls ? `<span class="${cls}">${txt}</span>` : txt;
+}
+
+function playerDetailHtml(pid) {
+  const p = PLAYERS && PLAYERS.players && PLAYERS.players[pid];
+  if (!p) return '<div class="empty">No multi-season data for this player.</div>';
+  const years = Object.keys(p.seasons).sort();
+  let rows = "", nBoth = 0, sumDelta = 0, over = 0, under = 0, nWk = 0,
+      ppgDiffSum = 0, ppgN = 0;
+  years.forEach(y => {
+    const r = p.seasons[y][FMT];
+    if (!r) return;
+    const delta = (r.pre != null && r.fin != null) ? r.pre - r.fin : null;
+    if (delta != null) { nBoth++; sumDelta += delta; }
+    const wk = r.wk || {};
+    if (wk.n) { over += wk.over; under += wk.under; nWk += wk.n; }
+    if (wk.ppg_proj != null) { ppgDiffSum += (wk.ppg_act - wk.ppg_proj) * wk.n; ppgN += wk.n; }
+    rows += `<tr><td>${y}</td>` +
+      `<td class="num">${r.pre != null ? p.pos + r.pre : "—"}</td>` +
+      `<td class="num">${r.fin != null ? p.pos + r.fin : "—"}</td>` +
+      `<td class="num">${fmtDelta(delta)}</td>` +
+      `<td class="num">${r.pts != null ? r.pts.toFixed(1) : "—"}</td>` +
+      `<td class="num">${r.gp != null ? r.gp : "—"}</td>` +
+      `<td class="num">${wk.proj != null ? wk.proj.toFixed(1) : "—"}</td>` +
+      `<td class="num">${wk.act != null ? wk.act.toFixed(1) : "—"}</td>` +
+      `<td class="num">${wk.n ? wk.over + "–" + wk.under : "—"}</td>` +
+      `<td class="num">${wk.ppg_proj != null ? wk.ppg_proj.toFixed(1) + " / " + wk.ppg_act.toFixed(1) : "—"}</td></tr>`;
+  });
+  if (!rows) return '<div class="empty">No data for this player in this scoring format.</div>';
+  let notes = [];
+  if (nBoth) {
+    const bias = sumDelta / nBoth;
+    const dir = bias > 0.5 ? "finished better than drafted"
+              : bias < -0.5 ? "finished worse than drafted" : "matched the pre-draft rank";
+    notes.push(`Mean pre-draft miss over ${nBoth} season${nBoth === 1 ? "" : "s"}: ` +
+      `${bias >= 0 ? "+" : ""}${bias.toFixed(1)} positional ranks (${dir} on average).`);
+  }
+  if (nWk) {
+    notes.push(`Finished above the weekly consensus rank in ${over} of ${nWk} ranked ` +
+      `player-weeks (${Math.round(over / nWk * 100)}%), below it in ${under} (${Math.round(under / nWk * 100)}%).`);
+  }
+  if (ppgN) {
+    const d = ppgDiffSum / ppgN;
+    notes.push(`Mean scoring relative to rank-implied points: ${d >= 0 ? "+" : ""}${d.toFixed(1)} points per game.`);
+  }
+  return `<div class="phist">` +
+    `<div class="phist-head">${esc(p.name)} — season-by-season record, ${FMT_LABEL[FMT]}</div>` +
+    `<div class="phist-sub">Ranks are positional (${esc(p.pos)}). Δ = pre-draft − finish; positive = finished better than drafted. ` +
+    `Wk proj / Wk finish = mean weekly consensus rank vs. mean weekly finish. O–U = weeks finished above vs. below his consensus rank. ` +
+    `PPG = rank-implied vs. actual points per game.</div>` +
+    `<div class="scroll-x"><table><thead><tr><th>Season</th><th class="num">Pre-draft</th><th class="num">Finish</th>` +
+    `<th class="num">Δ</th><th class="num">Pts</th><th class="num">GP</th><th class="num">Wk proj</th>` +
+    `<th class="num">Wk finish</th><th class="num">O–U</th><th class="num">PPG</th></tr></thead>` +
+    `<tbody>${rows}</tbody></table></div>` +
+    (notes.length ? `<p class="phist-note">${notes.join(" ")}</p>` : "");
+}
+
+function toggleDetail(tr) {
+  const next = tr.nextElementSibling;
+  const open = next && next.classList.contains("detail-row");
+  document.querySelectorAll("#board .detail-row").forEach(r => r.remove());
+  document.querySelectorAll('#board tr[aria-expanded="true"]')
+    .forEach(r => r.setAttribute("aria-expanded", "false"));
+  if (open) return;
+  const cols = tr.children.length;
+  tr.setAttribute("aria-expanded", "true");
+  tr.insertAdjacentHTML("afterend",
+    `<tr class="detail-row"><td class="detail-td" colspan="${cols}">` +
+    `<div class="empty">Loading player history…</div></td></tr>`);
+  fetchPlayers().then(() => {
+    const cell = tr.nextElementSibling && tr.nextElementSibling.querySelector(".detail-td");
+    if (cell) cell.innerHTML = PLAYERS
+      ? playerDetailHtml(tr.dataset.pid)
+      : '<div class="empty">Player history unavailable.</div>';
+  });
+}
+
+document.addEventListener("click", e => {
+  if (e.target.closest("#board th")) return;
+  const tr = e.target.closest('#board tbody tr[data-pid]');
+  if (tr && tr.dataset.pid) toggleDetail(tr);
+});
+document.addEventListener("keydown", e => {
+  if (e.key !== "Enter" && e.key !== " ") return;
+  const tr = e.target.closest && e.target.closest('#board tbody tr[data-pid]');
+  if (tr && tr.dataset.pid) { e.preventDefault(); toggleDetail(tr); }
+});
+
+/* ---------- expectation model ---------- */
+let MODEL = null, MODEL_POS = "ALL", MODEL_SORT = "edge", MODEL_Q = "";
+const COEF_LABEL = {
+  pre: "Draft slot", implied_pts: "Slot's historical points", age: "Age",
+  age_c2: "Aging curve (age − 26)²", age_rb: "RB-specific aging", rookie: "Rookie",
+  years_exp: "Years of experience", draft_round: "NFL draft round",
+  log_pick: "log(draft pick)", team_change: "Changed team",
+  turnover: "Team skill-roster turnover", prior_poe: "Prior season ± vs slot",
+  prior_board: "Ranked last season", prior_gp: "Games played last season",
+  prior_ppg: "Points per game last season", prior2_gp: "Games two seasons ago",
+  inj_listed: "Injury-report weeks last season", inj_out: "Weeks Out last season",
+  pos_RB: "RB", pos_WR: "WR", pos_TE: "TE",
+};
+const DRIVER_LABEL = {
+  age: "age", age_c2: "age curve", age_rb: "RB aging", rookie: "rookie",
+  years_exp: "experience", draft_round: "draft capital", log_pick: "draft pick",
+  team_change: "team change", turnover: "roster turnover",
+  prior_poe: "prior ±", prior_board: "unranked last yr", prior_gp: "durability",
+  prior_ppg: "prior ppg", prior2_gp: "durability (2 yr)",
+  inj_listed: "injury weeks", inj_out: "weeks out",
+};
+
+function renderModel() {
+  if (!MODEL) return;
+  const m = MODEL.metrics;
+  $("#model-card").hidden = false;
+  $("#model-sub").innerHTML =
+    `Two ridge regressions estimate how each QB/RB/WR/TE on the ${MODEL.season} consensus board will ` +
+    `compare with the historical value of his draft slot. The <b>value model</b> predicts points over ` +
+    `expectation (POE): season fantasy points minus the points the slot has historically produced — a ` +
+    `magnitude target, so a 120-point blowout season counts for far more than clearing a rank by half a ` +
+    `point. The <b>rank model</b> estimates the probability of finishing at or better than the slot. ` +
+    `Inputs are strictly pre-season: slot value, age and aging curve, experience, NFL draft capital, team ` +
+    `change, team skill-roster turnover, and the prior seasons' games, scoring, injury-report weeks, and ` +
+    `POE. Fitted on PPR boards (multi-source consensus in every captured season since 2013); roster, ` +
+    `injury, and draft data from <a href="https://github.com/nflverse/nflverse-data">nflverse</a>.`;
+  $("#model-meta").innerHTML =
+    `<span class="chip">train <b>${m.train_seasons[0]}–${m.train_seasons[1]}</b> · n=${m.n_train}</span>` +
+    `<span class="chip">test <b>${m.test_seasons[0]}–${m.test_seasons[1]}</b> · n=${m.n_test}</span>` +
+    `<span class="chip" title="Rank correlation between predicted and actual POE on held-out seasons">value: Spearman <b>${m.reg.spearman.toFixed(2)}</b></span>` +
+    `<span class="chip" title="Mean absolute error of predicted POE; actual POE has a standard deviation of ${m.reg.sd_actual} points">value: MAE <b>${m.reg.mae}</b> pts (SD ${m.reg.sd_actual})</span>` +
+    `<span class="chip" title="Probability that a random beater outranks a random non-beater; 0.5 = chance">rank: AUC <b>${m.cls.auc.toFixed(2)}</b></span>` +
+    `<span class="chip" title="Mean squared probability error vs ${(m.cls.base_rate * (1 - m.cls.base_rate)).toFixed(3)} for a constant base-rate forecast">rank: Brier <b>${m.cls.brier.toFixed(3)}</b></span>`;
+
+  const coefs = [...MODEL.coefficients].sort((a, b) => Math.abs(b.beta_reg) - Math.abs(a.beta_reg));
+  const maxB = Math.max(...coefs.map(c => Math.abs(c.beta_reg)));
+  $("#model-coefs").innerHTML = coefs.map(c => {
+    const w = Math.abs(c.beta_reg) / maxB * 50;
+    const side = c.beta_reg >= 0 ? `left:50%;width:${w}%` : `left:${50 - w}%;width:${w}%`;
+    const col = c.beta_reg >= 0 ? "var(--s6)" : "var(--s8)";
+    return `<div class="coef-row"><span class="coef-label" title="${esc(c.desc)}">${esc(COEF_LABEL[c.f] || c.f)}</span>` +
+      `<span class="coef-track"><span class="coef-bar" style="${side};background:${col}"></span></span>` +
+      `<span class="coef-val">${c.beta_reg >= 0 ? "+" : ""}${c.beta_reg.toFixed(1)}</span></div>`;
+  }).join("");
+
+  $("#model-quintiles").innerHTML =
+    '<thead><tr><th>Q</th><th class="num">Predicted</th><th class="num">Observed</th><th class="num">n</th></tr></thead><tbody>' +
+    (MODEL.quintiles_test || []).map(q =>
+      `<tr><td>${q.q}</td><td class="num">${q.pred_mean > 0 ? "+" : ""}${q.pred_mean}</td>` +
+      `<td class="num">${q.obs_mean > 0 ? "+" : ""}${q.obs_mean}</td><td class="num">${q.n}</td></tr>`).join("") +
+    "</tbody>";
+  $("#model-reliability").innerHTML =
+    '<thead><tr><th class="num">Predicted</th><th class="num">Observed</th><th class="num">n</th></tr></thead><tbody>' +
+    MODEL.reliability_test.map(r =>
+      `<tr><td class="num">${(r.p_mean * 100).toFixed(0)}%</td>` +
+      `<td class="num">${(r.obs_rate * 100).toFixed(0)}%</td><td class="num">${r.n}</td></tr>`).join("") +
+    "</tbody>";
+
+  $("#model-pred-head").textContent = `${MODEL.season} board, ${MODEL.predictions.length} players`;
+  let rows = [...MODEL.predictions];
+  if (MODEL_POS !== "ALL") rows = rows.filter(r => r.pos === MODEL_POS);
+  if (MODEL_Q) rows = rows.filter(r => r.name.toLowerCase().includes(MODEL_Q));
+  const dir = MODEL_SORT === "pre" ? 1 : -1;
+  rows.sort((a, b) => (a[MODEL_SORT] - b[MODEL_SORT]) * dir);
+  const caret = k => MODEL_SORT === k ? " ▼" : "";
+  const maxE = Math.max(10, ...MODEL.predictions.map(r => Math.abs(r.edge)));
+  $("#model-table").innerHTML = '<table><thead><tr>' +
+    '<th>Player</th>' +
+    `<th class="num sortable" data-msort="pre" title="Pre-draft consensus positional rank (PPR) and the season points that slot has historically produced">Slot${caret("pre")}</th>` +
+    `<th class="num sortable" data-msort="edge" title="Player-specific signal only: the sum of contributions from age, durability, draft capital, injuries, and prior delivery — slot and position terms removed. Compares players against peers drafted near them.">Edge${caret("edge")}</th>` +
+    // E[± pts] is dominated by the slot and negative for every early pick by
+    // construction; Edge is the column to actually compare players on, so the
+    // narrow layout keeps Edge and drops this one
+    `<th class="num sortable col-desc" data-msort="poe" title="Predicted points over slot expectation, including the slot's own mean reversion. Early slots are negative on average — slot-1 players usually fail to repay slot-1 points.">E[± pts]${caret("poe")}</th>` +
+    `<th class="num sortable" data-msort="p" title="Rank model: probability of finishing at or better than the slot">P(beat)${caret("p")}</th>` +
+    '<th class="col-desc" title="Largest player-specific inputs, in points of POE">Drivers</th></tr></thead><tbody>' +
+    rows.map(r => {
+      const w = Math.abs(r.edge) / maxE * 50;
+      const side = r.edge >= 0 ? `left:50%;width:${w}%` : `left:${50 - w}%;width:${w}%`;
+      const ecol = r.edge >= 0 ? "var(--s6)" : "var(--s8)";
+      const drivers = (r.drivers || []).map(d => {
+        const beta = (MODEL.coefficients.find(c => c.f === d.f) || {}).beta_reg || 0;
+        const above = beta !== 0 && (d.c / beta) > 0;
+        const tip = `${above ? "above" : "below"}-average ${COEF_LABEL[d.f] || d.f} contributes ` +
+          `${d.c >= 0 ? "+" : "−"}${Math.abs(d.c).toFixed(0)} points of expected POE`;
+        return `<span class="dpill" title="${esc(tip)}">${esc(DRIVER_LABEL[d.f] || d.f)} ` +
+          `<b class="${d.c >= 0 ? "pos" : "neg"}">${d.c >= 0 ? "+" : "−"}${Math.abs(d.c).toFixed(0)}</b></span>`;
+      }).join("");
+      return `<tr><td><span class="pcell">${faceHtml(r)}<span><span class="pname">${esc(r.name)}</span><br>` +
+        `<span class="pmeta"><span class="posbadge pos-${r.pos}">${r.pos}</span>${esc(r.team || "")}</span></span></span></td>` +
+        `<td class="num" title="slot has historically produced ${r.implied != null ? r.implied : "?"} pts">${r.pos}${r.pre}</td>` +
+        `<td class="num ${r.edge >= 0 ? "epos" : "eneg"}"><span class="ebar"><i style="${side};background:${ecol}"></i></span>${r.edge >= 0 ? "+" : "−"}${Math.abs(r.edge).toFixed(0)}</td>` +
+        `<td class="num col-desc">${r.poe >= 0 ? "+" : "−"}${Math.abs(r.poe).toFixed(0)}</td>` +
+        `<td class="num"><span class="pbar"><i style="width:${Math.round(r.p * 100)}%"></i></span>${(r.p * 100).toFixed(0)}%</td>` +
+        `<td class="col-desc">${drivers}</td></tr>`;
+    }).join("") + "</tbody></table>";
+
+  $("#model-takeaway").innerHTML =
+    `E[± pts] is dominated by the slot itself: early slots carry the largest historical expectations and ` +
+    `mean-revert hardest, so every top pick shows a negative expected POE — the statement that slot-1 ` +
+    `players usually fail to repay slot-1 points, not a fade of any individual. <b>Edge</b> removes the ` +
+    `slot terms and keeps only player-specific signal — durability, age, draft capital, injury history, ` +
+    `prior delivery — and is the column to compare between players drafted near each other. Out-of-time ` +
+    `Spearman of ${m.reg.spearman.toFixed(2)} on POE is real but modest signal: most of a season is not ` +
+    `predictable before kickoff.`;
+  applyClamps();
+}
+
+const _el_model_posfilter = document.getElementById("model-posfilter"); if (_el_model_posfilter) _el_model_posfilter.addEventListener("click", e => {
+  const b = e.target.closest("button"); if (!b) return;
+  MODEL_POS = b.dataset.mpos;
+  document.querySelectorAll("#model-posfilter button").forEach(x => x.classList.toggle("active", x === b));
+  renderModel();
+});
+const _el_model_search = document.getElementById("model-search"); if (_el_model_search) _el_model_search.addEventListener("input", e => {
+  MODEL_Q = e.target.value.trim().toLowerCase();
+  renderModel();
+});
+document.addEventListener("click", e => {
+  const th = e.target.closest("#model-table th.sortable");
+  if (!th) return;
+  MODEL_SORT = th.dataset.msort;
+  renderModel();
+});
+
+fetch("data/model.json", {cache: "no-cache"}).then(r => r.json())
+  .then(d => { MODEL = d; renderModel(); })
+  .catch(() => {});
+
+/* ---------- pipeline health ----------
+   Operational state, not analysis: which sources the unattended run last got
+   anything from. The banner only appears when something is actually broken,
+   so a healthy pipeline stays quiet and a broken one cannot be missed. */
+let HEALTH = null;
+
+function ago(stamp) {
+  if (!stamp) return "never";
+  const then = new Date(stamp);
+  if (isNaN(then)) return "unknown";
+  const days = Math.floor((Date.now() - then.getTime()) / 86400000);
+  if (days <= 0) return "today";
+  return days === 1 ? "yesterday" : days + " days ago";
+}
+
+function renderHealth() {
+  const card = document.getElementById("health-card");
+  const banner = document.getElementById("health-banner");
+  if (!card || !HEALTH || !(HEALTH.sources || []).length) return;
+  card.hidden = false;
+
+  const broken = HEALTH.sources.filter(s => s.state === "broken");
+  if (broken.length) {
+    banner.hidden = false;
+    banner.innerHTML = `<b>${broken.length} source${broken.length === 1 ? " is" : "s are"} not reporting.</b> ` +
+      esc(broken.map(s => srcName(s.source)).join(", ")) +
+      ` — last produced data ${esc(ago(broken[0].last_ok))}. Scores below are computed from the ` +
+      `sources that did report; see <a href="#health-card">pipeline health</a>.`;
+  } else {
+    banner.hidden = true;
+  }
+
+  const order = {broken: 0, flaky: 1, ok: 2};
+  const rows = [...HEALTH.sources].sort(
+    (a, b) => (order[a.state] - order[b.state]) || a.source.localeCompare(b.source));
+
+  let html = '<table><thead><tr><th>Source</th><th>State</th>' +
+    '<th class="num col-desc" title="Weeks captured this season">Weeks</th>' +
+    '<th class="num col-desc">Last data</th>' +
+    '<th class="col-desc">Last error</th></tr></thead><tbody>';
+  rows.forEach(s => {
+    html += `<tr><td class="srccol">${srcMark(s.source, true)}</td>` +
+      `<td><span class="hstate ${s.state}">${s.state}</span>` +
+      (s.fails > 1 ? ` <span class="herr">${s.fails} runs</span>` : "") + `</td>` +
+      `<td class="num col-desc">${s.weeks != null ? s.weeks : "—"}</td>` +
+      `<td class="num col-desc">${esc(ago(s.last_ok))}</td>` +
+      `<td class="col-desc herr">${s.last_error ? esc(s.last_error.slice(0, 90)) : ""}</td></tr>`;
+  });
+  $("#health-board").innerHTML = html + "</tbody></table>";
+
+  const last = (HEALTH.runs || [])[0];
+  $("#health-runs").innerHTML = last
+    ? `<span class="arrow">▶</span>Last automated run ${esc(ago(last.at))}: ` +
+      `${last.ok} source-formats captured, ${last.failed} failed. ` +
+      `The run is idempotent and repeats daily, so a missed run repairs itself where the ` +
+      `source still serves that week.`
+    : "";
+}
+
+fetch("data/health.json", {cache: "no-cache"}).then(r => r.json())
+  .then(d => { HEALTH = d; try { renderHealth(); } catch (e) { console.error("renderHealth", e); } })
+  .catch(() => {});
+
+// the cross-season record is independent of the selected season, so it loads
+// once and re-renders whenever the format or roster lens changes
+fetch("data/history.json", {cache: "no-cache"}).then(r => r.json())
+  .then(d => { HISTORY = d; try { renderHistory(); } catch (e) { console.error("renderHistory", e); } })
+  .catch(() => {});
+
+function renderAll() {
+  // isolate each panel: one failing render shouldn't blank the whole page
+  [renderHero, renderBaselineNote, renderBoard, renderHistory, renderWeeklyBoard,
+   renderTrend, renderPosBreakdown, renderCalibration, renderPredraftBoard].forEach(fn => {
+    try { fn(); } catch (err) { console.error(fn.name, err); }
+  });
+  applyClamps();
+  // Charts may have been measured before layout settled. One immediate check
+  // is not enough: the window "load" listener usually fires before the data
+  // fetches resolve (so it bails with no SUMMARY), and web fonts can reflow
+  // the page after first paint. Stagger a few cheap checks instead — each is
+  // a width comparison that redraws only when it finds a real mismatch.
+  [0, 150, 600].forEach(d => setTimeout(recheckWidths, d));
+  requestAnimationFrame(recheckWidths);
+  $("#meta").innerHTML =
+    `Sources: FantasyPros, ESPN, CBS, NFL.com, Yahoo, The Ringer, PFF, RotoBaller, Draft Sharks, FantasySharks, ` +
+    `FFToday, WalterFootball, plus market ADP from FF Calculator, MyFantasyLeague, and Underdog. ` +
+    `Actual fantasy points from Sleeper. Coverage varies by scoring format — each tab shows only sources that ` +
+    `publish it. Rankings are snapshotted before games; scoring is Spearman rank correlation vs. real results. ` +
+    `Generated ${esc(SUMMARY.generated_at)} UTC · <a href="https://github.com/colindiggs/nfl-fantasy-rankings-rankings">methodology &amp; data</a>`;
+}
+
+const _el_fmt_tabs = document.getElementById("fmt-tabs"); if (_el_fmt_tabs) _el_fmt_tabs.addEventListener("click", e => {
+  const b = e.target.closest("button"); if (!b) return;
+  FMT = b.dataset.fmt;
+  document.querySelectorAll("#fmt-tabs button").forEach(x => x.classList.toggle("active", x === b));
+  renderAll();
+});
+const _el_posfilter = document.getElementById("posfilter"); if (_el_posfilter) _el_posfilter.addEventListener("click", e => {
+  const b = e.target.closest("button"); if (!b) return;
+  POS = b.dataset.pos;
+  document.querySelectorAll("#posfilter button").forEach(x => x.classList.toggle("active", x === b));
+  renderBoard();
+});
+document.addEventListener("click", e => {
+  const th = e.target.closest("#board th.sortable");
+  if (!th) return;
+  const key = th.dataset.sort;
+  SORT = (SORT.key === key) ? {key, dir: -SORT.dir} : {key, dir: 1};
+  renderBoard();
+});
+const _el_search = document.getElementById("search"); if (_el_search) _el_search.addEventListener("input", e => {
+  QUERY = e.target.value.trim().toLowerCase();
+  renderBoard();
+});
+const _el_src_toggle = document.getElementById("src-toggle"); if (_el_src_toggle) _el_src_toggle.addEventListener("click", () => {
+  SHOW_SRC = !SHOW_SRC;
+  SRC_TOGGLED = true;   // an explicit choice outranks the breakpoint default
+  // sorting by a now-hidden source column would leave an unexplained order
+  if (!SHOW_SRC && !["avg", "tier", "value", "cov"].includes(SORT.key)) {
+    SORT = {key: "avg", dir: 1};
+  }
+  renderBoard();
+});
+const _el_roster_tabs = document.getElementById("roster-tabs"); if (_el_roster_tabs) _el_roster_tabs.addEventListener("click", e => {
+  const b = e.target.closest("button"); if (!b) return;
+  ROSTER = b.dataset.roster;
+  document.querySelectorAll("#roster-tabs button").forEach(x => x.classList.toggle("active", x === b));
+  renderAll();
+});
+const _el_season_select = document.getElementById("season-select"); if (_el_season_select) _el_season_select.addEventListener("change", e => {
+  loadSeason(Number(e.target.value)).then(renderAll);
+});
+
+function fail(msg) {
+  document.querySelector(".wrap").insertAdjacentHTML("beforeend", `<div class="empty">${msg}</div>`);
+}
+
+// Seasons live in data/{year}/; the current season is also mirrored at data/
+// so an older cached index still finds it.
+function loadSeason(year) {
+  SEASON = year;
+  const base = `data/${year}/`;
+  // no-cache = revalidate against the server (cheap 304s), so a fresh deploy
+  // is never hidden behind a stale cached copy
+  return Promise.all([
+    fetch(base + "summary.json", {cache: "no-cache"}).then(r => r.json()),
+    fetch(base + "predraft.json", {cache: "no-cache"}).then(r => r.json()).catch(() => null),
+  ]).then(([s, p]) => { SUMMARY = s; PREDRAFT = p; adoptLeague(p); });
+}
+
+function renderSeasonSelect() {
+  const sel = document.getElementById("season-select");
+  const list = (SEASONS && SEASONS.seasons) || [];
+  if (list.length < 2) { sel.style.display = "none"; return; }
+  const scored = new Set(SEASONS.scored || list);
+  sel.innerHTML = list.map(y => {
+    let label = String(y);
+    if (y === SEASONS.current) label += scored.has(y) ? " (current)" : " (upcoming)";
+    else if (!scored.has(y)) label += " (no results)";
+    return `<option value="${y}"${y === SEASON ? " selected" : ""}>${label}</option>`;
+  }).join("");
+}
+
+fetch("data/seasons.json", {cache: "no-cache"}).then(r => r.json())
+  .catch(() => null)
+  .then(idx => {
+    SEASONS = idx;
+    if (idx && idx.seasons && idx.seasons.length) {
+      // ?season=2025 deep-links a specific year; otherwise the current one
+      const want = Number(new URLSearchParams(location.search).get("season"));
+      const pick = idx.seasons.includes(want) ? want : idx.current;
+      return loadSeason(pick).then(renderSeasonSelect);
+    }
+    // no season index (older build) — fall back to the flat files
+    return Promise.all([
+      fetch("data/summary.json", {cache: "no-cache"}).then(r => r.json()),
+      fetch("data/predraft.json", {cache: "no-cache"}).then(r => r.json()).catch(() => null),
+    ]).then(([s, p]) => { SUMMARY = s; PREDRAFT = p; adoptLeague(p); });
+  })
+  .then(renderAll)
+  .catch(() => fail("No data yet — first capture pending."));
+</script>
+</body>
+</html>
