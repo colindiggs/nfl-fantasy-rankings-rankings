@@ -121,26 +121,23 @@ td.espn { text-align: right; font-variant-numeric: tabular-nums; }
 
 /* range: a window centred on the consensus rank, so the bar shows not just how
    wide the disagreement is but which side of him it falls on */
-th.c-range, td.c-range { min-width: 215px; }
+th.c-range, td.c-range { min-width: 205px; }
 .rng { display: flex; align-items: center; gap: 8px; }
-.rngtrack { position: relative; flex: 1; height: 18px; background: var(--chip);
+.rngtrack { position: relative; flex: 1; height: 16px; background: var(--chip);
             border-radius: 3px; }
-.rngbar { position: absolute; top: 6px; height: 6px; background: var(--accent);
+.rngbar { position: absolute; top: 8px; height: 5px; background: var(--accent);
           opacity: .45; border-radius: 2px; min-width: 3px; }
-.rngtick { position: absolute; top: 2px; width: 2px; height: 14px; background: var(--ink-2); opacity: .45; }
-.rngespn {
-  position: absolute; top: 50%; transform: translate(-50%, -50%);
-  width: 25px; height: 14px; border-radius: 2px;
-  background: #d00 url("data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEAAAAAkCAYAAAA5DDySAAADAElEQVR4Xu2Y6UtUURjG/WMiCiJtETLbS1pULNRUNB0SyqRQMixooQiC/KBGC/VBoWyxsAWiIqzMEFtAHWfGcRbHLQ0dBxu1xqvovHUuzJk57znT3IvfOveB34f7vOee5Zkz5wwT17lyHchMHDZkI65j2WqQGSMAbMiGEQA2ZMMIABuyYQSADdkwAsCGbOgKwLwmGcbu1Mdk6OwltX3P7gwYqarl6rq5XQdD5y+DOSEJOpYn8HXEj2u3oDcjh5u/CF0B9O7PBS2afPkaXIVHYHFWwaUlyd/yCSzJu7At1KKigD0ti1sDRlcAnmPleByhyKfgb27B9pIVVObAmWfCdlQNX7zCrQGjKwBXQTH4mp7HxG06qm5D7C8V772H6tbGfjScuSZuDRhdAfSkpIMr/3BMutdvBqfAj8SRVQBdqxLVfm07Urm6CHtaNli37WU8c3wSnR+udcVv4NaA0RXAzzfNeJcJRZKHYBDbnJTh72Ddugd8T1/gklCTr96Ct+ER49m276Pz8z54zNRI33gNGF0B/Oq2MgNEE7ktpr98w7ZQI1U1MN3+FducggsL4DleAf53LdQjhyz5Vyc0P/+H1nAtEIDOFWu5NWB0BTA/4aMDzLr7YPD0BZ7Kc2pbcmX1nzjF1UdrbtA+iEauVoMyOESf58fGuXdIn/b0bLXfgN1B2yoDg8z8Ag4Xrc329XPzF6E5gO7ELcy2/m2xqXczxlNaDr0H8jg/xHjdXdoHUX9ZJQTn5ujzdNtnbmzK398AC1NTtO1UWzutdZLazEy41trGvy9AcwDk9NUisg3xd/FfcptKmGffk2fc2CEsG3dGbWvZlMLUJhqbuPdFaA7AU1LGDBBNZPHkB4sW+d9/VG+DSJHrE48dwpGZz7atvRmuZR9iaqPV17n3RWgOwJlTBN77jTFxF5eqBxv2Ixmvb4CBk2fUA8yemsnUnLlF3Ngh7KlZbNuccFtyRkTWHAcLufdFaA7gf8UIABuyYQSADdkwAsCGbBgBYEM2jACwIRt/AKo6lwJKPKh8AAAAAElFTkSuQmCC") center/contain no-repeat;
-  box-shadow: 0 0 0 1.5px var(--surface), 0 1px 2px rgba(0,0,0,.35);
-}
+.rngtick { position: absolute; top: 7px; width: 2px; height: 7px; background: var(--ink-2); opacity: .5; }
+.rngespn { position: absolute; top: 0; width: 0; height: 0; margin-left: -5px;
+           border-left: 5px solid transparent; border-right: 5px solid transparent;
+           border-top: 7px solid var(--espn); }
 .rngtxt { color: var(--ink-2); font-size: .72rem; font-variant-numeric: tabular-nums;
           min-width: 56px; text-align: right; }
 .axis { display: flex; justify-content: space-between; font-size: .58rem; letter-spacing: .04em;
         color: var(--muted); font-weight: 500; text-transform: none; margin-top: 1px; }
-.espn-key { display: inline-block; width: 25px; height: 14px; border-radius: 2px;
-            vertical-align: -3px; margin-right: 6px;
-            background: #d00 url("data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEAAAAAkCAYAAAA5DDySAAADAElEQVR4Xu2Y6UtUURjG/WMiCiJtETLbS1pULNRUNB0SyqRQMixooQiC/KBGC/VBoWyxsAWiIqzMEFtAHWfGcRbHLQ0dBxu1xqvovHUuzJk57znT3IvfOveB34f7vOee5Zkz5wwT17lyHchMHDZkI65j2WqQGSMAbMiGEQA2ZMMIABuyYQSADdkwAsCGbOgKwLwmGcbu1Mdk6OwltX3P7gwYqarl6rq5XQdD5y+DOSEJOpYn8HXEj2u3oDcjh5u/CF0B9O7PBS2afPkaXIVHYHFWwaUlyd/yCSzJu7At1KKigD0ti1sDRlcAnmPleByhyKfgb27B9pIVVObAmWfCdlQNX7zCrQGjKwBXQTH4mp7HxG06qm5D7C8V772H6tbGfjScuSZuDRhdAfSkpIMr/3BMutdvBqfAj8SRVQBdqxLVfm07Urm6CHtaNli37WU8c3wSnR+udcVv4NaA0RXAzzfNeJcJRZKHYBDbnJTh72Ddugd8T1/gklCTr96Ct+ER49m276Pz8z54zNRI33gNGF0B/Oq2MgNEE7ktpr98w7ZQI1U1MN3+FducggsL4DleAf53LdQjhyz5Vyc0P/+H1nAtEIDOFWu5NWB0BTA/4aMDzLr7YPD0BZ7Kc2pbcmX1nzjF1UdrbtA+iEauVoMyOESf58fGuXdIn/b0bLXfgN1B2yoDg8z8Ag4Xrc329XPzF6E5gO7ELcy2/m2xqXczxlNaDr0H8jg/xHjdXdoHUX9ZJQTn5ujzdNtnbmzK398AC1NTtO1UWzutdZLazEy41trGvy9AcwDk9NUisg3xd/FfcptKmGffk2fc2CEsG3dGbWvZlMLUJhqbuPdFaA7AU1LGDBBNZPHkB4sW+d9/VG+DSJHrE48dwpGZz7atvRmuZR9iaqPV17n3RWgOwJlTBN77jTFxF5eqBxv2Ixmvb4CBk2fUA8yemsnUnLlF3Ngh7KlZbNuccFtyRkTWHAcLufdFaA7gf8UIABuyYQSADdkwAsCGbBgBYEM2jACwIRt/AKo6lwJKPKh8AAAAAElFTkSuQmCC") center/contain no-repeat; }
+.espn-key { display: inline-block; width: 0; height: 0; vertical-align: 1px; margin-right: 6px;
+            border-left: 5px solid transparent; border-right: 5px solid transparent;
+            border-top: 7px solid var(--espn); }
 
 /* player drill-in */
 tr.detail-row:hover, tr.detail-row td { background: var(--page); }
@@ -158,7 +155,7 @@ tr.detail-row:hover, tr.detail-row td { background: var(--page); }
 .scroll-x { overflow-x: auto; }
 
 .legend { display: flex; gap: 14px; align-items: center; flex-wrap: wrap;
-          margin-top: 9px; font-size: .75rem; color: var(--muted); line-height: 1.6; }
+          margin: 0 0 9px; font-size: .75rem; color: var(--muted); line-height: 1.6; }
 .sw { display: inline-block; width: 22px; height: 12px; border-radius: 3px; vertical-align: -2px; margin-right: 5px; }
 .empty { color: var(--muted); font-style: italic; padding: 20px; }
 </style>
@@ -195,15 +192,15 @@ tr.detail-row:hover, tr.detail-row td { background: var(--page); }
     <select id="season" aria-label="Season"></select>
   </div>
 
-  <div class="tablewrap" id="board"><div class="empty">Loading…</div></div>
-
   <div class="legend">
     <span id="key-good"><span class="sw" style="background:rgba(27,150,110,.55)"></span>higher than consensus</span>
     <span id="key-bad"><span class="sw" style="background:rgba(205,66,66,.55)"></span>lower than consensus</span>
     <span><b>Range</b> = where the sources spread him &mdash; left is better, right is worse</span>
-    <span><i class="espn-key"></i>ESPN draft slot &mdash; bar left of it means the field likes him more than the room</span>
+    <span><i class="espn-key"></i><b>red caret = ESPN draft slot</b> &mdash; bar left of it means the field likes him more than the room</span>
     <span>Tint scales with draft depth &mdash; a 10-pick gap matters at 5, not at 200</span>
   </div>
+
+  <div class="tablewrap" id="board"><div class="empty">Loading…</div></div>
 </div>
 
 <script>
@@ -273,7 +270,7 @@ function tint(rank, avg, depth){
     return ' style="color:color-mix(in srgb, ' + col + ' ' + pct + '%, var(--ink-2));font-weight:' +
            (Math.abs(m) > 0.55 ? 700 : 600) + '"';
   }
-  const a = (Math.abs(m) * 0.32).toFixed(3);
+  const a = (Math.abs(m) * 0.19).toFixed(3);
   return ' style="background:rgba(var(--' + (m < 0 ? "good" : "bad") + '),' + a + ')"';
 }
 
