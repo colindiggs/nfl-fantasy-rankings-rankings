@@ -254,6 +254,30 @@ Both are tagged `basis="projection"` and badged in the UI. A projection ordered
 by points is a real ranking, but it answers "who scores most" rather than "who
 should you start", and the two come apart where usage is volatile.
 
+### The ESPN lane
+
+ESPN publishes two different things and the app foregrounds the first:
+
+- **ESPN RANK** — the editorial list you scroll on draft day. It comes from
+  `draftRanksByRankType` on the `kona_player_info` endpoint, rank type `PPR`.
+  Verified against a screenshot of the app's "2026 Fantasy Football Rankings"
+  screen: the top ten match exactly, including the inversions that prove it is
+  not a points sort (McCaffrey has the second-highest projection but ranks 7th,
+  Taylor ranks 5th on a lower projection than Nacua at 4th).
+- **ESPN ADP** — where the room actually takes him, from the ADP feed.
+
+The board leads with the rank and keeps ADP alongside, and the red caret on the
+range bar marks the **rank**, because that is the list in front of him when the
+pick is on the clock.
+
+One wrinkle worth knowing: ESPN only publishes `STANDARD` and `PPR` rank types
+— there is no half-PPR list, and the app's default rankings screen shows the
+PPR order even for a half-PPR league. The projection *values* the app displays
+are half-PPR: every one of the ten checked lands within ~1.4 points of
+`(standard + PPR) / 2`, which is exactly half-PPR since half is standard plus
+0.5/reception and PPR is standard plus 1.0. So the order is PPR and the points
+are half-PPR, which is ESPN's behaviour, not ours.
+
 ### Rows that can't be scored fairly
 
 Two kinds of row are excluded from scoring rather than counted as zero, and

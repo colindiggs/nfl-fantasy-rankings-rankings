@@ -117,6 +117,8 @@ td.c-rank b { font-size: .9rem; }
 td.src { text-align: right; font-variant-numeric: tabular-nums; }
 td.na { color: var(--grid); text-align: right; }
 td.espn, th.espn { border-left: 2px solid var(--border); }
+td.espnadp, th.espnadp { text-align: right; font-variant-numeric: tabular-nums;
+                         border-right: 2px solid var(--border); color: var(--ink-2); }
 td.espn { text-align: right; font-variant-numeric: tabular-nums; }
 
 /* range: a window centred on the consensus rank, so the bar shows not just how
@@ -196,7 +198,7 @@ tr.detail-row:hover, tr.detail-row td { background: var(--page); }
     <span id="key-good"><span class="sw" style="background:rgba(27,150,110,.55)"></span>higher than consensus</span>
     <span id="key-bad"><span class="sw" style="background:rgba(205,66,66,.55)"></span>lower than consensus</span>
     <span><b>Range</b> = where the sources spread him &mdash; left is better, right is worse</span>
-    <span><i class="espn-key"></i><b>red caret = ESPN draft slot</b> &mdash; bar left of it means the field likes him more than the room</span>
+    <span><i class="espn-key"></i><b>red caret = ESPN&rsquo;s rank</b> &mdash; the list you scroll in the app; bar left of it means the field likes him more than ESPN does</span>
     <span>Tint scales with draft depth &mdash; a 10-pick gap matters at 5, not at 200</span>
   </div>
 
@@ -331,18 +333,20 @@ function rangeCell(p, depth){
   const pct = v => Math.max(0, Math.min(100, ((v - lo) / (hi - lo)) * 100));
   const a = pct(p.min), b = pct(p.max);
   const e = p.espn || {};
-  const er = e.adp_rank != null ? e.adp_rank : null;
+  // the caret tracks ESPN's ranking, not its ADP — the ranking is the list he
+  // is actually scrolling when the pick is on the clock
+  const er = e.rank != null ? e.rank : null;
   let marker = "", note = "";
   if (er != null){
     const d = Math.round((er - p.avg) * 10) / 10;
-    note = d > 0 ? " · ESPN has him " + Math.abs(d) + " later (better value)"
-         : d < 0 ? " · ESPN has him " + Math.abs(d) + " earlier (costs more)"
+    note = d > 0 ? " · ESPN ranks him " + Math.abs(d) + " lower than the field (value)"
+         : d < 0 ? " · ESPN ranks him " + Math.abs(d) + " higher than the field (reach)"
          : " · ESPN matches the consensus";
     marker = '<i class="rngespn" style="left:' + pct(er) + '%"></i>';
   }
   return '<td class="c-range"><span class="rng">' +
     '<span class="rngtrack" title="' + p.n + ' sources rank him between ' + p.min +
-    " and " + p.max + (er != null ? "; ESPN drafts him around " + er : "") + note + '">' +
+    " and " + p.max + (er != null ? "; ESPN ranks him " + er : "") + note + '">' +
     '<i class="rngbar" style="left:' + a + '%;width:' + Math.max(2, b - a) + '%"></i>' +
     '<i class="rngtick" style="left:' + pct(depth) + '%"></i>' + marker + '</span>' +
     '<span class="rngtxt">' + p.min + "–" + p.max + '</span></span></td>';
@@ -356,7 +360,11 @@ function render(){
     return;
   }
   const sources = f.sources || [];
-  const hasEspn = f.players.some(p => p.espn && p.espn.adp != null);
+  // ESPN publishes two different things and the app shows the first: the
+  // editorial rank list you scroll while drafting, and the ADP of where players
+  // actually go. The rank is the anchor; ADP rides alongside as the market.
+  const hasRank = f.players.some(p => p.espn && p.espn.rank != null);
+  const hasAdp = f.players.some(p => p.espn && p.espn.adp != null);
 
   // Consensus rank is fixed by the board, not by the current sort — so when you
   // sort by one source you can still see that his 12th is the consensus 47th.
@@ -370,6 +378,7 @@ function render(){
 
   rows = rows.slice().sort(function(a, b){
     const get = r => SORT.key === "rank" ? crank.get(r.id)
+                   : SORT.key === "espnrank" ? (r.espn && r.espn.rank != null ? r.espn.rank : Infinity)
                    : SORT.key === "espn" ? (r.espn && r.espn.adp != null ? r.espn.adp : Infinity)
                    : (r.ranks[SORT.key] != null ? r.ranks[SORT.key] : Infinity);
     const x = get(a), y = get(b);
@@ -386,7 +395,8 @@ function render(){
     '<th class="c-range left" title="Where the sources spread him. Left is a better rank, right is worse. ' +
     'The red marker is where ESPN drafts him.">Range' +
     '<span class="axis"><span>&#9664; better</span><span>worse &#9654;</span></span></th>' +
-    (hasEspn ? '<th class="espn" data-sort="espn" title="ESPN average draft position — the room you are drafting in">ESPN ADP' + caret("espn") + '</th>' : "") +
+    (hasRank ? '<th class="espn" data-sort="espnrank" title="ESPN&rsquo;s own ranking &mdash; the list you scroll in the app on draft day">ESPN RANK' + caret("espnrank") + '</th>' : "") +
+    (hasAdp ? '<th class="espnadp" data-sort="espn" title="ESPN average draft position &mdash; where the room actually takes him">ESPN ADP' + caret("espn") + '</th>' : "") +
     sources.map(s => '<th data-sort="' + esc(s) + '" title="' + esc(label(s)) + ' — click to sort">' +
                      esc(short(s)) + caret(s) + '</th>').join("") +
     "</tr></thead><tbody>";
@@ -400,16 +410,22 @@ function render(){
       '<span class="pmeta"><span class="pos pos-' + esc(p.pos) + '">' + esc(p.pos) + '</span>' +
       esc(p.team || "") + ' · avg ' + p.avg + '</span></span></span></td>' +
       rangeCell(p, depth);
-    if (hasEspn){
-      const e = p.espn || {};
+    const e = p.espn || {};
+    if (hasRank){
+      h += e.rank != null
+        ? '<td class="espn"' + tint(e.rank, p.avg, depth) +
+          ' title="ESPN ranks him ' + e.rank + ' on the list in the app">' + e.rank + '</td>'
+        : '<td class="espn na">–</td>';
+    }
+    if (hasAdp){
       // Show the ADP itself, not the round.pick slot. Several players with an
       // ADP near 12 all round to "1.12", which reads like a duplicated value
       // even though the underlying numbers differ; the slot lives on hover.
       h += e.adp != null
-        ? '<td class="espn"' + tint(e.adp_rank, p.avg, depth) +
-          ' title="ADP ' + e.adp + (e.pick ? ", drafted around " + esc(String(e.pick)) : "") + '">' +
+        ? '<td class="espnadp"' + tint(e.adp_rank, p.avg, depth) +
+          ' title="Drafted around ' + e.adp + (e.pick ? ", pick " + esc(String(e.pick)) : "") + '">' +
           e.adp + '</td>'
-        : '<td class="espn na">–</td>';
+        : '<td class="espnadp na">–</td>';
     }
     sources.forEach(function(s){
       const r = p.ranks[s];
@@ -429,7 +445,7 @@ function render(){
     bad.innerHTML = swatch("bad", CM === "numbers") + "lower than consensus";
   }
 
-  const n = sources.length + (hasEspn ? 1 : 0);
+  const n = sources.length + (hasRank ? 1 : 0) + (hasAdp ? 1 : 0);
   $("#chips").innerHTML =
     '<span class="chip"><b>' + DATA.season + '</b> season</span>' +
     '<span class="chip"><b>' + n + '</b> sources</span>' +
@@ -525,7 +541,7 @@ $("#fmt").addEventListener("click", function(e){
   FMT = b.dataset.fmt;
   $("#fmt").querySelectorAll("button").forEach(x => x.classList.toggle("on", x === b));
   // a source column from the old format may not exist in the new one
-  if (SORT.key !== "rank" && SORT.key !== "espn"){
+  if (["rank", "espn", "espnrank"].indexOf(SORT.key) < 0){
     const f = board();
     if (!f || (f.sources || []).indexOf(SORT.key) < 0) SORT = {key: "rank", dir: 1};
   }
