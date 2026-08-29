@@ -270,6 +270,32 @@ The board leads with the rank and keeps ADP alongside, and the red caret on the
 range bar marks the **rank**, because that is the list in front of him when the
 pick is on the clock.
 
+### Draft day: picks, roster, needs
+
+The board is two things at once, and the second one grew out of the first. It
+started as an accuracy benchmark — thirteen seasons of rankings scored against
+what actually happened — and the draft-day view is that benchmark pointed at
+Sunday: the same consensus, plus where ESPN's room takes each player. The site
+now commits to that, so a draft can be run off it rather than read off it.
+
+Each row carries two checkboxes: **ME** when you take a player, **OUT** when
+anyone else does. They are exclusive — a player leaves the board once — and
+unticking is the undo for a misclick on the clock. Mine tint green, theirs grey
+out and strike through, and **Hide drafted** drops everyone gone so the list is
+only players you can still have.
+
+A roster panel tracks the consequences. It fills your starting lineup from
+`scripts/league.py` (nothing here hardcodes twelve teams or a lineup — the
+league travels with the board in `predraft.json`), walking your picks in
+consensus order and giving each his own position's slot, then FLEX, then the
+bench. Below it: the starting spots still open, and the best players available
+at one of those positions. On a phone it collapses to a bar carrying the count.
+
+Picks live in `localStorage`, keyed by season. A draft is a two-hour event on
+one device, there is no account here to sync to, and last year's roster turning
+up on this year's board would be worse than no memory at all. Nothing about
+pick state reaches the pipeline or the repo.
+
 One wrinkle worth knowing: ESPN only publishes `STANDARD` and `PPR` rank types
 — there is no half-PPR list, and the app's default rankings screen shows the
 PPR order even for a half-PPR league. The projection *values* the app displays
