@@ -94,10 +94,16 @@ td.num { text-align: right; font-variant-numeric: tabular-nums; }
 tbody tr[data-pid] { cursor: pointer; }
 tbody tr:hover { background: var(--rowhover); }
 
-th.c-rank, td.c-rank { position: sticky; left: 0; z-index: 2; background: var(--surface); width: 46px; text-align: right; }
-th.c-player, td.c-player { position: sticky; left: 46px; z-index: 2; background: var(--surface); min-width: 190px; box-shadow: 1px 0 0 var(--grid); }
-thead th.c-rank, thead th.c-player { z-index: 4; }
-tbody tr:hover td.c-rank, tbody tr:hover td.c-player { background: color-mix(in srgb, var(--surface) 93%, var(--accent)); }
+/* Three sticky columns now ride the left edge — the pick controls, the rank and
+   the player. Their widths drive each other's offsets, so the phone override
+   below only has to change the two numbers. */
+:root { --w-pick: 62px; --w-rank: 46px; }
+th.c-pick, td.c-pick { position: sticky; left: 0; z-index: 2; background: var(--surface); width: var(--w-pick); padding: 2px 6px; }
+th.c-rank, td.c-rank { position: sticky; left: var(--w-pick); z-index: 2; background: var(--surface); width: var(--w-rank); text-align: right; }
+th.c-player, td.c-player { position: sticky; left: calc(var(--w-pick) + var(--w-rank)); z-index: 2; background: var(--surface); min-width: 190px; box-shadow: 1px 0 0 var(--grid); }
+thead th.c-pick, thead th.c-rank, thead th.c-player { z-index: 4; }
+thead th.c-pick { cursor: default; }
+tbody tr:hover td.c-pick, tbody tr:hover td.c-rank, tbody tr:hover td.c-player { background: color-mix(in srgb, var(--surface) 93%, var(--accent)); }
 td.c-rank b { font-size: .9rem; }
 
 .pcell { display: flex; align-items: center; gap: 7px; }
@@ -160,6 +166,104 @@ tr.detail-row:hover, tr.detail-row td { background: var(--page); }
           margin: 0 0 9px; font-size: .75rem; color: var(--muted); line-height: 1.6; }
 .sw { display: inline-block; width: 22px; height: 12px; border-radius: 3px; vertical-align: -2px; margin-right: 5px; }
 .empty { color: var(--muted); font-style: italic; padding: 20px; }
+
+/* ------------------------------------------------------------------
+   Draft day: two checkboxes per row and a roster panel.
+   ME = I took him, OUT = someone else did. They are mutually exclusive
+   because a player can only leave the board once, but they stay two
+   separate boxes rather than one cycling control: on the clock you want
+   to hit the right one, not count clicks.
+   ------------------------------------------------------------------ */
+.pkwrap { display: flex; gap: 3px; align-items: center; }
+.pk { display: inline-flex; cursor: pointer; position: relative; }
+.pk input { position: absolute; opacity: 0; width: 0; height: 0; }
+.pk span {
+  display: inline-flex; align-items: center; justify-content: center;
+  min-width: 25px; height: 20px; padding: 0 3px; border-radius: 6px;
+  font-size: .55rem; font-weight: 800; letter-spacing: .02em;
+  border: 1.5px solid var(--border); color: var(--muted); background: var(--surface);
+  transition: background-color .12s, color .12s, border-color .12s;
+}
+.pk:hover span { border-color: var(--ink-2); color: var(--ink-2); }
+.pk input:focus-visible + span { outline: 2px solid var(--accent); outline-offset: 1px; }
+.pk-me input:checked + span { background: var(--pos-good); border-color: var(--pos-good); color: #fff; }
+.pk-out input:checked + span { background: var(--muted); border-color: var(--muted); color: var(--surface); }
+
+/* Mine reads as a claim, theirs as a strike-out. Both keep the row legible —
+   you still want to see what you passed on and what it cost. */
+tr.is-me td { background: color-mix(in srgb, var(--surface) 89%, var(--pos-good)); }
+tr.is-me td.c-pick { box-shadow: inset 3px 0 0 var(--pos-good); }
+tr.is-them td { background: color-mix(in srgb, var(--surface) 93%, var(--muted)); color: var(--muted); }
+tr.is-them .pname { text-decoration: line-through; }
+tr.is-them .face, tr.is-them .fb { filter: grayscale(1); opacity: .5; }
+tr.is-them .rngbar { opacity: .2; }
+
+#roster {
+  position: fixed; right: 16px; bottom: 16px; z-index: 20; width: 286px;
+  background: var(--surface); border: 1px solid var(--border); border-radius: 12px;
+  box-shadow: 0 2px 6px rgba(0,0,0,.07), 0 16px 40px rgba(0,0,0,.15);
+  overflow: hidden;
+}
+.rhead { display: flex; align-items: center; gap: 8px; padding: 8px 12px; cursor: pointer;
+         background: var(--chip); border-bottom: 1px solid var(--border); }
+.rhead h2 { font-size: .84rem; margin: 0; font-weight: 700; letter-spacing: -0.01em; }
+.rcount { margin-left: auto; color: var(--ink-2); font-size: .74rem; font-variant-numeric: tabular-nums; }
+.rcaret { color: var(--muted); font-size: .7rem; transition: transform .15s; }
+#roster.collapsed .rcaret { transform: rotate(-90deg); }
+#roster.collapsed .rbody { display: none; }
+.rbody { padding: 10px 12px 12px; max-height: 56vh; overflow: auto; }
+
+.slots { display: grid; grid-template-columns: 36px 1fr; gap: 2px 8px; align-items: center; }
+.slot-l { font-size: .6rem; font-weight: 800; color: var(--muted); letter-spacing: .04em; text-align: right; }
+.slot-v { display: flex; align-items: center; gap: 5px; min-height: 20px;
+          border-bottom: 1px dashed var(--grid); overflow: hidden; }
+.slot-v.empty { color: var(--muted); font-style: italic; font-size: .72rem; }
+.slot-v .pos { font-size: .55rem; padding: 0 4px; margin: 0; vertical-align: 0; }
+.slot-n { font-size: .76rem; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.slot-t { color: var(--muted); font-size: .64rem; margin-left: auto; }
+
+.rsec { margin-top: 10px; border-top: 1px solid var(--grid); padding-top: 8px; }
+.rsec-h { font-size: .59rem; text-transform: uppercase; letter-spacing: .07em;
+          color: var(--muted); font-weight: 800; margin-bottom: 5px; }
+.benchlist { display: flex; flex-wrap: wrap; gap: 4px; }
+.bpill { display: inline-flex; align-items: center; gap: 4px; background: var(--chip);
+         border: 1px solid var(--border); border-radius: 999px; padding: 1px 8px 1px 4px; font-size: .7rem; }
+.bpill .pos { font-size: .53rem; padding: 0 4px; margin: 0; vertical-align: 0; }
+.rneed { font-size: .74rem; color: var(--ink-2); line-height: 1.6; }
+.rneed b { color: var(--ink); }
+.needpill { display: inline-block; background: var(--chip); border: 1px solid var(--border);
+            border-radius: 999px; padding: 0 8px; margin: 2px 3px 0 0; font-size: .68rem; font-weight: 700; color: var(--ink); }
+.avail { margin: 0; padding: 0; list-style: none; }
+.avail li { display: flex; align-items: center; gap: 5px; padding: 2px 0; font-size: .74rem; }
+.avail .pos { font-size: .53rem; padding: 0 4px; margin: 0; vertical-align: 0; }
+.avail .an { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.avail .ar { margin-left: auto; color: var(--muted); font-size: .68rem; font-variant-numeric: tabular-nums; }
+.rfoot { display: flex; gap: 6px; margin-top: 10px; }
+.rfoot button { flex: 1; background: var(--chip); border: 1px solid var(--border); border-radius: 8px;
+                padding: 5px; font: inherit; font-size: .72rem; color: var(--ink-2); cursor: pointer; }
+.rfoot button:hover { color: var(--ink); border-color: var(--ink-2); }
+
+/* Draft day is a phone: shrink the three sticky columns so the board itself
+   still gets room, and let the roster panel span the width as a bottom sheet. */
+@media (max-width: 720px) {
+  :root { --w-pick: 48px; --w-rank: 30px; }
+  .pk span { min-width: 20px; height: 18px; padding: 0 1px; font-size: .48rem; }
+  th, td { padding: 2px 4px; }
+  th.c-pick, td.c-pick { padding: 2px 3px; }
+  /* Three sticky columns were taking 316px of a 375px screen, leaving room for
+     no data at all. It is the header words that make them that wide, not the
+     content, so shrink the labels and let the player name wrap. */
+  thead th.c-pick { font-size: .58rem; letter-spacing: 0; }
+  thead th.c-rank { font-size: .52rem; letter-spacing: 0; }
+  th.c-player, td.c-player { min-width: 118px; max-width: 132px; }
+  td.c-player .pname { white-space: normal; line-height: 1.15; }
+  th.c-range, td.c-range { min-width: 150px; }
+  .wrap { padding-bottom: 84px; }
+  #roster { right: 8px; left: 8px; bottom: 8px; width: auto; }
+  /* Expanded it covered half the board, so on a phone it opens on a tap
+     instead and the collapsed bar carries the roster count. */
+  .rbody { max-height: 38vh; }
+}
 </style>
 </head>
 <body>
@@ -168,8 +272,10 @@ tr.detail-row:hover, tr.detail-row td { background: var(--page); }
     <h1>NFL Draft Board</h1>
     <div class="meta-chips" id="chips"></div>
   </header>
-  <p class="sub">Every major ranking source, side by side. Green means a source is <b>higher</b> on a player
-  than the consensus, red means <b>lower</b>. Click any player for his season-by-season record.
+  <p class="sub">Every major ranking source side by side, with ESPN&rsquo;s own rank and ADP alongside them.
+  Green means a source is <b>higher</b> on a player than the consensus, red means <b>lower</b>.
+  On draft day, tick <b>ME</b> or <b>OUT</b> as picks come in &mdash; the board thins out and your roster and
+  remaining needs track in the corner. Click any player for his season-by-season record.
   <a href="analysis.html">Which sources are most accurate? &rarr;</a></p>
 
   <div class="bar">
@@ -190,6 +296,9 @@ tr.detail-row:hover, tr.detail-row td { background: var(--page); }
       <button data-cm="numbers">Coloured numbers</button>
     </div>
     <input type="search" id="q" placeholder="Search player…">
+    <div class="seg" id="hide">
+      <button data-hide="1" aria-pressed="false" title="Drop everyone already off the board, so the list is only players you can still take">Hide drafted</button>
+    </div>
     <div class="spacer"></div>
     <select id="season" aria-label="Season"></select>
   </div>
@@ -200,10 +309,19 @@ tr.detail-row:hover, tr.detail-row td { background: var(--page); }
     <span><b>Range</b> = where the sources spread him &mdash; left is better, right is worse</span>
     <span><i class="espn-key"></i><b>red caret = ESPN&rsquo;s rank</b> &mdash; the list you scroll in the app; bar left of it means the field likes him more than ESPN does</span>
     <span>Tint scales with draft depth &mdash; a 10-pick gap matters at 5, not at 200</span>
+    <span><b>ME</b> / <b>OUT</b> = drafted by you / by someone else; picks are kept in this browser per season</span>
   </div>
 
   <div class="tablewrap" id="board"><div class="empty">Loading…</div></div>
 </div>
+
+<aside id="roster" aria-label="My roster and remaining needs" hidden>
+  <div class="rhead" id="rhead" role="button" tabindex="0" aria-expanded="true"
+       aria-controls="rbody" title="Show or hide the roster panel">
+    <h2>My roster</h2><span class="rcount" id="rcount"></span><span class="rcaret">&#9662;</span>
+  </div>
+  <div class="rbody" id="rbody"></div>
+</aside>
 
 <script>
 { const t = new URLSearchParams(location.search).get("theme");
@@ -229,6 +347,9 @@ const SHORT = {
 
 let DATA = null;
 let FMT = "half_ppr", POS = "ALL", Q = "", SORT = {key: "rank", dir: 1};
+/* pid -> "me" | "them". A player leaves the board exactly once, so one map
+   covers both checkboxes and they can never both be ticked. */
+let DRAFTED = {}, HIDE = false;
 let CM = window.__CM0 || "cells";   // "cells" = tinted backgrounds, "numbers" = coloured digits
 
 const $ = s => document.querySelector(s);
@@ -352,11 +473,186 @@ function rangeCell(p, depth){
     '<span class="rngtxt">' + p.min + "–" + p.max + '</span></span></td>';
 }
 
+/* ---------- draft state ----------
+   Kept per season in this browser only. A draft is a two-hour event on one
+   device; there is no account here to sync it to, and last year's roster
+   turning up on the 2026 board would be worse than none. */
+function dkey(){ return "rr-draft-" + (DATA ? DATA.season : "0"); }
+
+function loadDraft(){
+  try { DRAFTED = JSON.parse(localStorage.getItem(dkey())) || {}; }
+  catch(e){ DRAFTED = {}; }
+}
+function saveDraft(){
+  try { localStorage.setItem(dkey(), JSON.stringify(DRAFTED)); } catch(e){}
+}
+
+function pickCell(pid){
+  const st = DRAFTED[pid];
+  function box(kind, txt, lbl){
+    return '<label class="pk pk-' + (kind === "me" ? "me" : "out") + '" title="' + lbl + '">' +
+      '<input type="checkbox" data-pick="' + kind + '"' + (st === kind ? " checked" : "") +
+      ' aria-label="' + lbl + '"><span>' + txt + '</span></label>';
+  }
+  return '<span class="pkwrap">' + box("me", "ME", "Drafted by me") +
+         box("them", "OUT", "Drafted by someone else") + '</span>';
+}
+
+/* Repaint one row in place rather than re-rendering the board. Mid-draft the
+   board is scrolled to wherever the run is, and a full render would throw that
+   scroll position away on every pick. */
+function paintRow(tr){
+  const st = DRAFTED[tr.dataset.pid];
+  tr.classList.toggle("is-me", st === "me");
+  tr.classList.toggle("is-them", st === "them");
+  tr.querySelectorAll("input[data-pick]").forEach(function(x){
+    x.checked = (x.dataset.pick === st);
+  });
+}
+
+/* ---------- roster and needs ---------- */
+const DEF_STARTERS = {QB: 1, RB: 2, WR: 2, TE: 1, FLEX: 1, DST: 1, K: 1};
+const SLOT_ORDER = ["QB", "RB", "WR", "TE", "FLEX", "DST", "K"];
+const FLEX_POS = {RB: 1, WR: 1, TE: 1};
+
+// the league travels with the board (scripts/league.py), so nothing here
+// hardcodes twelve teams or a starting lineup
+function league(){
+  const l = (DATA && DATA.league) || {};
+  return {teams: l.teams || 12,
+          starters: l.starters || DEF_STARTERS,
+          bench: l.bench == null ? 6 : l.bench};
+}
+
+/* Greedy fill in consensus order: a player takes his own position's slot if one
+   is open, then FLEX, then the bench. Because the walk is best-first, whoever
+   gets pushed into FLEX is always the later pick. */
+function fillSlots(){
+  const L = league(), f = board();
+  const slots = [];
+  SLOT_ORDER.forEach(function(k){
+    const n = L.starters[k] || 0;
+    for (let i = 0; i < n; i++) slots.push({slot: k, label: n > 1 ? k + (i + 1) : k, p: null});
+  });
+  const bench = [];
+  const mine = !f ? [] : f.players.filter(p => DRAFTED[String(p.id)] === "me")
+                          .slice().sort((a, b) => a.avg - b.avg);
+  mine.forEach(function(p){
+    let s = slots.find(x => x.slot === p.pos && !x.p);
+    if (!s && FLEX_POS[p.pos]) s = slots.find(x => x.slot === "FLEX" && !x.p);
+    if (s) s.p = p; else bench.push(p);
+  });
+  return {slots: slots, bench: bench, L: L, mine: mine};
+}
+
+// an open FLEX is a need at all three flex positions, not a need for "a FLEX"
+function needPositions(slots){
+  const set = new Set();
+  slots.filter(x => !x.p).forEach(function(x){
+    if (x.slot === "FLEX") Object.keys(FLEX_POS).forEach(k => set.add(k));
+    else set.add(x.slot);
+  });
+  return set;
+}
+
+function renderRoster(){
+  const panel = document.getElementById("roster");
+  const el = document.getElementById("rbody");
+  const f = board();
+  if (!panel || !el) return;
+  panel.hidden = !f;
+  if (!f) return;
+  const r = fillSlots();
+  const total = r.slots.length + r.L.bench;
+  document.getElementById("rcount").textContent = r.mine.length + "/" + total;
+
+  let h = '<div class="slots">';
+  r.slots.forEach(function(x){
+    h += '<div class="slot-l">' + x.label + '</div>';
+    h += x.p
+      ? '<div class="slot-v"><span class="pos pos-' + esc(x.p.pos) + '">' + esc(x.p.pos) + '</span>' +
+        '<span class="slot-n">' + esc(x.p.name) + '</span>' +
+        '<span class="slot-t">' + esc(x.p.team || "") + '</span></div>'
+      : '<div class="slot-v empty">open</div>';
+  });
+  h += '</div>';
+
+  h += '<div class="rsec"><div class="rsec-h">Bench &middot; ' + r.bench.length + '/' + r.L.bench + '</div>' +
+    (r.bench.length
+      ? '<div class="benchlist">' + r.bench.map(function(b){
+          return '<span class="bpill"><span class="pos pos-' + esc(b.pos) + '">' + esc(b.pos) +
+                 '</span>' + esc(b.name.split(/\s+/).slice(-1)[0]) + '</span>'; }).join("") + '</div>'
+      : '<div class="slot-v empty">empty</div>') + '</div>';
+
+  const open = r.slots.filter(x => !x.p);
+  h += '<div class="rsec"><div class="rsec-h">Still need</div><div class="rneed">';
+  if (open.length){
+    const seen = {};
+    open.forEach(function(x){ seen[x.slot] = (seen[x.slot] || 0) + 1; });
+    h += Object.keys(seen).map(function(k){
+      return '<span class="needpill">' + k + (seen[k] > 1 ? " ×" + seen[k] : "") + '</span>';
+    }).join("");
+    h += '<br>' + open.length + ' starting spot' + (open.length === 1 ? "" : "s") + ' left to fill.';
+  } else {
+    h += '<b>Starters full.</b> Everything from here is bench &mdash; take the best player available.';
+  }
+  h += '</div></div>';
+
+  const needs = needPositions(r.slots);
+  const avail = f.players.slice().sort((a, b) => a.avg - b.avg)
+                 .filter(p => !DRAFTED[String(p.id)]);
+  const top3 = (needs.size ? avail.filter(p => needs.has(p.pos)) : avail).slice(0, 3);
+  h += '<div class="rsec"><div class="rsec-h">Best available' + (needs.size ? " at a need" : "") + '</div>' +
+    (top3.length
+      ? '<ul class="avail">' + top3.map(function(p){
+          return '<li><span class="pos pos-' + esc(p.pos) + '">' + esc(p.pos) + '</span>' +
+                 '<span class="an">' + esc(p.name) + '</span>' +
+                 '<span class="ar">' + p.avg + '</span></li>'; }).join("") + '</ul>'
+      : '<div class="slot-v empty">nobody left at those positions</div>') + '</div>';
+
+  h += '<div class="rfoot"><button id="r-clear" title="Clear every pick recorded for the ' +
+       esc(String(DATA.season)) + ' season">Reset (' + Object.keys(DRAFTED).length + ')</button></div>';
+  el.innerHTML = h;
+}
+
+/* The three left-hand columns are sticky, so each one's `left` has to equal the
+   real width of everything before it. Declaring those widths in CSS is a guess
+   the browser is free to overrule — a table cell's width is a minimum, and the
+   ME/OUT boxes came out five pixels wider than declared, which is exactly the
+   overlap you would see the moment the board scrolled sideways. So measure what
+   was actually laid out and feed it back. */
+function syncSticky(){
+  const head = $("#board").querySelector ? $("#board").querySelector("thead") : null;
+  if (!head) return;
+  const pick = head.querySelector("th.c-pick"), rank = head.querySelector("th.c-rank");
+  if (!pick || !rank) return;
+  const st = document.documentElement.style;
+  // Drop last measurement first. These end up as `width` on the columns, and an
+  // inline value outranks the phone media query — so measuring without clearing
+  // would keep re-measuring the desktop width and the columns would never
+  // shrink when the window narrowed past the breakpoint.
+  st.removeProperty("--w-pick");
+  st.removeProperty("--w-rank");
+  const wp = Math.ceil(pick.getBoundingClientRect().width);
+  const wr = Math.ceil(rank.getBoundingClientRect().width);
+  st.setProperty("--w-pick", wp + "px");
+  st.setProperty("--w-rank", wr + "px");
+}
+
+// a resize changes the columns without changing the rows, and nothing else
+// re-renders on resize, so the offsets would otherwise go stale
+let _rz = null;
+window.addEventListener("resize", function(){
+  clearTimeout(_rz);
+  _rz = setTimeout(syncSticky, 120);
+});
+
 function render(){
   const f = board();
   if (!f || !f.players || !f.players.length){
     $("#board").innerHTML = '<div class="empty">No board captured for this format yet.</div>';
     $("#chips").innerHTML = "";
+    document.getElementById("roster").hidden = true;
     return;
   }
   const sources = f.sources || [];
@@ -375,6 +671,7 @@ function render(){
   let rows = f.players;
   if (POS !== "ALL") rows = rows.filter(p => p.pos === POS);
   if (Q) rows = rows.filter(p => p.name.toLowerCase().includes(Q));
+  if (HIDE) rows = rows.filter(p => !DRAFTED[String(p.id)]);
 
   rows = rows.slice().sort(function(a, b){
     const get = r => SORT.key === "rank" ? crank.get(r.id)
@@ -390,6 +687,7 @@ function render(){
 
   const caret = k => SORT.key === k ? (SORT.dir === 1 ? " ▲" : " ▼") : "";
   let h = "<table><thead><tr>" +
+    '<th class="c-pick left" title="Tick ME when you draft him, OUT when anyone else does">Drafted</th>' +
     '<th class="c-rank" data-sort="rank" title="Consensus rank across every source. Click to sort.">Rank' + caret("rank") + '</th>' +
     '<th class="c-player left">Player</th>' +
     '<th class="c-range left" title="Where the sources spread him. Left is a better rank, right is worse. ' +
@@ -403,7 +701,11 @@ function render(){
 
   rows.forEach(function(p){
     const depth = crank.get(p.id);
-    h += '<tr data-pid="' + esc(String(p.id)) + '" title="Click for his season-by-season record">' +
+    const st = DRAFTED[String(p.id)];
+    h += '<tr data-pid="' + esc(String(p.id)) + '"' +
+      (st === "me" ? ' class="is-me"' : st === "them" ? ' class="is-them"' : "") +
+      ' title="Click for his season-by-season record">' +
+      '<td class="c-pick">' + pickCell(String(p.id)) + '</td>' +
       '<td class="c-rank num"><b>' + depth + '</b></td>' +
       '<td class="c-player"><span class="pcell">' + face(p) + '<span>' +
       '<span class="pname">' + esc(p.name) + '</span><br>' +
@@ -435,6 +737,7 @@ function render(){
     h += "</tr>";
   });
   $("#board").innerHTML = h + "</tbody></table>";
+  syncSticky();
 
   const good = document.getElementById("key-good"), bad = document.getElementById("key-bad");
   if (good && bad){
@@ -446,11 +749,15 @@ function render(){
   }
 
   const n = sources.length + (hasRank ? 1 : 0) + (hasAdp ? 1 : 0);
+  const nGone = Object.keys(DRAFTED).length;
   $("#chips").innerHTML =
     '<span class="chip"><b>' + DATA.season + '</b> season</span>' +
     '<span class="chip"><b>' + n + '</b> sources</span>' +
     '<span class="chip"><b>' + rows.length + '</b> players</span>' +
-    (DATA.built_at ? '<span class="chip">updated <b>' + esc(String(DATA.built_at).slice(0, 10)) + '</b></span>' : "");
+    (DATA.built_at ? '<span class="chip">updated <b>' + esc(String(DATA.built_at).slice(0, 10)) + '</b></span>' : "") +
+    (nGone ? '<span class="chip chip-gone"><b>' + nGone + '</b> off the board</span>' : "");
+
+  renderRoster();
 }
 
 /* ---------- player drill-in: season-by-season record ---------- */
@@ -560,6 +867,48 @@ $("#colormode").addEventListener("click", function(e){
   render();
 });
 $("#q").addEventListener("input", function(e){ Q = e.target.value.trim().toLowerCase(); render(); });
+$("#hide").addEventListener("click", function(e){
+  const b = e.target.closest("button"); if (!b) return;
+  HIDE = !HIDE;
+  b.classList.toggle("on", HIDE);
+  b.setAttribute("aria-pressed", String(HIDE));
+  render();
+});
+
+/* A pick is one checkbox change. Ticking either box unticks the other, because
+   the two states are exclusive; unticking the ticked one puts him back on the
+   board, which is the undo for a misclick on the clock. */
+$("#board").addEventListener("change", function(e){
+  const cb = e.target.closest("input[data-pick]"); if (!cb) return;
+  const tr = cb.closest("tr[data-pid]"); if (!tr) return;
+  const pid = tr.dataset.pid;
+  if (cb.checked) DRAFTED[pid] = cb.dataset.pick; else delete DRAFTED[pid];
+  saveDraft();
+  // Hiding drafted players changes which rows exist, so that one needs a full
+  // render; otherwise repaint in place and keep the scroll position.
+  if (HIDE) render();
+  else { paintRow(tr); renderRoster(); refreshChips(); }
+});
+
+$("#rhead").addEventListener("click", function(){ toggleRoster(); });
+$("#rhead").addEventListener("keydown", function(e){
+  if (e.key === "Enter" || e.key === " ") { e.preventDefault(); toggleRoster(); }
+});
+function toggleRoster(){
+  const panel = $("#roster");
+  const open = !panel.classList.toggle("collapsed");
+  $("#rhead").setAttribute("aria-expanded", String(open));
+  try { localStorage.setItem("rr-roster-open", open ? "1" : "0"); } catch(e){}
+}
+
+$("#rbody").addEventListener("click", function(e){
+  if (!e.target.closest("#r-clear")) return;
+  const n = Object.keys(DRAFTED).length;
+  if (!n || !confirm("Clear all " + n + " recorded picks for " + DATA.season + "?")) return;
+  DRAFTED = {};
+  saveDraft();
+  render();
+});
 
 document.addEventListener("click", function(e){
   const th = e.target.closest("#board th[data-sort]");
@@ -570,17 +919,29 @@ document.addEventListener("click", function(e){
     return;
   }
   if (e.target.closest("#board thead")) return;
+  // the checkboxes live inside a clickable row; a pick is not a drill-in
+  if (e.target.closest("#board .c-pick")) return;
   const tr = e.target.closest("#board tbody tr[data-pid]");
   if (tr) toggleDetail(tr);
 });
 
 $("#season").addEventListener("change", function(e){ load(Number(e.target.value)).then(render); });
 
+/* The only chip that moves on a pick is the "off the board" count. Rebuilding
+   the whole board to update it would cost the scroll position. */
+function refreshChips(){
+  const n = Object.keys(DRAFTED).length;
+  const el = $("#chips").querySelector ? $("#chips").querySelector(".chip-gone") : null;
+  if (el) { if (n) el.innerHTML = "<b>" + n + "</b> off the board"; else el.remove(); }
+  else if (n) $("#chips").insertAdjacentHTML("beforeend",
+    '<span class="chip chip-gone"><b>' + n + '</b> off the board</span>');
+}
+
 function load(year){
   BOARD = null;
   return fetch("data/" + year + "/predraft.json")
     .then(r => r.ok ? r.json() : fetch("data/predraft.json").then(x => x.json()))
-    .then(j => { DATA = j; });
+    .then(j => { DATA = j; loadDraft(); });
 }
 
 fetch("data/seasons.json").then(r => r.json()).catch(() => null)
@@ -598,6 +959,13 @@ fetch("data/seasons.json").then(r => r.json()).catch(() => null)
   .then(function(){
     $("#colormode").querySelectorAll("button")
       .forEach(x => x.classList.toggle("on", x.dataset.cm === CM));
+    let rOpen = null;
+    try { rOpen = localStorage.getItem("rr-roster-open"); } catch(e){}
+    if (rOpen == null) rOpen = window.innerWidth <= 720 ? "0" : "1";
+    if (rOpen === "0"){
+      $("#roster").classList.add("collapsed");
+      $("#rhead").setAttribute("aria-expanded", "false");
+    }
     render();
   })
   .catch(function(){ $("#board").innerHTML = '<div class="empty">Could not load the board.</div>'; });
