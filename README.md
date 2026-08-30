@@ -278,11 +278,22 @@ what actually happened — and the draft-day view is that benchmark pointed at
 Sunday: the same consensus, plus where ESPN's room takes each player. The site
 now commits to that, so a draft can be run off it rather than read off it.
 
-Each row carries two checkboxes: **ME** when you take a player, **OUT** when
-anyone else does. They are exclusive — a player leaves the board once — and
-unticking is the undo for a misclick on the clock. Mine tint green, theirs grey
-out and strike through, and **Hide drafted** drops everyone gone so the list is
-only players you can still have.
+Each row carries two pill buttons: **+ ROSTER** when you take a player, which
+turns into **✓ ROSTER**, and **DRAFTED** when anyone else does. They are
+exclusive — a player leaves the board once — and pressing the lit one is the
+undo for a misclick on the clock. Yours tint green, everyone else's grey out and
+strike through, and **Hide drafted** drops the gone so the list is only players
+you can still have.
+
+These were checkbox squares labelled ME and OUT first, and both halves of that
+were wrong. No draft tool does it that way: FantasyPros' simulator puts a single
+labelled `Draft` button on each row and its cheat sheets just strike drafted
+players through, with a `Hide Drafted` checkbox over the list. On the clock you
+read a word, not a tick state, and the word has to name what happens —
+`+ ROSTER` is the panel he lands in, `DRAFTED` is what everyone else calls a
+player who is off the board. Stacking the two pills rather than setting them
+side by side also cut the column from 104px to 57px, which on a phone is the
+difference between seeing the board and not.
 
 A roster panel tracks the consequences. It fills your starting lineup from
 `scripts/league.py` (nothing here hardcodes twelve teams or a lineup — the
@@ -290,6 +301,12 @@ league travels with the board in `predraft.json`), walking your picks in
 consensus order and giving each his own position's slot, then FLEX, then the
 bench. Below it: the starting spots still open, and the best players available
 at one of those positions. On a phone it collapses to a bar carrying the count.
+
+The phone landing was rebuilt around this. The board used to start 830px down a
+812px screen — every pixel above it explanation you have already read by the
+time you are drafting. The intro now clamps to two lines behind a `more`, the
+legend folds into `How to read the board`, and the controls tighten, which puts
+the board at 423px and six players on screen before any scrolling.
 
 Picks live in `localStorage`, keyed by season. A draft is a two-hour event on
 one device, there is no account here to sync to, and last year's roster turning

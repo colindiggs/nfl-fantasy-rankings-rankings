@@ -167,27 +167,47 @@ tr.detail-row:hover, tr.detail-row td { background: var(--page); }
 .sw { display: inline-block; width: 22px; height: 12px; border-radius: 3px; vertical-align: -2px; margin-right: 5px; }
 .empty { color: var(--muted); font-style: italic; padding: 20px; }
 
+/* On a laptop the legend is just prose above the board, so the disclosure
+   triangle is hidden and it cannot be closed. The phone rules below give it
+   back its summary and start it shut. */
+.legendwrap > summary { display: none; }
+.legendwrap { margin-bottom: 9px; }
+.submore {
+  display: none; background: none; border: 0; padding: 0 0 10px; margin: -8px 0 0;
+  color: var(--accent); font: inherit; font-size: .8rem; font-weight: 600;
+  cursor: pointer; text-decoration: underline;
+}
+.legendwrap > .legend { margin-bottom: 0; }
+
 /* ------------------------------------------------------------------
-   Draft day: two checkboxes per row and a roster panel.
-   ME = I took him, OUT = someone else did. They are mutually exclusive
-   because a player can only leave the board once, but they stay two
-   separate boxes rather than one cycling control: on the clock you want
-   to hit the right one, not count clicks.
+   Draft day: two labelled pill buttons per row, and a roster panel.
+   + ROSTER = he is mine, DRAFTED = someone else took him.
+
+   These were checkbox squares labelled ME and OUT first, and both halves of
+   that were wrong. Every draft tool worth copying uses a labelled button —
+   FantasyPros' simulator puts a single blue "Draft" on each row — because on
+   the clock you read a word, not a tick state, and you should never have to
+   work out which of two little boxes is the ticked one. And the words have to
+   name the thing that happens: "+ ROSTER" is the panel he lands in, "DRAFTED"
+   is what the rest of the industry calls a player who is off the board. The
+   two are exclusive, because a player leaves the board exactly once, and
+   pressing the lit one puts him back — the undo for a misclick.
    ------------------------------------------------------------------ */
-.pkwrap { display: flex; gap: 3px; align-items: center; }
-.pk { display: inline-flex; cursor: pointer; position: relative; }
-.pk input { position: absolute; opacity: 0; width: 0; height: 0; }
-.pk span {
+/* Stacked, not side by side. Two pills in a row wanted 104px of a sticky
+   column; stacked they want 42px and cost nothing, because the row is already
+   as tall as the headshot in it. */
+.pkwrap { display: flex; flex-direction: column; gap: 2px; align-items: stretch; }
+.pk {
   display: inline-flex; align-items: center; justify-content: center;
-  min-width: 25px; height: 20px; padding: 0 3px; border-radius: 6px;
-  font-size: .55rem; font-weight: 800; letter-spacing: .02em;
-  border: 1.5px solid var(--border); color: var(--muted); background: var(--surface);
+  padding: 1px 6px; border-radius: 999px; cursor: pointer;
+  font: inherit; font-size: .58rem; font-weight: 800; letter-spacing: .02em;
+  border: 1px solid var(--border); color: var(--muted); background: var(--surface);
   transition: background-color .12s, color .12s, border-color .12s;
 }
-.pk:hover span { border-color: var(--ink-2); color: var(--ink-2); }
-.pk input:focus-visible + span { outline: 2px solid var(--accent); outline-offset: 1px; }
-.pk-me input:checked + span { background: var(--pos-good); border-color: var(--pos-good); color: #fff; }
-.pk-out input:checked + span { background: var(--muted); border-color: var(--muted); color: var(--surface); }
+.pk:hover { border-color: var(--ink-2); color: var(--ink); }
+.pk:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+.pk-me[aria-pressed="true"] { background: var(--pos-good); border-color: var(--pos-good); color: #fff; }
+.pk-out[aria-pressed="true"] { background: var(--muted); border-color: var(--muted); color: var(--surface); }
 
 /* Mine reads as a claim, theirs as a strike-out. Both keep the row legible —
    you still want to see what you passed on and what it cost. */
@@ -246,8 +266,33 @@ tr.is-them .rngbar { opacity: .2; }
 /* Draft day is a phone: shrink the three sticky columns so the board itself
    still gets room, and let the roster panel span the width as a bottom sheet. */
 @media (max-width: 720px) {
+  /* The board is the page. It was starting 830px down a 812px screen — every
+     pixel above it was explanation, and on draft day the explanation is the
+     thing you already know. The intro clamps to two lines and the legend
+     folds; both open on a tap. */
+  h1 { font-size: 1.3rem; }
+  .sub {
+    display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
+    overflow: hidden; cursor: pointer; margin-bottom: 10px;
+  }
+  .sub.open { display: block; overflow: visible; }
+  /* The cue cannot live inside the clamped box — line-clamp truncates it away
+     with the rest of the third line. It is a sibling for that reason. */
+  .submore { display: block; }
+  .legendwrap > summary {
+    display: list-item; cursor: pointer; font-size: .78rem; color: var(--accent);
+    font-weight: 600; padding: 2px 0; margin-left: 14px;
+  }
+  .bar { gap: 7px; margin-bottom: 9px; }
+  .seg button { padding: 6px 11px; font-size: .82rem; }
+  select, input[type=search] { padding: 6px 9px; font-size: .82rem; }
+  input[type=search] { width: 150px; }
+  .wrap { padding-top: 14px; }
+  .meta-chips { margin-left: 0; }
+
   :root { --w-pick: 48px; --w-rank: 30px; }
-  .pk span { min-width: 20px; height: 18px; padding: 0 1px; font-size: .48rem; }
+  .pk { padding: 1px 4px; font-size: .52rem; letter-spacing: 0; }
+  .pkwrap { gap: 2px; }
   th, td { padding: 2px 4px; }
   th.c-pick, td.c-pick { padding: 2px 3px; }
   /* Three sticky columns were taking 316px of a 375px screen, leaving room for
@@ -272,11 +317,13 @@ tr.is-them .rngbar { opacity: .2; }
     <h1>NFL Draft Board</h1>
     <div class="meta-chips" id="chips"></div>
   </header>
-  <p class="sub">Every major ranking source side by side, with ESPN&rsquo;s own rank and ADP alongside them.
+  <p class="sub" id="sub">Every major ranking source side by side, with ESPN&rsquo;s own rank and ADP alongside them.
   Green means a source is <b>higher</b> on a player than the consensus, red means <b>lower</b>.
-  On draft day, tick <b>ME</b> or <b>OUT</b> as picks come in &mdash; the board thins out and your roster and
-  remaining needs track in the corner. Click any player for his season-by-season record.
+  On draft day, hit <b>+ ROSTER</b> when you take a player and <b>DRAFTED</b> when anyone else does &mdash; the
+  board thins out and your roster and remaining needs track in the corner. Click any player for his
+  season-by-season record.
   <a href="analysis.html">Which sources are most accurate? &rarr;</a></p>
+  <button class="submore" id="submore" aria-expanded="false" aria-controls="sub">more</button>
 
   <div class="bar">
     <div class="seg" id="fmt">
@@ -303,14 +350,17 @@ tr.is-them .rngbar { opacity: .2; }
     <select id="season" aria-label="Season"></select>
   </div>
 
+  <details class="legendwrap" id="legendwrap" open>
+    <summary>How to read the board</summary>
   <div class="legend">
     <span id="key-good"><span class="sw" style="background:rgba(27,150,110,.55)"></span>higher than consensus</span>
     <span id="key-bad"><span class="sw" style="background:rgba(205,66,66,.55)"></span>lower than consensus</span>
     <span><b>Range</b> = where the sources spread him &mdash; left is better, right is worse</span>
     <span><i class="espn-key"></i><b>red caret = ESPN&rsquo;s rank</b> &mdash; the list you scroll in the app; bar left of it means the field likes him more than ESPN does</span>
     <span>Tint scales with draft depth &mdash; a 10-pick gap matters at 5, not at 200</span>
-    <span><b>ME</b> / <b>OUT</b> = drafted by you / by someone else; picks are kept in this browser per season</span>
+    <span><b>+ ROSTER</b> adds him to your team, <b>DRAFTED</b> takes him off the board &mdash; press again to undo; picks are kept in this browser per season</span>
   </div>
+  </details>
 
   <div class="tablewrap" id="board"><div class="empty">Loading…</div></div>
 </div>
@@ -487,15 +537,17 @@ function saveDraft(){
   try { localStorage.setItem(dkey(), JSON.stringify(DRAFTED)); } catch(e){}
 }
 
-function pickCell(pid){
+function meLabel(st){ return (st === "me" ? "\u2713" : "+") + " ROSTER"; }
+
+function pickCell(pid, name){
   const st = DRAFTED[pid];
-  function box(kind, txt, lbl){
-    return '<label class="pk pk-' + (kind === "me" ? "me" : "out") + '" title="' + lbl + '">' +
-      '<input type="checkbox" data-pick="' + kind + '"' + (st === kind ? " checked" : "") +
-      ' aria-label="' + lbl + '"><span>' + txt + '</span></label>';
+  function pill(kind, txt, lbl){
+    return '<button type="button" class="pk pk-' + (kind === "me" ? "me" : "out") +
+      '" data-pick="' + kind + '" aria-pressed="' + (st === kind) +
+      '" title="' + lbl + '" aria-label="' + lbl + ': ' + esc(name) + '">' + txt + '</button>';
   }
-  return '<span class="pkwrap">' + box("me", "ME", "Drafted by me") +
-         box("them", "OUT", "Drafted by someone else") + '</span>';
+  return '<span class="pkwrap">' + pill("me", meLabel(st), "Add him to my roster") +
+         pill("them", "DRAFTED", "Drafted by someone else") + '</span>';
 }
 
 /* Repaint one row in place rather than re-rendering the board. Mid-draft the
@@ -505,8 +557,9 @@ function paintRow(tr){
   const st = DRAFTED[tr.dataset.pid];
   tr.classList.toggle("is-me", st === "me");
   tr.classList.toggle("is-them", st === "them");
-  tr.querySelectorAll("input[data-pick]").forEach(function(x){
-    x.checked = (x.dataset.pick === st);
+  tr.querySelectorAll("button[data-pick]").forEach(function(b){
+    b.setAttribute("aria-pressed", String(b.dataset.pick === st));
+    if (b.dataset.pick === "me") b.textContent = meLabel(st);
   });
 }
 
@@ -687,7 +740,7 @@ function render(){
 
   const caret = k => SORT.key === k ? (SORT.dir === 1 ? " ▲" : " ▼") : "";
   let h = "<table><thead><tr>" +
-    '<th class="c-pick left" title="Tick ME when you draft him, OUT when anyone else does">Drafted</th>' +
+    '<th class="c-pick left" title="Press + ROSTER when you take him, DRAFTED when anyone else does. Press again to undo.">Pick</th>' +
     '<th class="c-rank" data-sort="rank" title="Consensus rank across every source. Click to sort.">Rank' + caret("rank") + '</th>' +
     '<th class="c-player left">Player</th>' +
     '<th class="c-range left" title="Where the sources spread him. Left is a better rank, right is worse. ' +
@@ -705,7 +758,7 @@ function render(){
     h += '<tr data-pid="' + esc(String(p.id)) + '"' +
       (st === "me" ? ' class="is-me"' : st === "them" ? ' class="is-them"' : "") +
       ' title="Click for his season-by-season record">' +
-      '<td class="c-pick">' + pickCell(String(p.id)) + '</td>' +
+      '<td class="c-pick">' + pickCell(String(p.id), p.name) + '</td>' +
       '<td class="c-rank num"><b>' + depth + '</b></td>' +
       '<td class="c-player"><span class="pcell">' + face(p) + '<span>' +
       '<span class="pname">' + esc(p.name) + '</span><br>' +
@@ -867,6 +920,20 @@ $("#colormode").addEventListener("click", function(e){
   render();
 });
 $("#q").addEventListener("input", function(e){ Q = e.target.value.trim().toLowerCase(); render(); });
+
+// `open` cannot be set from a media query, so the phone case is set once here.
+// Clamping is CSS; this is only the initial state and the tap that undoes it.
+if (window.innerWidth <= 720) $("#legendwrap").open = false;
+function toggleSub(){
+  const open = $("#sub").classList.toggle("open");
+  $("#submore").textContent = open ? "less" : "more";
+  $("#submore").setAttribute("aria-expanded", String(open));
+}
+$("#submore").addEventListener("click", toggleSub);
+$("#sub").addEventListener("click", function(e){
+  if (e.target.closest("a") || window.innerWidth > 720) return;
+  toggleSub();
+});
 $("#hide").addEventListener("click", function(e){
   const b = e.target.closest("button"); if (!b) return;
   HIDE = !HIDE;
@@ -875,14 +942,13 @@ $("#hide").addEventListener("click", function(e){
   render();
 });
 
-/* A pick is one checkbox change. Ticking either box unticks the other, because
-   the two states are exclusive; unticking the ticked one puts him back on the
-   board, which is the undo for a misclick on the clock. */
-$("#board").addEventListener("change", function(e){
-  const cb = e.target.closest("input[data-pick]"); if (!cb) return;
-  const tr = cb.closest("tr[data-pid]"); if (!tr) return;
-  const pid = tr.dataset.pid;
-  if (cb.checked) DRAFTED[pid] = cb.dataset.pick; else delete DRAFTED[pid];
+/* One press sets a state, and pressing the lit pill clears it. Pressing the
+   other one switches sides, since the two are exclusive. */
+$("#board").addEventListener("click", function(e){
+  const b = e.target.closest("button[data-pick]"); if (!b) return;
+  const tr = b.closest("tr[data-pid]"); if (!tr) return;
+  const pid = tr.dataset.pid, kind = b.dataset.pick;
+  if (DRAFTED[pid] === kind) delete DRAFTED[pid]; else DRAFTED[pid] = kind;
   saveDraft();
   // Hiding drafted players changes which rows exist, so that one needs a full
   // render; otherwise repaint in place and keep the scroll position.
